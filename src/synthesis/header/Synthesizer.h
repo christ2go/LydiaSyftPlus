@@ -32,6 +32,18 @@ namespace Syft {
         CUDD::BDD winning_move;
     };
 
+    enum class LTLfLabel {
+        GF,
+        FG,
+        G,
+        F,
+    };
+
+    struct LTLfPlus {
+        std::string formula_;
+        LTLfLabel label_;
+    };
+
 /**
  * \brief Abstract class for synthesizers.
  *

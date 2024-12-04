@@ -7,6 +7,7 @@
 #include "Player.h"
 #include "synthesizer/LTLfSynthesizer.h"
 #include "Preprocessing.h"
+#include "synthesizer/LTLfPlusSynthesizer.h"
 
 namespace Syft {
     namespace Test {
@@ -70,5 +71,20 @@ namespace Syft {
 
             return result.realizability;
         }
+
+        bool get_realizability_ltlfplus_from_input(std::map<char, Syft::LTLfPlus> &spec, const std::string &color_formula, const std::vector<std::string> &input_variables,
+                                          const std::vector<std::string> &output_variables) {
+
+
+            Syft::InputOutputPartition partition = Syft::InputOutputPartition::construct_from_input(input_variables,
+                                                                                                    output_variables);
+            Syft::Player starting_player = Syft::Player::Agent;
+            Syft::Player protagonist_player = Syft::Player::Agent;
+            LTLfPlusSynthesizer synthesizer(spec, color_formula, partition, starting_player, protagonist_player,
+                                            SymbolicStateDfa(std::shared_ptr()));
+            Syft::SynthesisResult result = synthesizer.run();
+            return result.realizability;
+        }
+
     }
 }
