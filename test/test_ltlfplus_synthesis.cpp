@@ -23,7 +23,7 @@ TEST_CASE("Game construction of email example", "[game construction]") {
     GFPhi_1.label_ = Syft::LTLfLabel::GF;
     FGPhi_2.formula_ = "b";
     FGPhi_2.label_ = Syft::LTLfLabel::FG;
-    FPhi_3.formula_ = "c";
+    FPhi_3.formula_ = "c U b";
     FPhi_3.label_ = Syft::LTLfLabel::F;
     GPhi_4.formula_ = "d";
     GPhi_4.label_ = Syft::LTLfLabel::G;
@@ -36,6 +36,8 @@ std::map<char, Syft::LTLfPlus> spec = {
     };
 
 bool expected = false;
+   INFO("tested\n");
+    std::cout.flush();
 bool actual = Syft::Test::get_realizability_ltlfplus_from_input(spec, boolean_formula, vars{"d"}, vars{"a", "b", "c"});
 REQUIRE(actual == expected);
 

@@ -7,6 +7,7 @@ add_subdirectory(05_ltlf_synthesis_maximally_permissive)
 add_subdirectory(06_ltlf_synthesis_with_fairness_conditions)
 add_subdirectory(07_ltlf_synthesis_with_stability_conditions)
 add_subdirectory(08_ltlf_synthesis_with_gr1_env_spec)
+add_subdirectory(09_ltlf_plus_synthesis)
 
 add_custom_target(examples)
 
@@ -19,4 +20,5 @@ add_dependencies(examples
     ltlf_synthesis_with_fairness_conditions_example
     ltlf_synthesis_with_stability_conditions_example
     ltlf_synthesis_with_gr1_env_spec_example
+    ltlf_plus_synthesis_example
 )

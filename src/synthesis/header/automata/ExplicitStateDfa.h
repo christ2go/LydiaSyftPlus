@@ -76,6 +76,11 @@ namespace Syft {
          */
         void dfa_print();
 
+        /**
+         * \brief Get final states.
+         */
+        std::vector<size_t> get_final();
+
 
         /**
          * \brief Construct an explicit-state DFA from a given formula using Lydia.
@@ -121,6 +126,16 @@ namespace Syft {
       * \return The restricted explicit-state DFA, which is also minimized.
       */
         static ExplicitStateDfa restrict_dfa_with_states(ExplicitStateDfa &d, std::vector<size_t> states);
+
+        /**
+      * \brief Restrict an explicit-state DFA by redirecting all the outgoing edges of final states to self-loops
+      *
+      * Basically restrict a DFA of an LTLf formula to a DFA of exist LTLf, and return a minimized one.
+      *
+      * \param d The DFA to be restricted.
+      * \return The restricted explicit-state DFA, which is also minimized.
+      */
+        static ExplicitStateDfa restrict_dfa_final_selfloops_only(ExplicitStateDfa &d);
 
         /**
          * \brief Restrict a DFA with a given set of transitions.

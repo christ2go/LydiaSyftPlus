@@ -29,6 +29,10 @@ namespace Syft {
         auto driver = std::make_shared<whitemech::lydia::parsers::ltlf::LTLfDriver>();
         std::vector<Syft::SymbolicStateDfa> vec_spec;
         std::vector<CUDD::BDD> goal_states;
+
+
+        std::cout<<"TTTTTTTTTTTT"<<std::endl;
+        std::cout.flush();
         for (auto const& [key, val] : ltlfplus_spec_)
         {
             std::stringstream formula_stream(val.formula_);
@@ -39,15 +43,42 @@ namespace Syft {
             auto not_end = context->makeLtlfNotEnd();
             parsed_formula = context->makeLtlfAnd({parsed_formula, not_end});;
             Syft::ExplicitStateDfa explicit_dfa = Syft::ExplicitStateDfa::dfa_of_formula(*parsed_formula);
+            explicit_dfa.dfa_print();
+            std::cout.flush();
 
-
-            Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
-                                                                                                  explicit_dfa);
-
-            Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
-                    std::move(explicit_dfa_add));
-            vec_spec.push_back(symbolic_dfa);
             if (val.label_ == LTLfLabel::GF) {
+                Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+                                                                                                      explicit_dfa);
+                Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+                        std::move(explicit_dfa_add));
+                vec_spec.push_back(symbolic_dfa);
+                goal_states.push_back(symbolic_dfa.final_states());
+            } else if (val.label_ == LTLfLabel::FG) {
+                Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+                                                                                                      explicit_dfa);
+                Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+                        std::move(explicit_dfa_add));
+                vec_spec.push_back(symbolic_dfa);
+                goal_states.push_back(!symbolic_dfa.final_states());
+            } else if (val.label_ == LTLfLabel::G) {
+                std::vector<size_t> states_to_keep = explicit_dfa.get_final(); //TODO what about initial?
+                Syft::ExplicitStateDfa trimmed_explicit_dfa = Syft::ExplicitStateDfa::restrict_dfa_with_states(explicit_dfa, states_to_keep);
+                Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+                                                                                                      trimmed_explicit_dfa);
+                Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+                        std::move(explicit_dfa_add));
+                vec_spec.push_back(symbolic_dfa);
+                goal_states.push_back(symbolic_dfa.final_states());
+            } else if (val.label_ == LTLfLabel::F) {
+                std::vector<size_t> final_states = explicit_dfa.get_final();
+                explicit_dfa.dfa_print();
+                std::cout <<"tested\n"<<std::endl;
+                Syft::ExplicitStateDfa trimmed_explicit_dfa = Syft::ExplicitStateDfa::restrict_dfa_final_selfloops_only(explicit_dfa);
+                Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+                                                                                                      trimmed_explicit_dfa);
+                Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+                        std::move(explicit_dfa_add));
+                vec_spec.push_back(symbolic_dfa);
                 goal_states.push_back(symbolic_dfa.final_states());
             }
         }

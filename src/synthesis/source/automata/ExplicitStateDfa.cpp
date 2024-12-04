@@ -16,6 +16,8 @@
 #include "lydia/to_dfa/strategies/compositional/base.hpp"
 #include "lydia/utils/print.hpp"
 
+
+
 #include "cudd.h"
 
 namespace Syft {
@@ -27,6 +29,15 @@ namespace Syft {
                                    names, indices.data());
     }
 
+    std::vector<size_t> ExplicitStateDfa::get_final() {
+        std::vector<size_t> final_states;
+        DFA *dfa = get_dfa();
+        for (int i = 0; i < dfa->ns; i++){
+            if (dfa->f[i] == 1) {
+                final_states.push_back(i);
+            }
+        }
+    }
 
     ExplicitStateDfa ExplicitStateDfa::dfa_of_formula(const whitemech::lydia::LTLfFormula &formula) {
 
@@ -118,6 +129,73 @@ namespace Syft {
         statuses += "+";
         dfaAllocExceptions(0);
         dfaStoreState(new_ns);
+
+        DFA *tmp = dfaBuild(statuses.data());
+        ExplicitStateDfa res1(tmp, d.names);
+        result = dfaMinimize(tmp);
+        ExplicitStateDfa res(result, d.names);
+        return res;
+    }
+
+    ExplicitStateDfa
+    ExplicitStateDfa::restrict_dfa_final_selfloops_only(ExplicitStateDfa &d) {
+        int d_ns = d.get_nb_states();
+        std::vector<size_t> final_states = d.get_final();
+        int n = d.get_nb_variables();
+        int new_len = d.names.size();
+        int state_map[d_ns];
+        memset(state_map, -1, sizeof(state_map));
+
+
+        int index = 0;
+        for (int i = 0; i < d_ns; i++) {
+            state_map[i] = index++;
+        }
+
+        DFA *a = d.dfa_;
+        DFA *result;
+        paths state_paths, pp;
+        std::string statuses;
+
+        int indices[new_len];
+        for (int i = 0; i < d.indices.size(); i++) {
+            indices[i] = d.indices[i];
+        }
+
+        dfaSetup(d_ns + 1, new_len, indices);
+
+        for (int i = 0; i < a->ns; i++) {
+
+            auto it = find(final_states.begin(), final_states.end(), i);
+            // ignore non-final states
+            if (it == final_states.end()) continue;
+
+            int next_state;
+            std::string next_guard;
+
+            auto transitions = std::vector<std::pair<int, std::string>>();
+            state_paths = pp = make_paths(a->bddm, a->q[i]);
+            while (pp) {
+                auto guard = whitemech::lydia::get_path_guard(n, pp->trace);
+                transitions.emplace_back(i, guard);
+                pp = pp->next;
+            }
+
+            statuses += "-";
+            // transitions
+            int nb_transitions = transitions.size();
+            dfaAllocExceptions(nb_transitions);
+            for (const auto &p: transitions) {
+                std::tie(next_state, next_guard) = p;
+                dfaStoreException(state_map[next_state], next_guard.data());
+            }
+            dfaStoreState(d_ns);
+            kill_paths(state_paths);
+        }
+
+        statuses += "+";
+        dfaAllocExceptions(0);
+        dfaStoreState(d_ns);
 
         DFA *tmp = dfaBuild(statuses.data());
         ExplicitStateDfa res1(tmp, d.names);
