@@ -64,7 +64,7 @@ namespace Syft::Test {
   bool get_realizability_from_input(const std::string& formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables);
   bool get_realizability(const whitemech::lydia::ltlf_ptr & formula, const Syft::InputOutputPartition& partition);
 
-  bool get_realizability_ltlfplus_from_input(std::map<char, Syft::LTLfPlus> spec, const std::string& color_formula,
+  bool get_realizability_ltlfplus_from_input(std::map<char, Syft::LTLfPlus>& spec, const std::string& color_formula,
                                              const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables);
 }
 

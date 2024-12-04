@@ -4,6 +4,7 @@
 
 #include "synthesizer/LTLfPlusSynthesizer.h"
 #include "lydia/parser/ltlf/driver.hpp"
+#include "game/EmersonLei.hpp"
 #include <sstream>
 #include <cassert>
 
@@ -38,6 +39,8 @@ namespace Syft {
             auto not_end = context->makeLtlfNotEnd();
             parsed_formula = context->makeLtlfAnd({parsed_formula, not_end});;
             Syft::ExplicitStateDfa explicit_dfa = Syft::ExplicitStateDfa::dfa_of_formula(*parsed_formula);
+
+
             Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
                                                                                                   explicit_dfa);
 
@@ -50,8 +53,8 @@ namespace Syft {
         }
 
         SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
-        EmersonLei solver(arena, starting_player_, protagonist_player_,
-                            goal_states_);
+        EmersonLei solver(arena, color_formula_, starting_player_, protagonist_player_,
+        goal_states, var_mgr_->cudd_mgr()->bddOne());
         return solver.run();
 
     }

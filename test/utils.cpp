@@ -80,8 +80,7 @@ namespace Syft {
                                                                                                     output_variables);
             Syft::Player starting_player = Syft::Player::Agent;
             Syft::Player protagonist_player = Syft::Player::Agent;
-            LTLfPlusSynthesizer synthesizer(spec, color_formula, partition, starting_player, protagonist_player,
-                                            SymbolicStateDfa(std::shared_ptr()));
+            LTLfPlusSynthesizer synthesizer(spec, color_formula, partition, starting_player, protagonist_player);
             Syft::SynthesisResult result = synthesizer.run();
             return result.realizability;
         }
