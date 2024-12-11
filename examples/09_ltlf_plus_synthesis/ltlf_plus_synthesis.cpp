@@ -8,7 +8,7 @@
 #include <lydia/parser/ltlf/driver.hpp>
 
 #include "automata/SymbolicStateDfa.h"
-#include "synthesizer/LTLfSynthesizer.h"
+#include "synthesizer/LTLfPlusSynthesizer.h"
 #include "Player.h"
 #include "VarMgr.h"
 #include "Utils.h"
@@ -17,61 +17,36 @@
 
 int main(int argc, char ** argv) {
 
-    // parse TLSF file
-    std::filesystem::path ROOT_DIRECTORY = __ROOT_DIRECTORY;
-    std::filesystem::path tlsf_file_test = ROOT_DIRECTORY / "examples" / "test1.tlsf";
-    auto driver = std::make_shared<whitemech::lydia::parsers::ltlf::LTLfDriver>();
-    Syft::TLSFArgs args = Syft::parse_tlsf(driver, tlsf_file_test.string());
-    std::cout << "TLSF file parsed: " << tlsf_file_test.string() << std::endl;
-    std::cout << "Starting Player: " << (args.protagonist_player == Syft::Player::Agent? "Agent" : "Environment") << std::endl;
-    std::cout << "Protagonist Player: " << (args.starting_player == Syft::Player::Agent? "Agent" : "Environment") << std::endl;
-    std::cout << "Input variables: ";
-    for (const auto& var : args.partition.input_variables){
-        std::cout << var << ", ";
-    }
-    std::cout << std::endl;
-    std::cout << "Output variables: ";
-    for (const auto& var : args.partition.output_variables){
-        std::cout << var << ", ";
-    }
-    std::cout << std::endl;
+    std::string color_formula = "1 & !2 & (3 | 4)";
+    Syft::LTLfPlus GFPhi_1, FGPhi_2, FPhi_3, GPhi_4;
 
-    // build variable manager
-    auto var_mgr = Syft::build_var_mgr(args.partition);
+    GFPhi_1.label_ = Syft::LTLfLabel::GF;
+    GFPhi_1.formula_ = "a";
 
+    FGPhi_2.label_ = Syft::LTLfLabel::FG;
+    FGPhi_2.formula_ = "b";
 
-    // do preprocessing before constructing the entire DFA
-    auto one_step_result = Syft::preprocessing(*args.formula, args.partition, *var_mgr, args.starting_player);
-    bool preprocessing_success = one_step_result.realizability.has_value();
-    if (preprocessing_success) {
-        std::cout << "Preprocessing successful" << std::endl;
-    }
-    else {
-        std::cout << "Preprocessing not successful, continuing with full synthesis" << std::endl;
-    }
+    FPhi_3.label_ = Syft::LTLfLabel::G;
+    FPhi_3.formula_ = "Fc";
 
-    if (preprocessing_success and one_step_result.realizability.value()) {
-        std::cout << "Specification is realizable in one step!";
-        CUDD::BDD move = one_step_result.winning_move;
-        var_mgr->dump_dot(move.Add(), "test1_winning_move.dot");
-    }
+    GPhi_4.label_ = Syft::LTLfLabel::F;
+    GPhi_4.formula_ = "Gd";
 
-    std::cout << "Building DFA of the formula..." << std::endl;
-    Syft::SymbolicStateDfa dfa = Syft::do_dfa_construction(*args.formula, var_mgr);
+    std::map<char, Syft::LTLfPlus> spec = {
+            { '1', GFPhi_1},
+            { '2', FGPhi_2},
+            { '3', FPhi_3},
+            { '4', GPhi_4}
+    };
+    std::vector<std::string> input_variables{"d"};
+    std::vector<std::string> output_variables{"a", "b", "c"};
 
-    std::cout << "Solving the DFA game..." << std::endl;
-    var_mgr->partition_variables(args.partition.input_variables, args.partition.output_variables);
-    Syft::LTLfSynthesizer synthesizer(dfa, args.starting_player, args.protagonist_player, dfa.final_states(), var_mgr->cudd_mgr()->bddOne());
+    Syft::InputOutputPartition partition = Syft::InputOutputPartition::construct_from_input(input_variables,
+                                                                                            output_variables);
+    Syft::Player starting_player = Syft::Player::Agent;
+    Syft::Player protagonist_player = Syft::Player::Agent;
+    Syft::LTLfPlusSynthesizer synthesizer(spec, color_formula, partition, starting_player, protagonist_player);
     Syft::SynthesisResult result = synthesizer.run();
-    if (result.realizability) {
-        std::cout << "Specification is realizable!" << std::endl;
-        std::cout << "Printing the strategy in DOT format..." << std::endl;
-        result.transducer->dump_dot("test1_winning_strategy.dot");
-    }
-    else {
-        std::cout << "Specification is unrealizable!" << std::endl;
-    }
-
 
 }
 
