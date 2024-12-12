@@ -16,7 +16,7 @@
 
 
 int main(int argc, char ** argv) {
-
+    // GFPhi_1 & FGPhi_2 & (FPhi_3 | GPhi_4)
     std::string color_formula = "1 & !2 & (3 | 4)";
     Syft::LTLfPlus GFPhi_1, FGPhi_2, FPhi_3, GPhi_4;
 
