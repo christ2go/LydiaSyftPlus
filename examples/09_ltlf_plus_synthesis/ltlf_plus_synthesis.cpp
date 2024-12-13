@@ -38,8 +38,8 @@ int main(int argc, char ** argv) {
             { '3', FPhi_3},
             { '4', GPhi_4}
     };
-    std::vector<std::string> input_variables{"d"};
-    std::vector<std::string> output_variables{"a", "b", "c"};
+    std::vector<std::string> input_variables{"d", "c", "a"};
+    std::vector<std::string> output_variables{"b"};
 
     Syft::InputOutputPartition partition = Syft::InputOutputPartition::construct_from_input(input_variables,
                                                                                             output_variables);
@@ -47,6 +47,11 @@ int main(int argc, char ** argv) {
     Syft::Player protagonist_player = Syft::Player::Agent;
     Syft::LTLfPlusSynthesizer synthesizer(spec, color_formula, partition, starting_player, protagonist_player);
     Syft::SynthesisResult result = synthesizer.run();
+    if (result.realizability == true) {
+        std::cout<< "Realizable" <<std::endl;
+    } else {
+        std::cout<< "Unrealizable" <<std::endl;
+    }
 
 }
 

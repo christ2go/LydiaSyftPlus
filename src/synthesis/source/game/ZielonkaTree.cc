@@ -49,8 +49,8 @@ void ZielonkaTree::generate() {
                     .parent = current,
                     .parent_order = current->order,
                     .label = color_set,
-                    .avoidnodes = current->avoidnodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_),
-		            .targetnodes = current->avoidnodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_),
+                    .avoidnodes = current->avoidnodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
+		            .targetnodes = current->avoidnodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
                     .level = current->level + 1,
                     .order = order++,
                     .winning = !(current->winning)
@@ -80,8 +80,8 @@ void ZielonkaTree::generate_parity() {
             .parent = current,
             .parent_order = current->order,
             .label = colors,
-            .avoidnodes = current->avoidnodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_),
-	        .targetnodes = current->avoidnodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_),
+            .avoidnodes = current->avoidnodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
+	        .targetnodes = current->avoidnodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
             .level = current->level + 1,
             .order = order++,
             .winning = !(current->winning)
@@ -220,7 +220,7 @@ void ZielonkaTree::graphZielonkaTree() {
 // Public
 ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CUDD::BDD> &colorBDDs, std::shared_ptr<Syft::VarMgr> var_mgr) :  colorBDDs_(colorBDDs), var_mgr_(var_mgr){
     generate_phi_from_str(color_formula);
-    std::vector<bool> label( colorBDDs.size(), true);
+    std::vector<bool> label( colorBDDs.size()/2, true);
     root = new ZielonkaNode {
         .children  = {},
         .parent = nullptr,

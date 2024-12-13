@@ -38,21 +38,22 @@ namespace ELHelpers {
     }
 
 
-    inline CUDD::BDD unionOf(const std::vector<bool>& col, const std::vector<CUDD::BDD>& colorBDDs) {
+    inline CUDD::BDD unionOf(const std::vector<bool>& col, const std::vector<CUDD::BDD>& colorBDDs, std::shared_ptr<Syft::VarMgr>& var_mgr_) {
         // return union of all color bdds indicated by col
 //        CUDD::BDD result = mgr_.bddZero();
-        CUDD::BDD result = colorBDDs[0];
-        for (size_t i = 1; i < col.size(); ++i){
+
+        CUDD::BDD result = var_mgr_->cudd_mgr()->bddZero();
+        for (size_t i = 0; i < col.size(); ++i){
             if (col[i])
             result |= colorBDDs[i]; // result = result | NodesThatSeeColor(i)
         }
         return result;
     }
 
-    inline CUDD::BDD negIntersectionOf(const std::vector<bool>& col, const std::vector<CUDD::BDD>& colorBDDs) {
+    inline CUDD::BDD negIntersectionOf(const std::vector<bool>& col, const std::vector<CUDD::BDD>& colorBDDs, std::shared_ptr<Syft::VarMgr>& var_mgr_) {
         // return intersection of all negated color bdds indicated by col
-        CUDD::BDD result = colorBDDs[0];
-        for (size_t i = 1; i < col.size(); ++i){
+        CUDD::BDD result = var_mgr_->cudd_mgr()->bddOne();
+        for (size_t i = 0; i < col.size()/2; ++i){
             if (col[i])
             result &= (colorBDDs[colorBDDs.size()/2 + i]); // result = result & NodesThatDoNotSeeColor(i)
         }

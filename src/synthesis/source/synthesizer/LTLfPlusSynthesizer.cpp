@@ -85,8 +85,17 @@ namespace Syft {
                 goal_states.push_back(symbolic_dfa.final_states());
             }
         }
+        std::size_t n_colors = goal_states.size();
+        for (auto i = 0; i < n_colors; i++){
+            goal_states.push_back(!goal_states[i]);
+        }
+
+        for (auto j = 0; j < vec_spec.size(); j++) {
+            vec_spec[j].dump_dot("dfa"+std::to_string(j)+".dot");
+        }
 
         SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
+        arena.dump_dot("arena.dot");
         EmersonLei solver(arena, color_formula_, starting_player_, protagonist_player_,
         goal_states, var_mgr_->cudd_mgr()->bddOne());
         return solver.run();
