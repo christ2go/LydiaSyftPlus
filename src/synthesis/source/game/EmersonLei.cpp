@@ -14,9 +14,14 @@ namespace Syft {
 	}
 	
 	SynthesisResult EmersonLei::run() const {
+        std::cout << "Colors: \n";
+        for (size_t i = 0; i < Colors_.size(); i++){
+            std::cout << Colors_[i] << '\n';
+        }
 
 		// build Zielonka tree; parse formula from PHI_FILE, number of colors taken from colorBDDs
 		ZielonkaTree *Ztree = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
+
 
 		// solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
 		CUDD::BDD winning_states = EmersonLeiSolve(Ztree->get_root(), var_mgr_->cudd_mgr()->bddZero());
@@ -47,7 +52,7 @@ namespace Syft {
                 CUDD::BDD new_target_moves = target |
                                     (state_space_ & (!target) & quantified_X_transitions_to_winning_states);
 
-                result = project_into_states(quantified_X_transitions_to_winning_states);
+                result = project_into_states(new_target_moves);
             } else {
                 CUDD::BDD transitions_to_target_states = preimage(target);
                 CUDD::BDD new_collected_target_states = project_into_states(transitions_to_target_states);
@@ -55,7 +60,7 @@ namespace Syft {
                 CUDD::BDD new_target_moves = target |
                                     ((!target) & new_collected_target_states & transitions_to_target_states);
             }
-	
+	    std::cout << "cpre: " << result << "\n";
 	    return result;
 	}
 
@@ -64,42 +69,45 @@ namespace Syft {
 
 	    // initialize variable for fixpoint computation (lfp/gfp)
             if (t->winning) {
-                X = var_mgr_->cudd_mgr()->bddZero();
-            } else {
                 X = var_mgr_->cudd_mgr()->bddOne();
+            } else {
+                X = var_mgr_->cudd_mgr()->bddZero();
             }
 
 	    // loop until fixpoint has stabilized
       	    while (true) {
+                std::cout << "Node: " << t->order << "\n";
+                std::cout << X << "\n";
 
 		// if t is a leaf
                 if (t->children.empty()) { 
-                    XX = term | t->avoidnodes & cpre(X);
+                    XX = term | (t->avoidnodes & cpre(X));
                 }
 
 		// if t is not a leaf
                 else {
 
 		    // initialize intersecion/union
-                    if (t->winning)
-                        XX = var_mgr_->cudd_mgr()->bddOne();
-                    else
-                        XX = var_mgr_->cudd_mgr()->bddZero();
+                    if (t->winning) {
+                        XX = var_mgr_->cudd_mgr()->bddOne(); }
+                    else {
+                        XX = var_mgr_->cudd_mgr()->bddZero(); }
 
 		    // iterate over direct children of t
                     for (auto s : t->children) { 
 
 			// add new choice to term
-                        term |= s->targetnodes & cpre(X);
+                        CUDD::BDD current_term = term | (s->targetnodes & cpre(X));
+//                        term |= s->targetnodes & cpre(X);
 
-                        CUDD::BDD U = EmersonLeiSolve(s, term);
+//                        CUDD::BDD U = EmersonLeiSolve(s, term);
 
                         if (t->winning) {
 			    // intersect with recursively computed solution for s and new term
-                            XX &= EmersonLeiSolve(s, term);
+                            XX &= EmersonLeiSolve(s, current_term);
                         } else {
 			    // union with recursively computed solution for s and new term
-                            XX |= EmersonLeiSolve(s, term);
+                            XX |= EmersonLeiSolve(s, current_term);
                         }
                     }
                 }

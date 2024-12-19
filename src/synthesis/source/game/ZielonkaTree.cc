@@ -170,36 +170,41 @@ void printNTree(ZielonkaNode* x, std::vector<bool> flag, int depth = 0, bool isL
         // is exploring
         if (flag[i] == true) {
             std::cout << "│ "
-                << " "
-                << " "
-                << " ";
+                      << " "
+                      << " "
+                      << " ";
         }
-        // Otherwise print 
-        // the blank spaces
+            // Otherwise print
+            // the blank spaces
         else {
             std::cout << " "
-                << " "
-                << " "
-                << " ";
+                      << " "
+                      << " "
+                      << " ";
         }
     }
     // Condition when the current
     // node is the root node
-    if (depth == 0)
-        std::cout << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
-
+    if (depth == 0) {
+        std::cout << label_to_string(x->label) << " " << (x->winning ? 'W' : 'L') << '\n';
+        std::cout << " target nodes: " << x->targetnodes << '\n';
+        std::cout << " avoid nodes: " << x->avoidnodes << '\n';
+    }
     // Condition when the node is 
     // the last node of 
     // the exploring depth
     else if (isLast) {
         std::cout << "└── " << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
-         
+        std::cout << " target nodes: " << x->targetnodes << '\n';
+        std::cout << " avoid nodes: " << x->avoidnodes << '\n';
         // No more childrens turn it 
         // to the non-exploring depth
         flag[depth] = false;
     }
     else {
         std::cout << "├── " << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
+        std::cout << " target nodes: " << x->targetnodes << '\n';
+        std::cout << " avoid nodes: " << x->avoidnodes << '\n';
     }
  
     size_t it = 0;
@@ -226,8 +231,8 @@ ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CU
         .parent = nullptr,
         .parent_order = 0,
         .label = label,
-	.avoidnodes = var_mgr_->cudd_mgr()->bddOne(),
-	.targetnodes = var_mgr_->cudd_mgr()->bddOne(),
+	    .avoidnodes = var_mgr_->cudd_mgr()->bddOne(),
+	    .targetnodes = var_mgr_->cudd_mgr()->bddOne(),
         .level = 1,
         .order = 1,
         .winning = evaluate_phi(label)

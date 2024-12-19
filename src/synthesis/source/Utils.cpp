@@ -89,6 +89,7 @@ namespace Syft {
     Syft::SymbolicStateDfa
     do_dfa_construction(const whitemech::lydia::LTLfFormula &formula, const std::shared_ptr<Syft::VarMgr> &var_mgr) {
         Syft::ExplicitStateDfa explicit_dfa_mona = Syft::ExplicitStateDfa::dfa_of_formula(formula);
+        std::cout << "Number of states in the explicit-state DFA: "<<explicit_dfa_mona.get_nb_states()<<std::endl;
         Syft::ExplicitStateDfaAdd explicit_dfa = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr, explicit_dfa_mona);
         Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(explicit_dfa);
         return symbolic_dfa;
