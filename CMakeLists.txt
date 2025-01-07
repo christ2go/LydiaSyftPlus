@@ -32,24 +32,24 @@ endif()
 find_package(mona REQUIRED)
 
 
-if (NOT DEFINED Z3_FETCH)
-  set(Z3_FETCH ON)
-endif()
-
-if (Z3_FETCH)
-  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project will be fetched and built from source")
-  set(Z3_BUILD_LIBZ3_SHARED OFF)
-  FetchContent_Declare(z3
-      GIT_REPOSITORY https://github.com/Z3Prover/z3
-      GIT_TAG        z3-4.8.12
-      )
-  FetchContent_MakeAvailable(z3)
-  set(Z3_INCLUDE_DIR ${z3_SOURCE_DIR}/src/api/c++)
-  set(Z3_LIBRARY libz3)
-else()
-  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project is assumed to be found in the local filesystem")
-  find_package(Z3 REQUIRED)
-endif()
+#if (NOT DEFINED Z3_FETCH)
+#  set(Z3_FETCH ON)
+#endif()
+#
+#if (Z3_FETCH)
+#  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project will be fetched and built from source")
+#  set(Z3_BUILD_LIBZ3_SHARED OFF)
+#  FetchContent_Declare(z3
+#      GIT_REPOSITORY https://github.com/Z3Prover/z3
+#      GIT_TAG        z3-4.8.12
+#      )
+#  FetchContent_MakeAvailable(z3)
+#  set(Z3_INCLUDE_DIR ${z3_SOURCE_DIR}/src/api/c++)
+#  set(Z3_LIBRARY libz3)
+#else()
+#  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project is assumed to be found in the local filesystem")
+#  find_package(Z3 REQUIRED)
+#endif()
 
 if (NOT DEFINED LYDIASYFT_ENABLE_TESTS)
   set(LYDIASYFT_ENABLE_TESTS ON)
@@ -85,7 +85,7 @@ set(EXT_INCLUDE_PATH ${LYDIA_INCLUDE_DIR} ${LYDIA_THIRD_PARTY_INCLUDE_PATH} ${CU
 
 message(STATUS EXT_LIBRARIES_PATH ${EXT_LIBRARIES_PATH})
 
-enable_testing()
+#enable_testing()
 
 add_subdirectory(src)
 
