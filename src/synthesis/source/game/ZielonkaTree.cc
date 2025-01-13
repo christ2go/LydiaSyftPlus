@@ -45,24 +45,28 @@ void ZielonkaTree::generate() {
             if (evaluate_phi(color_set) != current->winning) {
                 ZielonkaNode *child_zn = new ZielonkaNode {
                     .children = {},
-//                    .parentdiff = ELHelpers::label_difference(current->label, color_set),
                     .parent = current,
                     .parent_order = current->order,
                     .label = color_set,
-                    .avoidnodes = current->avoidnodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
-		            .targetnodes = current->avoidnodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
+            	    .winningmoves = {},
+                    .safenodes = current->safenodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
+		            .targetnodes = current->safenodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
                     .level = current->level + 1,
                     .order = order++,
                     .winning = !(current->winning)
                 };
+                child_zn->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 seen_from_parent.push_back(color_set);
                 current->children.push_back(child_zn);
+                current->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 q.push(child_zn);
             }
         }
         if (current->children.empty()) leaves++;
     }
     //std::cout << "done generating...\n";
+    //TODO
+    // for every node, add another vector that stores its ancestor nodes
 }
 void ZielonkaTree::generate_parity() {
     // firstly evaluate root, then remove the last color from the current colorset
@@ -76,12 +80,12 @@ void ZielonkaTree::generate_parity() {
         colors[i] = false;
         ZielonkaNode *child_zn = new ZielonkaNode {
             .children = {},
-//            .parentdiff = ELHelpers::label_difference(current->label, colors),
             .parent = current,
             .parent_order = current->order,
             .label = colors,
-            .avoidnodes = current->avoidnodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
-	        .targetnodes = current->avoidnodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
+       	    .winningmoves = {},
+            .safenodes = current->safenodes & ELHelpers::negIntersectionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
+	        .targetnodes = current->safenodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
             .level = current->level + 1,
             .order = order++,
             .winning = !(current->winning)
@@ -188,7 +192,7 @@ void printNTree(ZielonkaNode* x, std::vector<bool> flag, int depth = 0, bool isL
     if (depth == 0) {
         std::cout << label_to_string(x->label) << " " << (x->winning ? 'W' : 'L') << '\n';
         std::cout << " target nodes: " << x->targetnodes << '\n';
-        std::cout << " avoid nodes: " << x->avoidnodes << '\n';
+        std::cout << " safe nodes: " << x->safenodes << '\n';
     }
     // Condition when the node is 
     // the last node of 
@@ -196,7 +200,7 @@ void printNTree(ZielonkaNode* x, std::vector<bool> flag, int depth = 0, bool isL
     else if (isLast) {
         std::cout << "└── " << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
         std::cout << " target nodes: " << x->targetnodes << '\n';
-        std::cout << " avoid nodes: " << x->avoidnodes << '\n';
+        std::cout << " safe nodes: " << x->safenodes << '\n';
         // No more childrens turn it 
         // to the non-exploring depth
         flag[depth] = false;
@@ -204,7 +208,7 @@ void printNTree(ZielonkaNode* x, std::vector<bool> flag, int depth = 0, bool isL
     else {
         std::cout << "├── " << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
         std::cout << " target nodes: " << x->targetnodes << '\n';
-        std::cout << " avoid nodes: " << x->avoidnodes << '\n';
+        std::cout << " safe nodes: " << x->safenodes << '\n';
     }
  
     size_t it = 0;
@@ -231,7 +235,8 @@ ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CU
         .parent = nullptr,
         .parent_order = 0,
         .label = label,
-	    .avoidnodes = var_mgr_->cudd_mgr()->bddOne(),
+	    .winningmoves = {},
+	    .safenodes = var_mgr_->cudd_mgr()->bddOne(),
 	    .targetnodes = var_mgr_->cudd_mgr()->bddOne(),
         .level = 1,
         .order = 1,

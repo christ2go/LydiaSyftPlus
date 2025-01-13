@@ -9,12 +9,15 @@ struct ZielonkaNode {
     std::vector<ZielonkaNode*> children;
     ZielonkaNode *parent;
     size_t parent_order;
+    size_t sibling_order;
     std::vector<bool> label;
-    CUDD::BDD avoidnodes;
+    std::vector<CUDD::BDD> winningmoves;
+    CUDD::BDD safenodes;
     CUDD::BDD targetnodes;
     size_t level;
     size_t order;
     bool winning;
+    // std::vector<ZielonkaNode*> ancestors;
 };
 
 class ZielonkaTree {
