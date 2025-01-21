@@ -44,6 +44,7 @@ namespace Syft {
 		}
 	}
 
+	/*
 CUDD::BDD EmersonLei::ExtractStrategy(SynthesisResult* result, ZielonkaNode *t) const {
 //		v: game node, t: tree node, s (anchor node): lowest ancester of t that includes all colors of v
 	ZielonkaNode *s = get_anchor(v, t)
@@ -84,7 +85,7 @@ CUDD::BDD EmersonLei::ExtractStrategy(SynthesisResult* result, ZielonkaNode *t) 
 //		    strategy(v,t) = pick one of (s->winningmoves(v)), (index of branch with picked move).
 		}
 	}
-
+*/
 
 
 	CUDD::BDD EmersonLei::cpre(ZielonkaNode *t, int i, CUDD::BDD target) const {
@@ -99,13 +100,13 @@ CUDD::BDD EmersonLei::ExtractStrategy(SynthesisResult* result, ZielonkaNode *t) 
 				// CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
 				if (t->winning) {
 					CUDD::BDD new_target_moves =  (state_space_ & quantified_X_transitions_to_winning_states);
-					result = project_into_states(new_target_moves);
+					result = target | project_into_states(new_target_moves);
 					// CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
             		t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
         		} else {
         			CUDD::BDD new_target_moves =
 									(state_space_ & (!target) & quantified_X_transitions_to_winning_states);
-        			result = project_into_states(new_target_moves);
+        			result = target | project_into_states(new_target_moves);
         			// CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
             		t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
         		}
