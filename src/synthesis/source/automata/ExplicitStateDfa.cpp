@@ -4,14 +4,20 @@
 #include <istream>
 #include <queue>
 #include <set>
-#include <bits/stdc++.h>
-#include <tuple>
+// #include <bits/stdc++.h>
+
+#include <vector>
+#include <algorithm>
+#include <cstring>
+#include <string>
+#include <bitset>
 #include <unordered_map>
+#include <unordered_set>
+#include <tuple>
 #include "lydia/mona_ext/mona_ext_base.hpp"
 #include "lydia/dfa/mona_dfa.hpp"
 #include "lydia/logic/to_ldlf.hpp"
 #include "lydia/parser/ldlf/driver.cpp"
-#include "lydia/parser/ltlf/driver.cpp"
 #include "lydia/to_dfa/core.hpp"
 #include "lydia/to_dfa/strategies/compositional/base.hpp"
 #include "lydia/utils/print.hpp"
