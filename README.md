@@ -149,8 +149,9 @@ sudo cp include/*.h /usr/local/include
 
 ## Build LydiaSyftEL
 
-1. `mkdir build && cd build`
-2. `cmake .. && make -j2`
+1. Add `submodules` using: i. `git clone https://github.com/GianmarcoDIAG/lydia.git --recursive` ii. `git clone https://github.com/VerifiableRobotics/slugs --recursive` and iii. `https://github.com/jothepro/doxygen-awesome-css.git --recursive` (note that standard version of Lydia does not work. You need Lydia's version in the project mention in i.)
+2. `mkdir build && cd build`
+3. `cmake .. && make -j2`
 
 ## Run LydiaSyftEL
 
