@@ -147,6 +147,32 @@ sudo cp bin/libz3.a /usr/local/lib
 sudo cp include/*.h /usr/local/include
 ```
 
+## Build LydiaSyftEL
+
+1. `mkdir build && cd build`
+2. `cmake .. && make -j2`
+
+## Running LydiaSyftEL
+
+This is the output of `LydiaSyftEL --help`
+
+```
+LydiaSyft-EL: A compositional synthesizer of LTLf+
+Usage: ./LydiaSyftEL [OPTIONS]
+
+Options:
+  -h,--help                   Print this help message and exit
+  -i,--input-file TEXT:FILE REQUIRED
+                              Path to LTLf+ formula file
+  -p,--partition-file TEXT:FILE REQUIRED
+                              Path to partition file
+  -s,--starting-player INT REQUIRED
+                              Starting player:
+                              agent=1;
+                              environment=0.
+```
+
+
 
 ## Build LydiaSyft
 
