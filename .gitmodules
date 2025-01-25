@@ -1,6 +1,6 @@
 [submodule "submodules/lydia"]
 	path = submodules/lydia
-	url = https://github.com/GianmarcoDIAG/lydia
+	url = https://github.com/GianmarcoDIAG/lydia/tree/main
 [submodule "submodules/slugs"]
 	path = submodules/slugs
 	url = https://github.com/VerifiableRobotics/slugs
