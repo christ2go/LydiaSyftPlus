@@ -8,8 +8,17 @@
 #include "automata/SymbolicStateDfa.h"
 #include "Synthesizer.h"
 #include "game/InputOutputPartition.h"
+#include "lydia/parser/ltlf/driver.hpp"
+#include "lydia/logic/ltlfplus/base.hpp"
+#include "lydia/logic/pnf.hpp"
+#include "lydia/parser/ltlfplus/driver.hpp"
+#include "lydia/utils/print.hpp"
 
 namespace Syft {
+
+    typedef whitemech::lydia::ltlf_plus_ptr ltlf_plus_ptr;
+    typedef whitemech::lydia::ltlf_ptr ltlf_ptr;
+    typedef whitemech::lydia::PrefixQuantifier PrefixQuantifier;
 
     class LTLfPlusSynthesizer {
     private:
@@ -20,7 +29,11 @@ namespace Syft {
         /**
          * \brief
          */
-        std::map<char, Syft::LTLfPlus> ltlfplus_spec_;
+        std::unordered_map<ltlf_plus_ptr, std::string> formula_to_color_;
+        /**
+         * \brief
+         */
+        std::unordered_map<ltlf_plus_ptr, PrefixQuantifier> formula_to_quantification_;
         /**
          * \brief The player that moves first each turn.
          */
@@ -39,10 +52,14 @@ namespace Syft {
         /**
          * \brief Construct an LtlfPlusSynthesizer.
          */
-        LTLfPlusSynthesizer(std::map<char, Syft::LTLfPlus> &ltlfplus_spec,
-                            const std::string &color_formula,
-                            const Syft::InputOutputPartition partition, Player starting_player,
-                            Player protagonist_player);
+        LTLfPlusSynthesizer(
+            std::unordered_map<ltlf_plus_ptr, std::string> formula_to_color,
+            std::unordered_map<ltlf_plus_ptr, PrefixQuantifier> formula_to_quantification,
+            const std::string &color_formula,
+            const Syft::InputOutputPartition partition, 
+            Player starting_player,
+            Player protagonist_player
+        );
 
         /**
          * \brief Solves the LTLfPlus synthesis problem.
