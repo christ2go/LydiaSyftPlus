@@ -43,7 +43,10 @@ namespace Syft {
 		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space);
 
         CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
-        CUDD::BDD cpre(CUDD::BDD target) const;
+        CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
+		ZielonkaNode* get_next_t(CUDD::BDD state, ZielonkaNode *anchor_node, ZielonkaNode *current_node, CUDD::BDD Y) const;
+
+		ZielonkaNode* get_anchor(ZielonkaNode *root, ZielonkaNode *current_node, CUDD::BDD Y) const;
 		
 		
 		/**
