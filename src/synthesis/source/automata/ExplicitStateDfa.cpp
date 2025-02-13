@@ -5,34 +5,19 @@
 #include <queue>
 #include <set>
 // #include <bits/stdc++.h>
-#include <iostream>
+
 #include <vector>
-#include <queue>
-#include <stack>
-#include <map>
-#include <set>
 #include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <string>
 #include <bitset>
-#include <functional>
-#include <iomanip>
-#include <limits>
-#include <numeric>
-#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
-
-
 #include <tuple>
-#include <unordered_map>
 #include "lydia/mona_ext/mona_ext_base.hpp"
 #include "lydia/dfa/mona_dfa.hpp"
 #include "lydia/logic/to_ldlf.hpp"
 #include "lydia/parser/ldlf/driver.cpp"
-#include "lydia/parser/ltlf/driver.cpp"
 #include "lydia/to_dfa/core.hpp"
 #include "lydia/to_dfa/strategies/compositional/base.hpp"
 #include "lydia/utils/print.hpp"
