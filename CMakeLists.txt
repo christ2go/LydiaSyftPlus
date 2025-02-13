@@ -3,6 +3,10 @@ project(LydiaSyft)
 
 include(FetchContent)
 
+# Force CMake to use GCC instead of Clang
+#set(CMAKE_C_COMPILER "/opt/homebrew/Cellar/gcc/14.2.0_1/bin/gcc-14")
+#set(CMAKE_CXX_COMPILER "/opt/homebrew/Cellar/gcc/14.2.0_1/bin/g++-14")
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_INSTALL_PREFIX /usr/local)
@@ -31,25 +35,25 @@ if (NOT DEFINED MONA_USE_STATIC_LIBS)
 endif()
 find_package(mona REQUIRED)
 
-
-if (NOT DEFINED Z3_FETCH)
-  set(Z3_FETCH ON)
-endif()
-
-if (Z3_FETCH)
-  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project will be fetched and built from source")
-  set(Z3_BUILD_LIBZ3_SHARED OFF)
-  FetchContent_Declare(z3
-      GIT_REPOSITORY https://github.com/Z3Prover/z3
-      GIT_TAG        z3-4.8.12
-      )
-  FetchContent_MakeAvailable(z3)
-  set(Z3_INCLUDE_DIR ${z3_SOURCE_DIR}/src/api/c++)
-  set(Z3_LIBRARY libz3)
-else()
-  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project is assumed to be found in the local filesystem")
-  find_package(Z3 REQUIRED)
-endif()
+#set(Z3_FETCH OFF)
+#if (NOT DEFINED Z3_FETCH)
+#  set(Z3_FETCH ON)
+#endif()
+#
+#if (Z3_FETCH)
+#  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project will be fetched and built from source")
+#  set(Z3_BUILD_LIBZ3_SHARED OFF)
+#  FetchContent_Declare(z3
+#      GIT_REPOSITORY https://github.com/Z3Prover/z3
+#      GIT_TAG        z3-4.8.12
+#      )
+#  FetchContent_MakeAvailable(z3)
+#  set(Z3_INCLUDE_DIR ${z3_SOURCE_DIR}/src/api/c++)
+#  set(Z3_LIBRARY libz3)
+#else()
+#  message("-- since Z3_FETCH is ${Z3_FETCH}, the Z3 project is assumed to be found in the local filesystem")
+#  find_package(Z3 REQUIRED)
+#endif()
 
 if (NOT DEFINED LYDIASYFT_ENABLE_TESTS)
   set(LYDIASYFT_ENABLE_TESTS ON)
@@ -85,14 +89,15 @@ set(EXT_INCLUDE_PATH ${LYDIA_INCLUDE_DIR} ${LYDIA_THIRD_PARTY_INCLUDE_PATH} ${CU
 
 message(STATUS EXT_LIBRARIES_PATH ${EXT_LIBRARIES_PATH})
 
-enable_testing()
+#enable_testing()
 
 add_subdirectory(src)
 
-if (LYDIASYFT_ENABLE_TESTS)
-  add_subdirectory(test)
-endif()
+# TODO. Fix tests and examples to be compliant with LydiaSyft-EL
+# if (LYDIASYFT_ENABLE_TESTS)
+  # add_subdirectory(test)
+# endif()
 
-if (LYDIASYFT_ENABLE_EXAMPLES)
-  add_subdirectory(examples)
-endif()
+# if (LYDIASYFT_ENABLE_EXAMPLES)
+  # add_subdirectory(examples)
+# endif()

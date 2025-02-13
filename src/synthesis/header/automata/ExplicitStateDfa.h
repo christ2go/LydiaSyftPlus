@@ -76,6 +76,15 @@ namespace Syft {
          */
         void dfa_print();
 
+        /**
+         * \brief Get final states.
+         */
+        std::vector<size_t> get_final();
+
+        /**
+         * \brief Get the initial state.
+         */
+        std::size_t get_initial();
 
         /**
          * \brief Construct an explicit-state DFA from a given formula using Lydia.
@@ -112,15 +121,24 @@ namespace Syft {
 
 
         /**
-      * \brief Restrict an explicit-state DFA with a given set of states.
-      *
-      * Basically restrict a DFA to a set of states from the DFA, and return a minimized one.
-      *
-      * \param d The DFA to be restricted.
-      * \param states The set of states to be kept.
-      * \return The restricted explicit-state DFA, which is also minimized.
-      */
+          * \brief Restrict an explicit-state DFA with a given set of states.
+          *
+          * Basically restrict a DFA to a set of states from the DFA, and return a minimized one.
+          *
+          * \param d The DFA to be restricted.
+          * \param states The set of states to be kept.
+          * \return The restricted explicit-state DFA, which is also minimized.
+          */
         static ExplicitStateDfa restrict_dfa_with_states(ExplicitStateDfa &d, std::vector<size_t> states);
+
+        /**
+         * \brief
+         */
+        static ExplicitStateDfa dfa_to_Gdfa(ExplicitStateDfa &d);
+        /**
+          * \brief
+          */
+        static ExplicitStateDfa dfa_to_Fdfa(ExplicitStateDfa &d);
 
         /**
          * \brief Restrict a DFA with a given set of transitions.
