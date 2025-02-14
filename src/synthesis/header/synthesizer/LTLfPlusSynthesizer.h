@@ -66,14 +66,14 @@ namespace Syft {
          *
          * \return The synthesis result.
          */
-        SynthesisResult run() const;
+        ELSynthesisResult run() const;
 
-        /**
-         * \brief Abstract a winning strategy for the agent.
-         *
-         * \return A winning strategy for the agent.
-         */
-        std::unique_ptr<Transducer> AbstractSingleStrategy(const SynthesisResult &result) const;
+        // /**
+        //  * \brief Abstract a winning strategy for the agent.
+        //  *
+        //  * \return A winning strategy for the agent.
+        //  */
+        // std::unique_ptr<Transducer> AbstractSingleStrategy(const SynthesisResult &result) const;
 
     };
 

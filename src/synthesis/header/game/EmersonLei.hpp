@@ -26,7 +26,7 @@ namespace Syft {
 		* \brief The Emerson-Lei condition represented as a Boolean formula \beta over colors
 		*/
 		std::vector<CUDD::BDD> Colors_;
-        std::string color_formula_;
+		std::string color_formula_;
 		
 		public:
 		
@@ -42,22 +42,19 @@ namespace Syft {
 		EmersonLei(const SymbolicStateDfa &spec, const std::string color_formula, Player starting_player, Player protagonist_player,
 		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space);
 
-        CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
-        CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
-		ZielonkaNode* get_next_t(CUDD::BDD state, ZielonkaNode *anchor_node, ZielonkaNode *current_node, CUDD::BDD Y) const;
-
-		ZielonkaNode* get_anchor(ZielonkaNode *root, ZielonkaNode *current_node, CUDD::BDD Y) const;
-		
-		
-		/**
-		* \brief Solves the Emerson-Lei game.
-		*
-		* \return The result consists of
-		* realizability
-		* a set of agent winning states
-		* a transducer representing a winning strategy or nullptr if the game is unrealizable.
-		*/
+    CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
+    CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
+		EL_output_function ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD gameNode, ZielonkaNode *t) const;
+		CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, CUDD::BDD winningmoves) const;
+		std::vector<CUDD::BDD> getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const;
+		int index_below(ZielonkaNode *anchor_node, ZielonkaNode *old_memory) const;
+		ZielonkaNode* get_anchor(CUDD::BDD game_node, ZielonkaNode *memory_value) const;
+		ZielonkaNode* get_leaf(ZielonkaNode *old_memory, ZielonkaNode *anchor_node, ZielonkaNode *curr, CUDD::BDD Y) const;
+		inline std::vector<CUDD::BDD> transition_function() const {return transition_vector_;}
+		inline int spec_id() const {return spec_.automaton_id();}
 		SynthesisResult run() const final;
+		ELSynthesisResult run_EL() const;
+
 		
 	};
 }

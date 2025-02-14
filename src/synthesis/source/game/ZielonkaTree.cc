@@ -55,10 +55,10 @@ void ZielonkaTree::generate() {
                     .order = order++,
                     .winning = !(current->winning)
                 };
-                child_zn->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
+                //child_zn->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 seen_from_parent.push_back(color_set);
                 current->children.push_back(child_zn);
-                current->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
+                //current->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 q.push(child_zn);
             }
         }

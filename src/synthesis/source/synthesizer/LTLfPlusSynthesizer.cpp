@@ -25,7 +25,7 @@ namespace Syft {
     }
 
 
-    SynthesisResult LTLfPlusSynthesizer::run() const {
+    ELSynthesisResult LTLfPlusSynthesizer::run() const {
         std::vector<Syft::SymbolicStateDfa> vec_spec;
         std::vector<CUDD::BDD> goal_states;
         // ensures that the "order" of colors is respected
@@ -123,7 +123,7 @@ namespace Syft {
         arena.dump_dot("arena.dot");
         EmersonLei solver(arena, color_formula_, starting_player_, protagonist_player_,
         goal_states, var_mgr_->cudd_mgr()->bddOne());
-        return solver.run();
+        return solver.run_EL();
     }
 }
 

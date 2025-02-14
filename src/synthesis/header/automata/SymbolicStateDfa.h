@@ -24,6 +24,7 @@ namespace Syft {
         std::vector<int> initial_state_;
         CUDD::BDD final_states_;
         std::vector<CUDD::BDD> transition_function_;
+        // std::vector<CUDD::BDD> transition_to_state_var_index_;
 
         SymbolicStateDfa(std::shared_ptr<VarMgr> var_mgr);
 

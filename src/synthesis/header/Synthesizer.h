@@ -4,8 +4,10 @@
 #include <memory>
 
 #include "game/Transducer.h"
+#include "game/ZielonkaTree.hh"
 #include <tuple>
 #include <optional>
+#include <map>
 
 
 namespace Syft {
@@ -18,6 +20,14 @@ namespace Syft {
         CUDD::BDD winning_states;
         CUDD::BDD winning_moves;
         std::unique_ptr<Transducer> transducer;
+        CUDD::BDD safe_states;
+    };
+
+    typedef std::map<std::pair<CUDD::BDD, ZielonkaNode*>, std::pair<CUDD::BDD, ZielonkaNode*>> EL_output_function;
+    struct ELSynthesisResult {
+        bool realizability;
+        CUDD::BDD winning_states;
+        EL_output_function output_function;
         CUDD::BDD safe_states;
     };
 

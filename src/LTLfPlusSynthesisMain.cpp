@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
     // do synthesis
     auto synthesis_result = synthesizer.run();
 
+
     // show result
     if (synthesis_result.realizability) std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
     else std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
