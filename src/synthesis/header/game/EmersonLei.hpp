@@ -50,7 +50,7 @@ namespace Syft {
 		int index_below(ZielonkaNode *anchor_node, ZielonkaNode *old_memory) const;
 		ZielonkaNode* get_anchor(CUDD::BDD game_node, ZielonkaNode *memory_value) const;
 		ZielonkaNode* get_leaf(ZielonkaNode *old_memory, ZielonkaNode *anchor_node, ZielonkaNode *curr, CUDD::BDD Y) const;
-		inline std::vector<CUDD::BDD> transition_function() const {return transition_vector_;}
+		inline std::vector<CUDD::BDD> transition_function() const {return spec_.transition_function();}
 		inline int spec_id() const {return spec_.automaton_id();}
 		SynthesisResult run() const final;
 		ELSynthesisResult run_EL() const;
