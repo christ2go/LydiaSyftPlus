@@ -58,8 +58,12 @@ int main(int argc, char** argv) {
     driver->parse(formula_stream);
     auto result = driver->get_result();
 
+    // cast ast_ptr into ltlf_plus_ptr. Necessary since AbstractDriver is not template anymore
+    auto ltlf_plus_formula =
+        std::static_pointer_cast<const whitemech::lydia::LTLfPlusFormula>(result);
+
     // transform formula in PNF
-    auto pnf = whitemech::lydia::get_pnf_result(*result);
+    auto pnf = whitemech::lydia::get_pnf_result(*ltlf_plus_formula);
 
     // debug
     for (const auto& [formula, color] : pnf.subformula_to_color_) {
