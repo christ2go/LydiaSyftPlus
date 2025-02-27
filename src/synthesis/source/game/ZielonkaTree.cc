@@ -53,7 +53,8 @@ void ZielonkaTree::generate() {
 		            .targetnodes = current->safenodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
                     .level = current->level + 1,
                     .order = order++,
-                    .winning = !(current->winning)
+                    .winning = !(current->winning),
+                    .transducers = {}
                 };
                 //child_zn->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 seen_from_parent.push_back(color_set);
@@ -88,7 +89,8 @@ void ZielonkaTree::generate_parity() {
 	        .targetnodes = current->safenodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
             .level = current->level + 1,
             .order = order++,
-            .winning = !(current->winning)
+            .winning = !(current->winning),
+            .transducers = {}
         };
         current->children.push_back(child_zn);
         current = child_zn;
@@ -240,7 +242,8 @@ ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CU
 	    .targetnodes = var_mgr_->cudd_mgr()->bddOne(),
         .level = 1,
         .order = 1,
-        .winning = evaluate_phi(label)
+        .winning = evaluate_phi(label),
+        .transducers = {}
     };
 //    this.colorBDDs = colorBDDs;
     generate();

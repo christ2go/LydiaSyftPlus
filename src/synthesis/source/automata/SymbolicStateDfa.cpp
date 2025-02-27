@@ -134,7 +134,7 @@ namespace Syft {
     }
 
     CUDD::BDD SymbolicStateDfa::initial_state_bdd() const {
-        return state_to_bdd(var_mgr_, automaton_id_, 1);
+        return state_to_bdd(var_mgr_, automaton_id_, 0);
     }
 
     CUDD::BDD SymbolicStateDfa::final_states() const {

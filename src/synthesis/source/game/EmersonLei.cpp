@@ -41,7 +41,8 @@ namespace Syft {
 			result.realizability = true;
 			result.winning_states = winning_states;
 			EL_output_function op;
-			result.output_function = ExtractStrategy_Explicit(op, spec_.initial_state_bdd(), Ztree->get_root());
+			std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
+			result.output_function = ExtractStrategy_Explicit(op, winning_states, spec_.initial_state_bdd(), Ztree->get_root());
 			return result;
 		} else {
 			result.realizability = false;
@@ -71,13 +72,15 @@ namespace Syft {
 
 	}
 
-	ZielonkaNode* EmersonLei::get_anchor(CUDD::BDD game_node, ZielonkaNode *memory_value) const {
-		CUDD::BDD restricted = game_node * memory_value->targetnodes;
-		if (restricted != var_mgr_->cudd_mgr()->bddZero()) {
-			return memory_value;
+	ZielonkaNode* EmersonLei::get_anchor(CUDD::BDD game_node, ZielonkaNode *t) const {
+		if (t->order == 1) {
+			return t;
 		}
-		else {
-			return (get_anchor(game_node, memory_value->parent));
+		CUDD::BDD restricted = game_node * t->targetnodes;
+		if (restricted != var_mgr_->cudd_mgr()->bddZero()) {
+			return t->parent;
+		} else {
+			return (get_anchor(game_node, t->parent));
 		}
 	}
 
@@ -93,7 +96,7 @@ namespace Syft {
 			int old_branch = 0;
 			if (curr == anchor_node) {
 				// compute branching direction from anchor_node to old_memory
-				int old_branch = index_below(anchor_node,old_memory);
+				old_branch = index_below(anchor_node,old_memory);
 			}
 			// move one to the right, cycling back to 0 if old_branch is rightmost direction
 			int next_branch = (old_branch + 1) % (curr->children.size());
@@ -103,7 +106,7 @@ namespace Syft {
 			// find branching direction from curr that allows system choice Y
 			int branch = 0;
 			while (branch < curr->children.size()) {
-				CUDD::BDD restricted = Y * curr->winningmoves[branch];
+				CUDD::BDD restricted = (Y * curr->winningmoves[branch]).ExistAbstract(var_mgr_->output_cube());
 				if (restricted != var_mgr_->cudd_mgr()->bddZero()) {
 					break;
 				}
@@ -114,13 +117,28 @@ namespace Syft {
 		}
 	}
 
-	EL_output_function EmersonLei::ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD gameNode, ZielonkaNode *t) const {
+	EL_output_function EmersonLei::ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD winning_states, CUDD::BDD gameNode, ZielonkaNode *t) const {
 		//	t: tree node, s (anchor node): lowest ancester of t that includes all colors of gameNode
 		EL_output_function temp = op;
 		// stop recursion if the strategy has already been defined for (gameNode,t)
+
+		// std::cout << "-----------\ngameNode: " << gameNode;
+		// gameNode.PrintCover();
+		// std::cout << "tree node: " << t->order << "\n";
+
 		std::pair<CUDD::BDD, ZielonkaNode*> curr;
-		if (temp.find(curr)!=temp.end()) {
-					return temp;;
+		curr.first = gameNode;
+		curr.second = t;
+		for (auto item : op) {
+			// std::cout << item.gameNode << " " << item.t->order << "\n";
+			// std::cout << item.Y << " " << item.u->order << "\n";
+			if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order)) {
+				// std::cout << "defined! " << gameNode << " " << t->order << "\n";
+				// gameNode.PrintCover();
+				// std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
+				// item.gameNode.PrintCover();
+				return temp;
+			}
 		}
 
 		// the following assumes that system moves first and environment moves second
@@ -133,12 +151,13 @@ namespace Syft {
 		// pick one choice for system that is winning for system from gameNode for objective s
 		if (s->children.empty()) {
        		// have just a single winningmoves BDD
-					Y = getUniqueSystemChoice(gameNode,s->winningmoves[0]);
+				Y = getUniqueSystemChoice(gameNode, s->winningmoves[0]);
+				// Y = getUniqueSystemChoice(gameNode,s->winningmoves[0]);
     	}
     else {
        	// iterate through all winningmoves BDD until a choice for system is found that is winning from gameNode for objective s; one is guaranteed to be found
 			for (int i = 0; i < s->children.size(); i++) {
-        Y = getUniqueSystemChoice(gameNode,s->winningmoves[i]);
+				Y = getUniqueSystemChoice(gameNode, s->winningmoves[i]);
 				if (Y != var_mgr_->cudd_mgr()->bddZero()) {
 					break;
 				}
@@ -150,10 +169,15 @@ namespace Syft {
 
 		// add system choice and resulting new memory to extracted strategy, 
 		// currently assumes result has component "strategy" which is vector of (gameNode, ZielonkaNode), (CUDD::BDD,ZielonkaNode)
-		std::pair<CUDD::BDD, ZielonkaNode*> next;
-		next.first = Y;
-		next.second = u;
-		temp[curr] = next;
+		ELWinningMove move;
+		move.gameNode = gameNode;
+		move.t = t;
+		move.Y = Y;
+		move.u = u;
+		temp.push_back(move);
+		// std::cout << " --> \n";
+		// std::cout << "Y: " << Y << "\n";
+		// std::cout << "tree node: " << u->order << "\n\n";
 
 		// compute game nodes that can result by taking system choice from gameNode
 		//TODO
@@ -161,57 +185,54 @@ namespace Syft {
 
 		// continue strategy construction with each possible new game node and the new memory value
 		for (int i = 0; i < newGameNodes.size(); i++) {
-			EL_output_function temp_new = ExtractStrategy_Explicit(temp, newGameNodes[i], u);
+			EL_output_function temp_new = ExtractStrategy_Explicit(temp, winning_states, newGameNodes[i], u);
 			temp = temp_new;
 		}
 		return temp;
 	}
 
 	std::vector<CUDD::BDD> EmersonLei::getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const {
-		// std::vector<CUDD::BDD> transition_function = spec.transition_function();
-		std::vector<CUDD::BDD> transition_vector = transition_function();
-		// std::unordered_set<std::string> state_var_names;
-		// for (auto state_var_name: var_mgr_->state_variable_labels(spec.automaton_id())) {
-		// 		state_var_names.insert(state_var_name);
-		// }
 		std::vector<CUDD::BDD> succs;
+		std::vector<CUDD::BDD> transition_vector = transition_function();
+		std::vector<CUDD::BDD> transition_vector_fix_Y_Z;
 		for (int i = 0; i < transition_vector.size(); i++) {
-			CUDD::BDD state_var = var_mgr_->state_variable(spec_id(), i);
-			CUDD::BDD transidtion_fix_Y_Z = transition_vector[i] * gameNode * Y;
-			if (transidtion_fix_Y_Z == var_mgr_->cudd_mgr()->bddZero()) {
-				std::vector<CUDD::BDD> succs_temp;
-				for (auto succ: succs) {
-					CUDD::BDD succ_new = succ * !state_var;
-					succs_temp.push_back(succ_new);
-				}
-				succs = succs_temp;
-			} else if (transidtion_fix_Y_Z == var_mgr_->cudd_mgr()->bddOne()) {
-				std::vector<CUDD::BDD> succs_temp;
-				for (auto succ: succs) {
-					CUDD::BDD succ_new = succ * state_var;
-					succs_temp.push_back(succ_new);
-				}
-				succs = succs_temp;
-			} else {
-				std::vector<CUDD::BDD> succs_temp;
-				for (auto succ: succs) {
-					CUDD::BDD succ_new_false = succ * !state_var;
-					CUDD::BDD succ_new_true = succ * state_var;
-					succs_temp.push_back(succ_new_false);
-					succs_temp.push_back(succ_new_true);
-				}
-				succs = succs_temp;
+			CUDD::BDD transition_fix_Y_Z = (transition_vector[i] * gameNode * Y).ExistAbstract(var_mgr_->state_variables_cube(spec_id())).ExistAbstract(var_mgr_->output_cube());
+			transition_vector_fix_Y_Z.push_back(transition_fix_Y_Z);
+		}
+		std::vector<std::string> X_labels = var_mgr_->input_variable_labels();
+		int total = 1 << X_labels.size();  // 2^n
+		for (int mask = 0; mask < total; ++mask) {
+			std::vector<int> values(var_mgr_->total_variable_count(), 0);
+			for (int i = 0; i < X_labels.size(); ++i) {
+				CUDD::BDD X_var = var_mgr_->name_to_variable(X_labels[i]);
+				values[X_var.NodeReadIndex()] = (mask >> i) & 1;  // Extract the i-th bit
 			}
+			std::vector<int> copy(values);
+			CUDD::BDD succ = var_mgr_->cudd_mgr()->bddOne();
+			for (int i = 0; i < transition_vector_fix_Y_Z.size(); i++) {
+				CUDD::BDD Z_var = var_mgr_->state_variable(spec_id(), i);
+				if (transition_vector_fix_Y_Z[i].Eval(copy.data()).IsOne()) {
+					succ = succ * Z_var;
+				} else {
+					succ = succ * !Z_var;
+				}
+			}
+			succs.push_back(succ);
 		}
 		return succs;
 	}
 
+
 	CUDD::BDD EmersonLei::getUniqueSystemChoice(CUDD::BDD gameNode, CUDD::BDD winningmoves) const {
-		CUDD::BDD restricted = winningmoves * gameNode;
+		DdNode* rawNode = Cudd_bddRestrict(var_mgr_->cudd_mgr()->getManager(), winningmoves.getNode(), gameNode.getNode());
+		// std::cout << "gameNode * winningmoves: " << gameNode * winningmoves << "\n";
+		// std::cout << "winningmoves: " << winningmoves << "\n";
+		CUDD::BDD Ys(*(var_mgr_->cudd_mgr()), rawNode);
+		// std::cout << "All possible Ys: " << Ys << "\n";
 		int n_vars = var_mgr_->total_variable_count();
 		int* cube = nullptr;
 		CUDD_VALUE_TYPE value;
-		DdGen* g = Cudd_FirstCube(restricted.manager(), restricted.getNode(), &cube, &value);
+		DdGen* g = Cudd_FirstCube(Ys.manager(), Ys.getNode(), &cube, &value);
 		assert (g != nullptr);
 		std::vector<uint8_t> Y_Z_value = std::vector<uint8_t>(cube, cube + n_vars);
 		CUDD::BDD Y = var_mgr_->cudd_mgr()->bddOne();
@@ -221,7 +242,8 @@ namespace Syft {
 			int var_index = var.NodeReadIndex();
 			int var_value = static_cast<int>(cube[var_index]);
 			if (var_value == 2) {
-				continue;
+				// continue;
+				Y = Y * var;
 			} else if (var_value == 1) {
 				Y = Y * var;
 			} else {
@@ -232,8 +254,7 @@ namespace Syft {
 	}
 
 	CUDD::BDD EmersonLei::cpre(ZielonkaNode *t, int i, CUDD::BDD target) const {
-
-	    CUDD::BDD result;
+			CUDD::BDD result;
 
 	    if (starting_player_ == Player::Agent) {
                 CUDD::BDD quantified_X_transitions_to_winning_states = preimage(target);
@@ -340,10 +361,9 @@ namespace Syft {
 
 			if (X == XX) {
 		  		break;
-			} 
-        	else { 
+			} else {
  		  		X = XX;
-        	}
+			}
 
 		
         }

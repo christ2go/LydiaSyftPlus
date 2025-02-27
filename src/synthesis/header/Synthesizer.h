@@ -23,7 +23,14 @@ namespace Syft {
         CUDD::BDD safe_states;
     };
 
-    typedef std::map<std::pair<CUDD::BDD, ZielonkaNode*>, std::pair<CUDD::BDD, ZielonkaNode*>> EL_output_function;
+    struct ELWinningMove {
+        CUDD::BDD gameNode;
+        ZielonkaNode* t;
+        CUDD::BDD Y;
+        ZielonkaNode* u;
+    };
+
+    typedef std::vector<ELWinningMove> EL_output_function;
     struct ELSynthesisResult {
         bool realizability;
         CUDD::BDD winning_states;

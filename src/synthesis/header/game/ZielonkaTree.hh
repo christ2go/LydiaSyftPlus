@@ -4,6 +4,7 @@
 #include <vector>
 #include "ELHelpers.hh"
 #include "VarMgr.h"
+#include "Transducer.h"
 
 struct ZielonkaNode {
     std::vector<ZielonkaNode*> children;
@@ -17,6 +18,7 @@ struct ZielonkaNode {
     size_t level;
     size_t order;
     bool winning;
+    std::vector<std::unique_ptr<Syft::Transducer>> transducers;
     // std::vector<ZielonkaNode*> ancestors;
 };
 
