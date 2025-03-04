@@ -48,6 +48,27 @@ std::size_t VarMgr::create_state_variables(std::size_t variable_count) {
   return automaton_id;
 }
 
+std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>& vars) {
+  std::size_t automaton_id = state_variables_.size();
+
+  // Creates an additional space for variables at index automaton_id,
+  // then reserves enough memory for all the new variables
+  state_variables_.emplace_back();
+  state_variables_[automaton_id].reserve(vars.size());
+
+  for (int i = 0; i < vars.size(); ++i) {
+    // Creates a new variable at the top of the variable ordering
+    CUDD::BDD new_state_variable = mgr_->bddNewVarAtLevel(0);
+
+    state_variables_[automaton_id].push_back(new_state_variable);
+    name_to_variable_[vars[i]] = new_state_variable;
+    index_to_name_[new_state_variable.NodeReadIndex()] = vars[i]; 
+  }
+
+  state_variable_count_ += vars.size();
+  return automaton_id;
+}
+
 std::size_t VarMgr::create_product_state_space(
     const std::vector<std::size_t>& automaton_ids) {
   std::size_t product_automaton_id = state_variables_.size();

@@ -52,6 +52,18 @@ namespace Syft {
         std::size_t create_state_variables(std::size_t variable_count);
 
         /**
+         * \brief Creates and stores named state variables
+         * 
+         * Multiple calls of this function create separate groups of state variables.
+         * The call generates an ID for the automaton whose state space the variables
+         * represent, so that the correct group of variables can be retrieved later.
+         *
+         * \param variable_count The number of state variables to create.
+         * \return The automaton ID the variables are associated with.
+         */
+        std::size_t create_named_state_variables(const std::vector<std::string>& variable_names);
+
+        /**
          * \brief Registers a new automaton ID associated with a product state space.
          *
          * This function does not create new state variables. Instead, the variables
