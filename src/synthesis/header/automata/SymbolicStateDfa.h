@@ -7,7 +7,7 @@
 #include <cuddObj.hh>
 
 #include "ExplicitStateDfaAdd.h"
-#include "../ppltl/ValVisitor.h"
+#include "automata/ppltl/ValVisitor.h"
 #include <lydia/logic/nnf.hpp>
 #include <lydia/logic/ynf.hpp>
 #include <lydia/utils/print.hpp>

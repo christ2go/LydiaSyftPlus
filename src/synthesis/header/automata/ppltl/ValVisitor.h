@@ -3,8 +3,8 @@
 
 #include"cuddObj.hh"
 #include"VarMgr.h"
-#include<lydia/lib/include/lydia/visitor.hpp>
-#include<lydia/lib/include/lydia/utils/print.hpp>
+#include<lydia/visitor.hpp>
+#include<lydia/utils/print.hpp>
 
 namespace Syft {
 
