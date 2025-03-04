@@ -4,6 +4,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 #include "cuddObj.hh"
 
@@ -30,6 +31,11 @@ namespace Syft {
          * \brief Constructs a VarMgr with no variables.
          */
         VarMgr();
+
+        /**
+         * \brief Prints the VarMgr
+         */
+        void print_mgr() const;
 
         /**
          * \brief Creates BDD variables and associates each with a name.

@@ -11,6 +11,40 @@ VarMgr::VarMgr() {
   mgr_ = std::make_shared<CUDD::Cudd>();
 }
 
+void VarMgr::print_mgr() const {
+  // prints the number of managed automata
+  std::cout << "Number of managed automata: " << state_variables_.size() << std::endl;
+
+  // prints number of vars
+  std::cout << "Number of variables: " << total_variable_count_ << std::endl;
+
+  // prints named variables
+  std::cout << "Named variables (name, var): " << std::endl;
+
+  for (const auto& name_var : name_to_variable_)
+    std::cout << "Name: " << name_var.first << ". Var: " << name_var.second << std::endl;
+  
+  std::cout << "Var indexes (index, name): " << std::endl;
+
+  for (const auto& index_name: index_to_name_)
+    std::cout << "Index: " << index_name.first << ". Name: " << index_name.second << std::endl;
+
+  // prints X vars
+  std::cout << "Input variables: " << std::endl;
+  for (const auto& var: input_variables_) std::cout << "Var: " << var << std::endl;
+
+  // prints Y vars
+  std::cout << "Output variables: " << std::endl;
+  for (const auto& var: output_variables_) std::cout << "Var: " << var << std::endl;  
+
+  // prints Z vars for each managed automaton
+  for (int i = 0; i < state_variables_.size(); ++i) {
+    std::cout << "Automaton ID " << i << " state variables" << std::endl;
+    for (const auto& var: state_variables_[i]) std::cout << var << " ";
+    std::cout << std::endl;
+  }
+}
+
 void VarMgr::create_named_variables(
     const std::vector<std::string>& variable_names) {
   for (const std::string& name : variable_names) {
