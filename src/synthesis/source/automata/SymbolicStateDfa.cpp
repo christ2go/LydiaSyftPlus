@@ -348,15 +348,15 @@ namespace Syft {
         // Y state vars
         for (const auto& f : y_sub) {
             auto ya = std::static_pointer_cast<const whitemech::lydia::PPLTLYesterday>(f);
-            auto arg = *ya->get_arg();
-            auto bdd = val(arg, mgr);
+            auto arg = ya->get_arg();
+            auto bdd = val(*arg, mgr);
             transition_function.push_back(bdd);
         }
         // WY state vars
         for (const auto& f : wy_sub) {
             auto wya = std::static_pointer_cast<const whitemech::lydia::PPLTLWeakYesterday>(f);
-            auto arg = *wya->get_arg();
-            auto bdd = val(arg, mgr);
+            auto arg = wya->get_arg();
+            auto bdd = val(*arg, mgr);
             transition_function.push_back(bdd);
         }
 
