@@ -51,6 +51,6 @@ namespace Syft {
 
     };
 
-    CUDD::BDD val(const PPLTLFormula& );
+    CUDD::BDD val(const PPLTLFormula& x, std::shared_ptr<VarMgr> mgr);
 }
 #endif // VAL_VISITOR_H

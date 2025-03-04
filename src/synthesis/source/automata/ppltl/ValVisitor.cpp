@@ -53,7 +53,7 @@ namespace Syft {
     void ValVisitor::visit(const PPLTLSince& x) {
         auto arg1 = x.get_args()[0]; // f1
         auto arg2 = x.get_args()[1]; // f2
-        auto s = x.ctx().makePPLTLSince(arg1, arg2);
+        auto s = x.ctx().makePPLTLSince(arg1, arg2); // f1 S f2
         auto ys = x.ctx().makePPLTLYesterday(s); // Y(f1 S f2)
         auto r = x.ctx().makePPLTLAnd({arg1, ys}); // (f1 ∧ Y(f1 S f2))
         auto l = x.ctx().makePPLTLOr({arg2, r}); // f2 v (f1 ∧ Y(f1 S f2))
@@ -78,14 +78,14 @@ namespace Syft {
         result = apply(*r);
     }
 
-    // val(f1 T f2, σ, s) = val(f2 ∧ (f1 v WY(f1 T f2), σ, s)
+    // val(f1 T f2, σ, s) = val(f1 ∧ (f2 v WY(f1 T f2), σ, s)
     void ValVisitor::visit(const PPLTLTriggered& x) {
         auto arg1 = x.get_args()[0]; // f1
         auto arg2 = x.get_args()[1]; // f2
         auto t = x.ctx().makePPLTLTriggered(arg1, arg2); // f1 T f2
         auto wyt = x.ctx().makePPLTLWeakYesterday(t); // WY(f1 T f2)
-        auto r = x.ctx().makePPLTLOr({arg1, wyt}); // (f1 v WY(f1 T f2))
-        auto l = x.ctx().makePPLTLAnd({arg2, r}); // f1 ∧ (f1 v Y(f1 S f2))
+        auto r = x.ctx().makePPLTLOr({arg2, wyt}); // (f2 v WY(f1 T f2))
+        auto l = x.ctx().makePPLTLAnd({arg1, r}); // f1 ∧ (f2 v Y(f1 S f2))
         result = apply(*l); 
     }
 

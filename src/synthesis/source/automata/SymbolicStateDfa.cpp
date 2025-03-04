@@ -299,5 +299,79 @@ namespace Syft {
         return complement_automaton;
     }
 
+    SymbolicStateDfa SymbolicStateDfa::dfa_of_ppltl_formula(const whitemech::lydia::PPLTLFormula& formula) {
+
+        std::shared_ptr<VarMgr> mgr = std::make_shared<VarMgr>();
+
+        whitemech::lydia::StrPrinter p;
+
+        // get NNF
+        whitemech::lydia::NNFTransformer t;
+        auto nnf =
+        t.apply(formula);
+
+        // get YNF
+        whitemech::lydia::YNFTransformer yt;
+        auto ynf =
+        yt.apply(*nnf);
+
+        // get subformulas
+        auto y_sub = yt.get_y_sub();
+        auto wy_sub = yt.get_wy_sub();
+        auto atoms  = yt.get_atoms();
+
+        // creates Boolean variables for the atoms
+        std::vector<std::string> str_atoms;
+        for (const auto& a : atoms) str_atoms.push_back(p.apply(*a));
+        mgr->create_named_variables(str_atoms);
+
+        // creates Boolean variables for Y and WY subformulas
+        // it also initializes the initial state
+        std::vector<std::string> str_sub;
+        std::vector<int> init_state;
+        for (const auto& a : y_sub) {
+            str_sub.push_back(p.apply(*a));
+            init_state.push_back(0);
+        }
+        for (const auto& a : wy_sub) {
+            str_sub.push_back(p.apply(*a));
+            init_state.push_back(1);
+        }
+        auto dfa_id = mgr->create_named_state_variables(str_sub);
+
+        // transition function
+        // Z = (Y0, ..., Yn, WY0, ...., WYm) {0, 1}
+        // d = (dY0, ..., dYn, dWY0, ..., dWYm) {BDD}
+        std::vector<CUDD::BDD> transition_function;
+        ValVisitor v(mgr);
+
+        // Y state vars
+        for (const auto& f : y_sub) {
+            auto ya = std::static_pointer_cast<const whitemech::lydia::PPLTLYesterday>(f);
+            auto arg = *ya->get_arg();
+            auto bdd = val(arg, mgr);
+            transition_function.push_back(bdd);
+        }
+        // WY state vars
+        for (const auto& f : wy_sub) {
+            auto wya = std::static_pointer_cast<const whitemech::lydia::PPLTLWeakYesterday>(f);
+            auto arg = *wya->get_arg();
+            auto bdd = val(arg, mgr);
+            transition_function.push_back(bdd);
+        }
+
+        // final states
+        CUDD::BDD final_states = val(formula, mgr);
+
+        // output 
+        SymbolicStateDfa dfa(std::move(mgr));
+        dfa.automaton_id_ = dfa_id;
+        dfa.initial_state_ = std::move(init_state);
+        dfa.transition_function_ = std::move(transition_function);
+        dfa.final_states_ = std::move(final_states);
+
+        return dfa;
+
+    }
 }
 
