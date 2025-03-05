@@ -53,6 +53,143 @@ namespace Syft {
 		}
 	}
 
+	   std::string simplifyFormula(std::vector<std::string> postfix, std::vector<bool> colors){
+
+		// TODO update formula, check postfix format
+        std::reverse(postfix.begin(), postfix.end());
+        std::string resFormula;
+
+        while (!postfix.empty()){
+            std::string s = postfix.back();
+            postfix.pop_back();
+
+            if (isNumber(s)){
+                int tmp = stoi(s);
+                //std::cout << "var " << tmp << std::endl;
+                resStack.push_back(colors[tmp]);
+            }
+            else{
+                if (s == "!"){
+                    bool tmp = resStack.back();
+                    resStack.pop_back();
+                    //std::cout << "not " << tmp << std::endl;
+                    resStack.push_back(!tmp);
+                }
+                else if (s == "&"){
+                    bool tmp1 = resStack.back();
+                    resStack.pop_back();
+                    bool tmp2 = resStack.back();
+                    resStack.pop_back();
+                    //std::cout << tmp1 << " & " << tmp2 << std::endl;
+                    resStack.push_back(tmp1 && tmp2);
+                }
+                else{
+                    bool tmp1 = resStack.back();
+                    resStack.pop_back();
+                    bool tmp2 = resStack.back();
+                    resStack.pop_back();
+                    //std::cout << tmp1 << " & " << tmp2 << std::endl;
+                    resStack.push_back(tmp1 || tmp2);
+                }
+            }
+        }
+        if (resStack.size() != 1)
+            std::cout << "resStack wrong size" << std::endl;
+        return resStack.back();
+    }
+
+
+	ELSynthesisResult EmersonLei::run_MP() const {
+		//TODO
+		// create another class LTLfPlusSynthesizerMP
+		// create another class MannaPnueli game
+		// in the MP game, we need to store the color formula as a BDD, which can be simplified given specific values of Fcolors and Gcolors
+		// we also need some structure to store the DAG, and the MP game starts from the bottom node in the DAG, this is obtained from the color formula
+		// an EL game should take ZielonkaTree node, an instantWinning BDD and an instantLosing BDD
+		// the result of MP game should be a different structure such that we have a vector of winningstates, every winningstates BDD corresponds to a game in the DAG
+
+    std::cout << "Colors: \n";
+    for (size_t i = 0; i < Colors_.size(); i++){
+        std::cout << Colors_[i] << '\n';
+    }
+
+		std::unordered_map<std::size_t, bool> Fcolors, Gcolors;
+		std::vector<bool> curFcolors(Fcolors.size(), true);
+		std::vector<bool> curGcolors(Gcolors.size(), false);
+
+		std::queue<std::pair(std::vector<bool>, std::vector<bool>)> todo;
+		todo.push(curFcolors,curGcolors);
+
+
+		while (!todo.empty()) {
+
+			(curFcolors,curGcolors) = todo.pop();
+
+			// curcolors should be the OR of the two bitvectors curFcolors and curGcolors
+			curcolors = curFcolors|curGcolors; // concatnate Fcolors (first) and Gcolors
+
+			// instantiate all Fc and all Gc in color_formula to 1 if c is in curcolors and to 0 otherwise
+			std::string curColor_formula = simplifyFormula(ELHelpers::infix2postfix(ELHelpers::tokenize(color_formula_)),curcolors);
+
+			// build Zielonka tree for current F- and G-colors
+			ZielonkaTree *Ztree = new ZielonkaTree(curColor_formula, Colors_, var_mgr_);
+
+			// setup winning and losing nodes
+			CUDD::BDD instantWinning;
+			CUDD::BDD instantLosing;
+
+			// TODO: loop over existing entries in the vector result.winning_states; each entry is a pair (colors,winningStates).
+			// 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning
+			//		 Add nodes from !winningStates for which curcolors&seencolors=colors to instantLosing
+
+			// solve EL game for root of Zielonka tree
+			CUDD::BDD winning_states = EmersonLeiSolve(Ztree->get_root(), instantWinning, instantLosing);
+
+			// update result according to computed solution, TODO: store result for curcolors; also, winningmoves
+			ELSynthesisResult result;
+			if (includes_initial_state(winning_states)) {
+				result.realizability = true;
+				result.winning_states = winning_states;
+				EL_output_function op;
+				result.output_function = ExtractStrategy_Explicit(op, spec_.initial_state_bdd(), Ztree->get_root());
+				return result;
+			} else {
+				result.realizability = false;
+				result.winning_states = winning_states;
+				EL_output_function output_function;
+				result.output_function = output_function;
+				return result;
+			}
+
+
+			//TODO
+			//Store the DAG
+
+			// for any color i in curFcolors, push (curFcolors-i,curGcolors) to queue
+			for (int i = 0; i < curFcolors.size(); i++) {
+				if (curFcolors[i]) {
+					curFcolors[i] = false;
+					todo.push(curFcolors,curGcolors);
+					curFcolors[i] = true;
+				}
+			}
+
+			// for any color i in curGcolors, push (curFcolors,curGcolors-i) to queue
+			for (int i = 0; i < curGcolors.size(); i++) {
+				if (!curGcolors[i]) {
+					curGcolors[i] = true;
+					todo.push(curFcolors,curGcolors);
+					curFcolors[i] = false;
+				}
+			}
+
+			// note: this will have duplicate computations if the same set of curcolors can be reached by removing single colors in different ways, so before computation, need lookup.
+
+
+		}
+
+	}
+
 
 	int EmersonLei::index_below(ZielonkaNode *anchor_node, ZielonkaNode *old_memory) const {
 		if (old_memory == anchor_node) {
@@ -69,6 +206,7 @@ namespace Syft {
 					return index_below(anchor_node, old_memory->parent);
 			}
 		}
+
 
 	}
 

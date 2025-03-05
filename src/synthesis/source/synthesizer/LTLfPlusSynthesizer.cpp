@@ -24,7 +24,7 @@ namespace Syft {
         var_mgr_ = var_mgr;
     }
 
-
+    // TODO create a run
     ELSynthesisResult LTLfPlusSynthesizer::run() const {
         std::vector<Syft::SymbolicStateDfa> vec_spec;
         std::vector<CUDD::BDD> goal_states;
