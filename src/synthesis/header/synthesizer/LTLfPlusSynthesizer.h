@@ -16,9 +16,9 @@
 
 namespace Syft {
 
-    typedef whitemech::lydia::ltlf_plus_ptr ltlf_plus_ptr;
-    typedef whitemech::lydia::ltlf_ptr ltlf_ptr;
-    typedef whitemech::lydia::PrefixQuantifier PrefixQuantifier;
+    // typedef whitemech::lydia::ltlf_plus_ptr ltlf_plus_ptr;
+    // typedef whitemech::lydia::ltlf_ptr ltlf_ptr;
+    // typedef whitemech::lydia::PrefixQuantifier PrefixQuantifier;
 
     class LTLfPlusSynthesizer {
     private:
@@ -26,14 +26,15 @@ namespace Syft {
          * \brief Variable manager.
          */
         std::shared_ptr<VarMgr> var_mgr_;
-        /**
-         * \brief
-         */
-        std::unordered_map<ltlf_plus_ptr, std::string> formula_to_color_;
-        /**
-         * \brief
-         */
-        std::unordered_map<ltlf_plus_ptr, PrefixQuantifier> formula_to_quantification_;
+        // /**
+        //  * \brief
+        //  */
+        // std::unordered_map<whitemech::lydia::ltlf_plus_ptr, std::string> formula_to_color_;
+        // /**
+        //  * \brief
+        //  */
+        // std::unordered_map<whitemech::lydia::ltlf_plus_ptr, whitemech::lydia::PrefixQuantifier> formula_to_quantification_;
+        LTLfPlus ltlf_plus_formula_;
         /**
          * \brief The player that moves first each turn.
          */
@@ -53,10 +54,8 @@ namespace Syft {
          * \brief Construct an LtlfPlusSynthesizer.
          */
         LTLfPlusSynthesizer(
-            std::unordered_map<ltlf_plus_ptr, std::string> formula_to_color,
-            std::unordered_map<ltlf_plus_ptr, PrefixQuantifier> formula_to_quantification,
-            const std::string &color_formula,
-            const Syft::InputOutputPartition partition, 
+            LTLfPlus ltlf_plus_formula,
+            InputOutputPartition partition,
             Player starting_player,
             Player protagonist_player
         );
@@ -68,12 +67,6 @@ namespace Syft {
          */
         ELSynthesisResult run() const;
 
-        // /**
-        //  * \brief Abstract a winning strategy for the agent.
-        //  *
-        //  * \return A winning strategy for the agent.
-        //  */
-        // std::unique_ptr<Transducer> AbstractSingleStrategy(const SynthesisResult &result) const;
 
     };
 

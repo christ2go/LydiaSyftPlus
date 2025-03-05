@@ -1,13 +1,13 @@
 #include <memory>
 
 #include "game/InputOutputPartition.h"
-#include "Preprocessing.h"
 #include "Utils.h"
 #include <lydia/logic/ltlfplus/base.hpp>
 #include <lydia/logic/ltlfplus/duality.hpp>
 #include <lydia/parser/ltlfplus/driver.hpp>
 #include <lydia/logic/pnf.hpp>
 #include "synthesizer/LTLfPlusSynthesizer.h"
+#include "synthesizer/LTLfPlusSynthesizerMP.h"
 #include <CLI/CLI.hpp>
 
 int main(int argc, char** argv) {
@@ -60,6 +60,10 @@ int main(int argc, char** argv) {
 
     // transform formula in PNF
     auto pnf = whitemech::lydia::get_pnf_result(*result);
+    Syft::LTLfPlus ltlf_plus_formula;
+    ltlf_plus_formula.color_formula_ = pnf.color_formula_;
+    ltlf_plus_formula.formula_to_color_= pnf.subformula_to_color_;
+    ltlf_plus_formula.formula_to_quantification_= pnf.subformula_to_quantifier_;
 
     // debug
     for (const auto& [formula, color] : pnf.subformula_to_color_) {
@@ -83,30 +87,57 @@ int main(int argc, char** argv) {
 
     // construct LTLfPlusSynthesizer obj
     Syft::Player starting_player;
-    if (starting_player_id) starting_player == Syft::Player::Agent;
-    else starting_player == Syft::Player::Environment;
+    if (starting_player_id) {
+        starting_player == Syft::Player::Agent;
+    } else {
+        starting_player == Syft::Player::Environment;
+    }
 
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
 
-    Syft::LTLfPlusSynthesizer synthesizer(
-        pnf.subformula_to_color_,
-        pnf.subformula_to_quantifier_,
-        pnf.color_formula_,
+    // Syft::LTLfPlusSynthesizer synthesizer(
+    //     ltlf_plus_formula,
+    //     partition,
+    //     starting_player,
+    //     Syft::Player::Agent
+    // );
+    //
+    // // do synthesis
+    // auto synthesis_result = synthesizer.run();
+
+    Syft::LTLfPlusSynthesizerMP synthesizerMP(
+        ltlf_plus_formula,
         partition,
         starting_player,
         Syft::Player::Agent
     );
 
     // do synthesis
-    auto synthesis_result = synthesizer.run();
+    auto synthesis_result_MP = synthesizerMP.run();
 
 
     // show result
-    if (synthesis_result.realizability) {
+    // if (synthesis_result.realizability) {
+    //     std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
+    //     int i = 0;
+    //     for (auto item : synthesis_result.output_function) {
+    //         std::cout << "state: " << item.gameNode;
+    //         item.gameNode.PrintCover();
+    //         // Cudd_bddPickArbitraryMinterm(manager, bdd, cube_array)
+    //         std::cout << "tree node: " << item.t->order << "\n";
+    //         std::cout << " -> \n";
+    //         std::cout << "Y: " << item.Y;
+    //         item.Y.PrintCover();
+    //         std::cout << "tree node: " << item.u->order << "\n\n";
+    //     }
+    // } else {
+    //     std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
+    // }
+    if (synthesis_result_MP.realizability) {
         std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
         int i = 0;
-        for (auto item : synthesis_result.output_function) {
+        for (auto item : synthesis_result_MP.output_function) {
             std::cout << "state: " << item.gameNode;
             item.gameNode.PrintCover();
             // Cudd_bddPickArbitraryMinterm(manager, bdd, cube_array)

@@ -37,7 +37,8 @@ list(REMOVE_ITEM SOURCE_FILES
 
 add_library(${SYNTHESIS_LIB_NAME} STATIC ${HEADER_FILES} ${SOURCE_FILES}
         source/game/EmersonLei.cpp
-        source/game/ZielonkaTree.cc)
+        source/game/ZielonkaTree.cc
+        header/game/MannaPnueli.hpp)
 
 target_link_libraries(${SYNTHESIS_LIB_NAME} ${UTILS_LIB_NAME} ${PARSER_LIB_NAME} ${EXT_LIBRARIES_PATH})
 
