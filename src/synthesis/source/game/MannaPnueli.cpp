@@ -363,6 +363,7 @@ namespace Syft {
 
 
       CUDD::BDD instant_winning = var_mgr_->cudd_mgr()->bddZero();
+      CUDD::BDD instant_losing = var_mgr_->cudd_mgr()->bddZero();
       for (auto child : node->children) {
         CUDD::BDD child_winnning_states = WP_winning_states[child.first->id];
         int color_flipped = child.second; // the color that got flipped
@@ -380,11 +381,14 @@ namespace Syft {
 
         if (color_value_in_child == 0) {
           instant_winning = instant_winning | (child_winnning_states * !Colors_[color_flipped]);
+          instant_losing = instant_losing | (!child_winnning_states * !Colors_[color_flipped]);
         } else {
           instant_winning = instant_winning | (child_winnning_states * Colors_[color_flipped]);
+          instant_losing = instant_losing | (!child_winnning_states * Colors_[color_flipped]);
         }
+
       }
-      CUDD::BDD instant_losing = !instant_winning;
+
 
       // TODO: loop over existing entries in the vector result.winning_states; each entry is a pair (colors,winningStates).
       // 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning
