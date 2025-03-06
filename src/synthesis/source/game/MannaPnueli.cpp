@@ -53,6 +53,16 @@ namespace Syft {
         std::cout << ") ";
       }
       std::cout << "}\n";
+      std::cout << "-> {";
+      for (auto child : node->children) {
+        std::cout << " Node " << child.first->id << " (";
+        for (int bit : child.first->F) std::cout << bit;
+        std::cout << ", ";
+        for (int bit : child.first->G) std::cout << bit;
+        std::cout << ") ";
+        std::cout << child.second << " ";
+      }
+      std::cout << "}\n";
     }
   }
 
@@ -265,6 +275,7 @@ namespace Syft {
             }
             Node* parent_node = dag[node_to_id[{newF, node->G}]];
             node->parents.push_back(parent_node);
+            parent_node->children.push_back({node, F_colors_[i]});
           }
         }
 
@@ -281,6 +292,7 @@ namespace Syft {
           }
           Node* parent_node = dag[node_to_id[{node->F, newG}]];
           node->parents.push_back(parent_node);
+          parent_node->children.push_back({node, G_colors_[i]});
         }
       }
     }
@@ -328,10 +340,8 @@ namespace Syft {
 
   MPSynthesisResult MannaPnueli::run_MP() const {
 
-    std::vector<CUDD::BDD> WP_winning_states(dag_.size());
+    std::vector<CUDD::BDD> WP_winning_states(dag_.size(), var_mgr_->cudd_mgr()->bddZero()); //TODO here initialized as Zero just for testing
     std::vector<bool> computed(dag_.size(), false);
-
-    // TODO sometimes, different F_colors and G_colors values lead to the same color_formula, we can also simplify
 
     while (std::find(computed.begin(), computed.end(), false) != computed.end()) {
 
@@ -345,16 +355,36 @@ namespace Syft {
       std::cout << ")\n";
 
 
-
       std::string curColor_formula = simplify_color_formula(node->F, node->G);
       std::cout << curColor_formula << std::endl;
 
       // build Zielonka tree for current F- and G-colors
       // ZielonkaTree *Ztree = new ZielonkaTree(curColor_formula, Colors_, var_mgr_);
 
-      // setup winning and losing nodes
-      CUDD::BDD instantWinning;
-      CUDD::BDD instantLosing;
+
+      CUDD::BDD instant_winning = var_mgr_->cudd_mgr()->bddZero();
+      for (auto child : node->children) {
+        CUDD::BDD child_winnning_states = WP_winning_states[child.first->id];
+        int color_flipped = child.second; // the color that got flipped
+        auto is_F_color = std::find(F_colors_.begin(), F_colors_.end(), color_flipped);
+        auto is_G_color = std::find(G_colors_.begin(), G_colors_.end(), color_flipped);
+        assert((is_F_color != F_colors_.end()) || (is_G_color != G_colors_.end())); // it has to be either an F or G
+        int color_value_in_child;
+        if (is_F_color != F_colors_.end()) { // if the flipped color is F
+          int index = static_cast<int>(std::distance(F_colors_.begin(), is_F_color));
+          color_value_in_child = child.first->F[index];
+        } else { // if it is G
+          int index = static_cast<int>(std::distance(G_colors_.begin(), is_G_color));
+          color_value_in_child = child.first->G[index];
+        }
+
+        if (color_value_in_child == 0) {
+          instant_winning = instant_winning | (child_winnning_states * !Colors_[color_flipped]);
+        } else {
+          instant_winning = instant_winning | (child_winnning_states * Colors_[color_flipped]);
+        }
+      }
+      CUDD::BDD instant_losing = !instant_winning;
 
       // TODO: loop over existing entries in the vector result.winning_states; each entry is a pair (colors,winningStates).
       // 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning

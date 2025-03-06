@@ -42,9 +42,11 @@ namespace Syft {
 		*/
     CUDD::BDD color_formula_bdd_;
 		struct Node {
-			std::vector<int> F, G;
+			std::vector<int> F;
+			std::vector<int> G;
 			int id;
 			std::vector<Node*> parents; // Store parent nodes directly
+			std::vector<std::pair<Node*, int>> children; // Store child nodes directly
 		};
 
 		// Custom hash function for unordered_map
