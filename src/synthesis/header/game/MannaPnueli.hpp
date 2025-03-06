@@ -32,6 +32,7 @@ namespace Syft {
 		std::vector<int> G_colors_;
 		CUDD::Cudd color_mgr_;
 		std::map<int, CUDD::BDD> color_to_variable_;
+		std::map<int, int> bdd_id_to_color_;
 		/**
 		* \brief The Manna-Pnueli condition represented as a Boolean formula \beta over colors
 		*/
@@ -61,9 +62,12 @@ namespace Syft {
 		Node_to_Id node_to_id_;
 
 		std::pair<Dag, Node_to_Id> build_FG_dag();
-		std::string simply_color_formula(std::vector<int> F_color, std::vector<int> G_color) const;
+		std::string simplify_color_formula(std::vector<int> F_color, std::vector<int> G_color) const;
 		std::string color_formula_bdd_to_string (const CUDD::BDD &color_formula_bdd) const;
 		void print_FG_dag() const;
+		std::string remove_whitespace(const std::string &str) const;
+		int precedence(char op) const;
+		std::string infix_to_postfix(const std::string &infix) const;
 		Node* bottom_node_Dag() const;
 
 		void MP_solve();

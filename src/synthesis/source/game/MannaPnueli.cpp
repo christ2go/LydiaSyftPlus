@@ -25,7 +25,12 @@ namespace Syft {
     color_formula_bdd_ = boolean_string_to_bdd(color_formula_);
     std::cout << "Mapping of integer propositions to BDD variables:" << std::endl;
     for (const auto &pair: color_to_variable_) {
-      std::cout << "Variable " << pair.first << " -> BDD ID: " << pair.second.NodeReadIndex() << std::endl;
+      std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second.NodeReadIndex() << std::endl;
+    }
+
+    std::cout << "Mapping of BDD variables ID to integer propositions:" << std::endl;
+    for (const auto &pair: bdd_id_to_color_) {
+      std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second << std::endl;
     }
     tie(dag_,node_to_id_) = build_FG_dag();
     print_FG_dag();
@@ -105,7 +110,7 @@ namespace Syft {
   //       return resStack.back();
   //   }
 
-  std::string remove_whitespace(const std::string &str) {
+  std::string MannaPnueli::remove_whitespace(const std::string &str) const {
     std::string result;
     for (char ch: str) {
       if (!isspace(ch)) result += ch;
@@ -113,7 +118,7 @@ namespace Syft {
     return result;
   }
 
-  int precedence(char op) {
+  int MannaPnueli::precedence(char op) const {
     if (op == '!') return 3; // Highest precedence (Unary NOT)
     if (op == '&') return 2; // AND
     if (op == '|') return 1; // OR
@@ -121,7 +126,7 @@ namespace Syft {
   }
 
   // Convert infix expression to postfix using Shunting-yard algorithm
-  std::string infix_to_postfix(const std::string &infix) {
+  std::string MannaPnueli::infix_to_postfix(const std::string &infix) const {
     std::string postfix;
     std::stack<char> ops;
 
@@ -179,6 +184,7 @@ namespace Syft {
         if (color_to_variable_.find(var) == color_to_variable_.end()) {
           CUDD::BDD var_bdd = color_mgr_.bddVar();
           color_to_variable_[var] = var_bdd;
+          bdd_id_to_color_[var_bdd.NodeReadIndex()] = var;
         }
         bdd_stack.push(color_to_variable_[var]);
       } else if (token == "!") {
@@ -203,12 +209,24 @@ namespace Syft {
     return bdd_stack.top();
   }
 
-  std::string MannaPnueli::color_formula_bdd_to_string (const CUDD::BDD &color_formula_bdd) const{
+  std::string MannaPnueli::color_formula_bdd_to_string(const CUDD::BDD &color_formula_bdd) const{
 
-    std::string bdd_string = color_formula_bdd.FactoredFormString();
-    bdd_string = std::regex_replace(bdd_string, std::regex("x(\\d+)"), "$1");
+    std::string formula_str = color_formula_bdd.FactoredFormString();
+    formula_str = std::regex_replace(formula_str, std::regex("x(\\d+)"), "$1");
 
-    return bdd_string;
+    // replace the bdd ID with their corresponding color
+    std::regex prop_regex(R"(\b\d+\b)"); // Matches whole numbers
+    std::sregex_iterator it(formula_str.begin(), formula_str.end(), prop_regex);
+    std::sregex_iterator end;
+
+    for (; it != end; ++it) {
+      int prop = std::stoi(it->str());  // Convert matched string to integer
+      if (bdd_id_to_color_.find(prop) != bdd_id_to_color_.end()) {
+        formula_str = std::regex_replace(formula_str, std::regex("\\b" + std::to_string(prop) + "\\b"), std::to_string(bdd_id_to_color_.at(prop)));
+      }
+    }
+
+    return formula_str;
   }
 
   std::pair<MannaPnueli::Dag, MannaPnueli::Node_to_Id> MannaPnueli::build_FG_dag() {
@@ -234,48 +252,42 @@ namespace Syft {
 
       if (x == 0 && y == 0) continue; // Stop when F is all 0s and G is all 1s
 
-      // Case 1: Reduce a 0 in G
-      if (y > 0) {
-        std::vector<int> newG = node->G;
-        for (int i = 0; i < n; i++) {
-          if (newG[i] == 0) {
-            newG[i] = 1;
-            break;
-          }
-        }
-        if (node_to_id.find({node->F, newG}) == node_to_id.end()) {
-          Node* newNode = new Node{node->F, newG, nodeCounter++};
-          dag[newNode->id] = newNode;
-          node_to_id[{node->F, newG}] = newNode->id;
-          q.push(newNode);
-        }
-        Node* parent_node = dag[node_to_id[{node->F, newG}]];
-        node->parents.push_back(parent_node);
-      }
-
-      // Case 2: Reduce a 1 in F
-      if (x > 0) {
-        std::vector<int> newF = node->F;
+      // Generate all possible children by reducing different 1s in F
         for (int i = 0; i < m; i++) {
-          if (newF[i] == 1) {
+          if (node->F[i] == 1) {
+            std::vector<int> newF = node->F;
             newF[i] = 0;
-            break;
+            if (node_to_id.find({newF, node->G}) == node_to_id.end()) {
+              Node* newNode = new Node{newF, node->G, nodeCounter++};
+              dag[newNode->id] = newNode;
+              node_to_id[{newF, node->G}] = newNode->id;
+              q.push(newNode);
+            }
+            Node* parent_node = dag[node_to_id[{newF, node->G}]];
+            node->parents.push_back(parent_node);
           }
         }
-        if (node_to_id.find({newF, node->G}) == node_to_id.end()) {
-          Node* newNode = new Node{newF, node->G, nodeCounter++};
-          dag[newNode->id] = newNode;
-          node_to_id[{newF, node->G}] = newNode->id;
-          q.push(newNode);
+
+      // Generate all possible children by reducing different 0s in G
+      for (int i = 0; i < n; i++) {
+        if (node->G[i] == 0) {
+          std::vector<int> newG = node->G;
+          newG[i] = 1;
+          if (node_to_id.find({node->F, newG}) == node_to_id.end()) {
+            Node* newNode = new Node{node->F, newG, nodeCounter++};
+            dag[newNode->id] = newNode;
+            node_to_id[{node->F, newG}] = newNode->id;
+            q.push(newNode);
+          }
+          Node* parent_node = dag[node_to_id[{node->F, newG}]];
+          node->parents.push_back(parent_node);
         }
-        Node* parent_node = dag[node_to_id[{newF, node->G}]];
-        node->parents.push_back(parent_node);
       }
     }
     return {dag, node_to_id};
   }
 
-  std::string MannaPnueli::simply_color_formula(std::vector<int> F_color, std::vector<int> G_color) const{
+  std::string MannaPnueli::simplify_color_formula(std::vector<int> F_color, std::vector<int> G_color) const{
     CUDD::BDD new_color_formula_bdd = color_formula_bdd_;
     // std::cout << new_color_formula_bdd.FactoredFormString()<< std::endl;
     for (int i = 0; i < F_color.size(); i++) {
@@ -334,7 +346,7 @@ namespace Syft {
 
 
 
-      std::string curColor_formula = simply_color_formula(node->F, node->G);
+      std::string curColor_formula = simplify_color_formula(node->F, node->G);
       std::cout << curColor_formula << std::endl;
 
       // build Zielonka tree for current F- and G-colors

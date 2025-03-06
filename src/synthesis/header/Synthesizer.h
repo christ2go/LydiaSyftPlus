@@ -39,8 +39,9 @@ namespace Syft {
 
     struct MPSynthesisResult {
         bool realizability;
-        CUDD::BDD winning_states;
-        EL_output_function output_function;
+        std::vector<CUDD::BDD> winning_states;
+        // TODO how to store the strategy?
+        // MP_output_function output_function;
         CUDD::BDD safe_states;
     };
 
