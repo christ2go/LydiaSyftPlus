@@ -301,19 +301,19 @@ namespace Syft {
 
     SymbolicStateDfa SymbolicStateDfa::dfa_of_ppltl_formula(const whitemech::lydia::PPLTLFormula& formula) {
 
+        // TODO. Refactor
+
         std::shared_ptr<VarMgr> mgr = std::make_shared<VarMgr>();
 
         whitemech::lydia::StrPrinter p;
 
         // get NNF
         whitemech::lydia::NNFTransformer t;
-        auto nnf =
-        t.apply(formula);
+        auto nnf = t.apply(formula);
 
         // get YNF
         whitemech::lydia::YNFTransformer yt;
-        auto ynf =
-        yt.apply(*nnf);
+        auto ynf = yt.apply(*nnf);
 
         // get subformulas
         auto y_sub = yt.get_y_sub();
@@ -361,7 +361,7 @@ namespace Syft {
         }
 
         // final states
-        CUDD::BDD final_states = val(formula, mgr);
+        CUDD::BDD final_states = val(*ynf, mgr);
 
         // output 
         SymbolicStateDfa dfa(std::move(mgr));
