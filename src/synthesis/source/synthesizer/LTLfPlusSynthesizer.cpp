@@ -127,7 +127,7 @@ namespace Syft {
     SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
     arena.dump_dot("arena.dot");
     EmersonLei solver(arena, color_formula_, starting_player_, protagonist_player_,
-                      goal_states, var_mgr_->cudd_mgr()->bddOne());
+                      goal_states, var_mgr_->cudd_mgr()->bddOne(), var_mgr_->cudd_mgr()->bddZero(), var_mgr_->cudd_mgr()->bddZero());
     return solver.run_EL();
   }
 }

@@ -112,6 +112,11 @@ namespace ELHelpers {
         input = std::regex_replace(input, inf_re, "");
         input = std::regex_replace(input, fin_re, "!");
 
+        std::regex true_re("true");
+        std::regex false_re("false");
+        input = std::regex_replace(input, true_re, "t");
+        input = std::regex_replace(input, false_re, "f");
+
         for (size_t i=0; i<input.size(); i++){
             std::string s = "";
             char inp = input[i];
@@ -144,6 +149,14 @@ namespace ELHelpers {
                 return false;
         }
         return true;
+    }
+
+    inline bool isTrue(std::string s){
+        return (s == "t");
+    }
+
+    inline bool isFalse(std::string s){
+        return (s == "f");
     }
 
     // Helper for infix2postfix
@@ -181,6 +194,12 @@ namespace ELHelpers {
                     opStack.pop_back();
                 }
                 }
+            }
+            else if (isTrue(s)){
+                outputStack.push_back(s);
+            }
+            else if (isFalse(s)){
+                outputStack.push_back(s);
             }
             else if (s == "("){
                 opStack.push_back(s);
@@ -221,8 +240,11 @@ namespace ELHelpers {
                 int tmp = stoi(s);
                 //std::cout << "var " << tmp << std::endl;
                 resStack.push_back(colors[tmp]);
-            }
-            else{
+            } else if (isTrue(s)) {
+                resStack.push_back(true);
+            } else if (isFalse(s)) {
+                resStack.push_back(false);
+            } else {
                 if (s == "!"){
                     bool tmp = resStack.back();
                     resStack.pop_back();

@@ -96,15 +96,7 @@ int main(int argc, char** argv) {
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
 
-    // Syft::LTLfPlusSynthesizer synthesizer(
-    //     ltlf_plus_formula,
-    //     partition,
-    //     starting_player,
-    //     Syft::Player::Agent
-    // );
-    //
-    // // do synthesis
-    // auto synthesis_result = synthesizer.run();
+
 
     Syft::LTLfPlusSynthesizerMP synthesizerMP(
         ltlf_plus_formula,
@@ -116,8 +108,16 @@ int main(int argc, char** argv) {
     // do synthesis
     auto synthesis_result_MP = synthesizerMP.run();
 
-
-    // show result
+    // Syft::LTLfPlusSynthesizer synthesizer(
+    //     ltlf_plus_formula,
+    //     partition,
+    //     starting_player,
+    //     Syft::Player::Agent
+    // );
+    //
+    // // do synthesis
+    // auto synthesis_result = synthesizer.run();
+    // // show result
     // if (synthesis_result.realizability) {
     //     std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
     //     int i = 0;

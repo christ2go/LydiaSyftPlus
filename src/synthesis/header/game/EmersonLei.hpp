@@ -27,6 +27,8 @@ namespace Syft {
 		*/
 		std::vector<CUDD::BDD> Colors_;
 		std::string color_formula_;
+		CUDD::BDD instant_winning_;
+		CUDD::BDD instant_losing_;
 		
 		public:
 		
@@ -40,7 +42,7 @@ namespace Syft {
 		* \param state_space The state space.
 		*/
 		EmersonLei(const SymbolicStateDfa &spec, const std::string color_formula, Player starting_player, Player protagonist_player,
-		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space);
+		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, const CUDD::BDD &instant_winning, const CUDD::BDD &instant_losing);
 
     CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
     CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;

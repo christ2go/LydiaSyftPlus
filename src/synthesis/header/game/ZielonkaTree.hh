@@ -26,6 +26,8 @@ class ZielonkaTree {
 private:
     // Private Variables
     ZielonkaNode *root;
+    size_t leaves = 0;
+    size_t total_nodes = 0;
     std::vector<std::string> phi; // Emerson-Lei condition in tokenized postfix format
     std::vector<CUDD::BDD> colorBDDs_;
     std::shared_ptr<Syft::VarMgr> var_mgr_;

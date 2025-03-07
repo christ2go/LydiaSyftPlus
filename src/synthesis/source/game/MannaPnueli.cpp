@@ -40,13 +40,13 @@ namespace Syft {
   void MannaPnueli::print_FG_dag() const{
     std::cout << "FG DAG:\n";
     for (auto& [id, node] : dag_) {
-      std::cout << "Node " << node->id << " (";
+      std::cout << "Dag Node " << node->id << " (";
       for (int bit : node->F) std::cout << bit;
       std::cout << ", ";
       for (int bit : node->G) std::cout << bit;
       std::cout << ") <- {";
       for (Node* parent : node->parents) {
-        std::cout << " Node " << parent->id << " (";
+        std::cout << " Dag Node " << parent->id << " (";
         for (int bit : parent->F) std::cout << bit;
         std::cout << ", ";
         for (int bit : parent->G) std::cout << bit;
@@ -340,7 +340,7 @@ namespace Syft {
 
   MPSynthesisResult MannaPnueli::run_MP() const {
 
-    std::vector<CUDD::BDD> WP_winning_states(dag_.size(), var_mgr_->cudd_mgr()->bddZero()); //TODO here initialized as Zero just for testing
+    std::vector<ELSynthesisResult> EL_results(dag_.size()); //TODO here initialized as Zero just for testing
     std::vector<bool> computed(dag_.size(), false);
 
     while (std::find(computed.begin(), computed.end(), false) != computed.end()) {
@@ -348,7 +348,7 @@ namespace Syft {
       auto it = std::find(computed.begin(), computed.end(), false);
       int index = distance(computed.begin(), it);
       Node* node = dag_.at(index);
-      std::cout << "Now process: Node " << node->id << " (";
+      std::cout << "Now process: Dag Node " << node->id << " (";
       for (int bit : node->F) std::cout << bit;
       std::cout << ", ";
       for (int bit : node->G) std::cout << bit;
@@ -365,26 +365,18 @@ namespace Syft {
       CUDD::BDD instant_winning = var_mgr_->cudd_mgr()->bddZero();
       CUDD::BDD instant_losing = var_mgr_->cudd_mgr()->bddZero();
       for (auto child : node->children) {
-        CUDD::BDD child_winnning_states = WP_winning_states[child.first->id];
+        CUDD::BDD child_winnning_states = EL_results[child.first->id].winning_states;
         int color_flipped = child.second; // the color that got flipped
         auto is_F_color = std::find(F_colors_.begin(), F_colors_.end(), color_flipped);
         auto is_G_color = std::find(G_colors_.begin(), G_colors_.end(), color_flipped);
         assert((is_F_color != F_colors_.end()) || (is_G_color != G_colors_.end())); // it has to be either an F or G
-        int color_value_in_child;
-        if (is_F_color != F_colors_.end()) { // if the flipped color is F
-          int index = static_cast<int>(std::distance(F_colors_.begin(), is_F_color));
-          color_value_in_child = child.first->F[index];
-        } else { // if it is G
-          int index = static_cast<int>(std::distance(G_colors_.begin(), is_G_color));
-          color_value_in_child = child.first->G[index];
-        }
 
-        if (color_value_in_child == 0) {
-          instant_winning = instant_winning | (child_winnning_states * !Colors_[color_flipped]);
-          instant_losing = instant_losing | (!child_winnning_states * !Colors_[color_flipped]);
-        } else {
+        if (is_F_color != F_colors_.end()) {
           instant_winning = instant_winning | (child_winnning_states * Colors_[color_flipped]);
           instant_losing = instant_losing | (!child_winnning_states * Colors_[color_flipped]);
+        } else {
+          instant_winning = instant_winning | (child_winnning_states * !Colors_[color_flipped]);
+          instant_losing = instant_losing | (!child_winnning_states * !Colors_[color_flipped]);
         }
 
       }
@@ -394,31 +386,29 @@ namespace Syft {
       // 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning
       //		 Add nodes from !winningStates for which curcolors&seencolors=colors to instantLosing
       EmersonLei solver(spec_, curColor_formula, starting_player_, protagonist_player_,
-                      Colors_, var_mgr_->cudd_mgr()->bddOne());
+                      Colors_, var_mgr_->cudd_mgr()->bddOne(), instant_winning, instant_losing);
+      ELSynthesisResult result = solver.run_EL();
       // solve EL game for curColor_formula
       //TODO change run_EL to take instantWinning, or change the constructor of EL
       // ELSynthesisResult el_synthesis_result = solver.run_EL(instantWinning, instantLosing);
       computed[index] = true;
+      EL_results[index] = result;
 
 
 
     }
     // update result according to computed solution, TODO: store result for curcolors; also, winningmoves
     MPSynthesisResult result;
-    // if (includes_initial_state(winning_states)) {
-    //   result.realizability = true;
-    //   result.winning_states = winning_states;
-    //   EL_output_function op;
-    //   result.output_function = ExtractStrategy_Explicit(op, spec_.initial_state_bdd(), Ztree->get_root());
-    //   return result;
-    // } else {
-    //   result.realizability = false;
-    //   result.winning_states = winning_states;
-    //   EL_output_function output_function;
-    //   result.output_function = output_function;
-    //   return result;
-    // }
-    return result;
+
+    if (EL_results[dag_.size()-1].realizability) {
+      result.realizability = true;
+      result.winning_states = EL_results[dag_.size()-1].winning_states;
+      return result;
+    } else {
+      result.realizability = false;
+      result.winning_states = EL_results[dag_.size()-1].winning_states;
+      return result;
+    }
 
   }
 }

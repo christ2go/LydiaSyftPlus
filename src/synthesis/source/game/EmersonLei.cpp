@@ -8,9 +8,11 @@ namespace Syft {
   EmersonLei::EmersonLei(const SymbolicStateDfa &spec, const std::string color_formula, Player starting_player,
                          Player protagonist_player,
                          const std::vector<CUDD::BDD> &colorBDDs,
-                         const CUDD::BDD &state_space)
+                         const CUDD::BDD &state_space,
+                         const CUDD::BDD &instant_winning,
+                         const CUDD::BDD &instant_losing)
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula), Colors_(colorBDDs),
-      state_space_(state_space) {
+      state_space_(state_space), instant_winning_(instant_winning), instant_losing_(instant_losing) {
   }
 
   SynthesisResult EmersonLei::run() const {
@@ -23,26 +25,24 @@ namespace Syft {
   }
 
   ELSynthesisResult EmersonLei::run_EL() const {
-    std::cout << "Colors: \n";
-    for (size_t i = 0; i < Colors_.size(); i++) {
-      std::cout << Colors_[i] << '\n';
-    }
+    // std::cout << "Colors: \n";
+    // for (size_t i = 0; i < Colors_.size(); i++) {
+    //   std::cout << Colors_[i] << '\n';
+    // }
 
     // build Zielonka tree; parse formula from PHI_FILE, number of colors taken from Colors
     ZielonkaTree *Ztree = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
 
 
+
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
-    CUDD::BDD winning_states = EmersonLeiSolve(Ztree->get_root(), var_mgr_->cudd_mgr()->bddZero());
+    CUDD::BDD winning_states = EmersonLeiSolve(Ztree->get_root(), instant_winning_);
 
     // update result according to computed solution
     ELSynthesisResult result;
     if (includes_initial_state(winning_states)) {
       result.realizability = true;
-      //TODO fix winning states
-      std::vector<CUDD::BDD> wins;
-      wins.push_back(winning_states);
-      result.winning_states = wins;
+      result.winning_states = winning_states;
       EL_output_function op;
       std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
       result.output_function = ExtractStrategy_Explicit(op, winning_states, spec_.initial_state_bdd(),
@@ -50,10 +50,7 @@ namespace Syft {
       return result;
     } else {
       result.realizability = false;
-      //TODO fix winning states
-      std::vector<CUDD::BDD> wins;
-      wins.push_back(winning_states);
-      result.winning_states = wins;
+      result.winning_states = winning_states;
       EL_output_function output_function;
       result.output_function = output_function;
       return result;
@@ -406,13 +403,13 @@ namespace Syft {
       //             result = project_into_states(new_target_moves);
       // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
       if (t->winning) {
-        CUDD::BDD new_target_moves = (state_space_ & quantified_X_transitions_to_winning_states);
+        CUDD::BDD new_target_moves = (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
         result = target | project_into_states(new_target_moves);
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
       } else {
         CUDD::BDD new_target_moves =
-            (state_space_ & (!target) & quantified_X_transitions_to_winning_states);
+            (state_space_ & (!target) & quantified_X_transitions_to_winning_states) & (!instant_losing_);
         result = target | project_into_states(new_target_moves);
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
@@ -422,13 +419,13 @@ namespace Syft {
       if (t->winning) {
         CUDD::BDD result = state_space_ & project_into_states(transitions_to_target_states);
         // result = target | new_collected_target_states;
-        CUDD::BDD new_target_moves = result & transitions_to_target_states;
+        CUDD::BDD new_target_moves = (result & transitions_to_target_states) & (!instant_losing_);
         // CUDD::BDD diffmoves = (!target) & transitions_to_target_states;
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
       } else {
         CUDD::BDD result = state_space_ & project_into_states(transitions_to_target_states);
         // result = target | new_collected_target_states;
-        CUDD::BDD new_target_moves = (!target) & result & transitions_to_target_states;
+        CUDD::BDD new_target_moves = (!target) & result & transitions_to_target_states & (!instant_losing_);
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
       }
     }
@@ -444,11 +441,13 @@ namespace Syft {
       X = var_mgr_->cudd_mgr()->bddOne();
       if (t->children.empty()) {
         // t->winningmoves[0]=var_mgr_->cudd_mgr()->bddOne();
-        t->winningmoves.push_back(var_mgr_->cudd_mgr()->bddOne());
+        // t->winningmoves.push_back(var_mgr_->cudd_mgr()->bddOne());
+        t->winningmoves.push_back(!instant_losing_);
       } else {
         for (int i = 0; i < t->children.size(); i++) {
           //t->winningmoves[i] = var_mgr_->cudd_mgr()->bddOne();
-          t->winningmoves.push_back(var_mgr_->cudd_mgr()->bddOne());
+          // t->winningmoves.push_back(var_mgr_->cudd_mgr()->bddOne());
+          t->winningmoves.push_back(!instant_losing_);
         }
       }
     } else {
@@ -471,7 +470,7 @@ namespace Syft {
 
       // if t is a leaf
       if (t->children.empty()) {
-        XX = term | (t->safenodes & cpre(t, 0, X));
+        XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
       }
 
       // if t is not a leaf
@@ -488,7 +487,7 @@ namespace Syft {
         for (int i = 0; i < t->children.size(); i++) {
           // add new choice to term
           auto s = t->children[i];
-          CUDD::BDD current_term = term | (s->targetnodes & cpre(t, i, X));
+          CUDD::BDD current_term = term | (s->targetnodes & cpre(t, i, X & (!instant_losing_)));
           if (t->winning) {
             // intersect with recursively computed solution for s and current term
             XX &= EmersonLeiSolve(s, current_term);

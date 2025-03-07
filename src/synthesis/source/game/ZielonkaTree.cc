@@ -13,12 +13,10 @@ bool cmp_descending_count_true(const std::vector<bool>& a, const std::vector<boo
     return std::count(a.begin(), a.end(), true) > std::count(b.begin(), b.end(), true);
 }
 
-// Private
-size_t leaves = 0;
-size_t total_nodes = 0;
+
 
 void ZielonkaTree::generate() {
-    //std::cout << "generating... \n";
+    std::cout << "generating... \n";
     std::queue<ZielonkaNode*> q;
     q.push(root);
     std::vector<std::vector<bool>> ps = ELHelpers::powerset(root->label.size());

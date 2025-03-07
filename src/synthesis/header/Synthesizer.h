@@ -32,17 +32,16 @@ namespace Syft {
     typedef std::vector<ELWinningMove> EL_output_function;
     struct ELSynthesisResult {
         bool realizability;
-        std::vector<CUDD::BDD> winning_states;
+        CUDD::BDD winning_states;
         EL_output_function output_function;
         CUDD::BDD safe_states;
     };
 
     struct MPSynthesisResult {
         bool realizability;
-        std::vector<CUDD::BDD> winning_states;
+        CUDD::BDD winning_states;
         // TODO how to store the strategy?
         // MP_output_function output_function;
-        CUDD::BDD safe_states;
     };
 
     struct MaxSetSynthesisResult {
