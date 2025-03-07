@@ -4,49 +4,57 @@ namespace Syft {
 
     // val(true, σ, s) = true
     void ValVisitor::visit(const PPLTLTrue& x) {
-        result = mgr_->cudd_mgr()->bddOne();
+        CUDD::BDD r = mgr_->cudd_mgr()->bddOne();
+        result = r;
     }
 
     // val(false, σ, s) = false
     void ValVisitor::visit(const PPLTLFalse& x) {
-        result = mgr_->cudd_mgr()->bddZero();
+        CUDD::BDD r = mgr_->cudd_mgr()->bddZero();
+        result = r;
     }
 
     // val(x, σ, s) = x
     void ValVisitor::visit(const PPLTLAtom& x) {
         auto str = p.apply(x);
-        result = mgr_->name_to_variable(str);
+        CUDD::BDD r = mgr_->name_to_variable(str);
+        result = r;
     }
 
     // val(f1 ∧ ... ∧ fn, σ, s) = ⋀_{i} val(fi, σ, s)
     void ValVisitor::visit(const PPLTLAnd& x) {
-        result = mgr_->cudd_mgr()->bddOne();
+        CUDD::BDD r = mgr_->cudd_mgr()->bddOne();
         auto container = x.get_container();
-        for (auto& a : container) result = result * apply(*a);
+        for (auto& a : container) r = r * apply(*a);
+        result = r;
     }
 
     // val(f1 v ... v fn, σ, s) = V_{i} val(fi, σ, s)
     void ValVisitor::visit(const PPLTLOr& x) {
-        result = mgr_->cudd_mgr()->bddZero();
+        CUDD::BDD r = mgr_->cudd_mgr()->bddZero();
         auto container = x.get_container();
-        for (auto& a : container) result = result + apply(*a);
+        for (auto& a : container) r = r + apply(*a);
+        result = r;
     }
 
     // val(!f, σ, s) = !val(f, σ, s)
     void ValVisitor::visit(const PPLTLNot& x) {
-        result = !(apply(*x.get_arg()));
+        CUDD::BDD r = !(apply(*x.get_arg()));
+        result = r;
     }
 
     // val(Yf, σ, s) = Yf
     void ValVisitor::visit(const PPLTLYesterday& x) {
         auto str = p.apply(x);
-        result = mgr_->name_to_variable(str);
+        CUDD::BDD r = mgr_->name_to_variable(str);
+        result = r;
     }
 
     // val(WYf, σ, s) = WYf
     void ValVisitor::visit(const PPLTLWeakYesterday& x) {
         auto str = p.apply(x);
-        result = mgr_->name_to_variable(str);
+        CUDD::BDD r = mgr_->name_to_variable(str);
+        result = r;
     }
 
     // val(f1 S f2, σ, s) = val(f2 v (f1 ∧ Y(f1 S f2)), σ, s)
