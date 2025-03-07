@@ -72,8 +72,10 @@ int main(int argc, char** argv) {
     std::shared_ptr<whitemech::lydia::AbstractDriver> driver;
     driver = std::make_shared<whitemech::lydia::parsers::ppltl::PPLTLDriver>();
 
-    // std::string ppltl_formula = "(Y(a) && Y(b)) || Y(c)";
-    std::string ppltl_formula = "Y(a) && (!b S c)";
+    std::string ppltl_formula;
+    std::cout << "Enter a PPLTL formula: ";
+    std::getline(std::cin, ppltl_formula);
+    
     std::stringstream formula_stream(ppltl_formula);
     driver->parse(formula_stream);
     auto parsed_formula = driver->get_result();
@@ -116,7 +118,8 @@ int main(int argc, char** argv) {
     std::cout << "Final states: " << final_states;
     std::cout  << std::endl;
 
-    // interactive mode
-    interactive(sdfa);
-
+    std::string interactive_mode;
+    std::cout << "Do you want to enter interactive mode? (y/n): ";
+    std::cin >> interactive_mode;
+    if (interactive_mode == "y") interactive(sdfa);
 }
