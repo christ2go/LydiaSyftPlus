@@ -16,7 +16,7 @@ void VarMgr::print_mgr() const {
   std::cout << "Number of managed automata: " << state_variables_.size() << std::endl;
 
   // prints number of vars
-  std::cout << "Number of variables: " << total_variable_count_ << std::endl;
+  std::cout << "Number of variables: " << total_variable_count() << std::endl;
 
   // prints named variables
   std::cout << "Named variables (name, var): " << std::endl;
