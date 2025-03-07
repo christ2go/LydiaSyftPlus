@@ -82,7 +82,7 @@ namespace Syft {
         auto arg = x.get_arg(); // f
         auto h = x.ctx().makePPLTLHistorically(arg); // H(f)
         auto wyh = x.ctx().makePPLTLWeakYesterday(h); // WY(H(f))
-        auto r = x.ctx().makePPLTLAnd({arg, h});
+        auto r = x.ctx().makePPLTLAnd({arg, wyh});
         result = apply(*r);
     }
 
