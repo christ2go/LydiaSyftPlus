@@ -300,9 +300,7 @@ namespace Syft {
     }
 
     SymbolicStateDfa SymbolicStateDfa::dfa_of_ppltl_formula(const whitemech::lydia::PPLTLFormula& formula) {
-
-        // TODO. Refactor
-
+        
         std::shared_ptr<VarMgr> mgr = std::make_shared<VarMgr>();
 
         whitemech::lydia::StrPrinter p;
@@ -326,23 +324,19 @@ namespace Syft {
         mgr->create_named_variables(str_atoms);
 
         // creates Boolean variables for Y and WY subformulas
-        // it also initializes the initial state
         std::vector<std::string> str_sub;
         std::vector<int> init_state;
-        for (const auto& a : y_sub) {
-            str_sub.push_back(p.apply(*a));
-            init_state.push_back(0);
-        }
-        for (const auto& a : wy_sub) {
-            str_sub.push_back(p.apply(*a));
-            init_state.push_back(1);
-        }
+        str_sub.reserve(y_sub.size() + wy_sub.size());
+        init_state.reserve(y_sub.size() + wy_sub.size());
+        for (const auto& a : y_sub) str_sub.push_back(p.apply(*a));
+        for (const auto& a : wy_sub) str_sub.push_back(p.apply(*a));
         auto dfa_id = mgr->create_named_state_variables(str_sub);
 
-        // transition function
+        // transition function and initial state
         // Z = (Y0, ..., Yn, WY0, ...., WYm) {0, 1}
         // d = (dY0, ..., dYn, dWY0, ..., dWYm) {BDD}
         std::vector<CUDD::BDD> transition_function;
+        transition_function.reserve(y_sub.size() + wy_sub.size());
         ValVisitor v(mgr);
 
         // Y state vars
@@ -351,6 +345,7 @@ namespace Syft {
             auto arg = ya->get_arg();
             auto bdd = val(*arg, mgr);
             transition_function.push_back(bdd);
+            init_state.push_back(0);
         }
         // WY state vars
         for (const auto& f : wy_sub) {
@@ -358,6 +353,7 @@ namespace Syft {
             auto arg = wya->get_arg();
             auto bdd = val(*arg, mgr);
             transition_function.push_back(bdd);
+            init_state.push_back(1);
         }
 
         // final states
@@ -371,7 +367,6 @@ namespace Syft {
         dfa.final_states_ = std::move(final_states);
 
         return dfa;
-
     }
 }
 
