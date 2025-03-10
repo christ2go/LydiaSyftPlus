@@ -2,8 +2,6 @@
 
 namespace Syft {
 
-    // TODO. Modify ValVisitor to unfold definition of val function
-
     // val(true, σ, s) = true
     void ValVisitor::visit(const PPLTLTrue& x) {
         CUDD::BDD r = mgr_->cudd_mgr()->bddOne();
@@ -63,40 +61,44 @@ namespace Syft {
     void ValVisitor::visit(const PPLTLSince& x) {
         auto arg1 = x.get_args()[0]; // f1
         auto arg2 = x.get_args()[1]; // f2
-        auto s = x.ctx().makePPLTLSince(arg1, arg2); // f1 S f2
-        auto ys = x.ctx().makePPLTLYesterday(s); // Y(f1 S f2)
-        auto r = x.ctx().makePPLTLAnd({arg1, ys}); // (f1 ∧ Y(f1 S f2))
-        auto l = x.ctx().makePPLTLOr({arg2, r}); // f2 v (f1 ∧ Y(f1 S f2))
-        result = std::move(apply(*l));
+        auto b1 = apply(*arg1); // val(f1)
+        auto b2 = apply(*arg2); // val(f2)
+        auto y = x.ctx().makePPLTLYesterday(x.ctx().makePPLTLSince(arg1, arg2)); // Y(f1 S f2)
+        auto yb = apply(*y); // val(Y(f1 S f2))
+        auto r = b2 + (b1 * yb); // val(f2) + (val(f1) * val(Y(f1 S f2)))
+        result = std::move(r);
     }
 
     // val(Of, σ, s) = val(f v Y(O(f)), σ, s)
     void ValVisitor::visit(const PPLTLOnce& x) {
         auto arg = x.get_arg(); // f
-        auto o = x.ctx().makePPLTLOnce(arg); // O(f)
-        auto yo = x.ctx().makePPLTLYesterday(o); // Y(O(f))
-        auto r = x.ctx().makePPLTLOr({arg, yo}); // f v Y(O(f))
-        result = std::move(apply(*r));
+        auto b = apply(*arg); // val(f)
+        auto y = x.ctx().makePPLTLYesterday(x.ctx().makePPLTLOnce(arg)); // Y(O(f))
+        auto yb = apply(*y); // val(Y(O(f)))
+        auto r = b + yb; // val(f) + val(Y(O(f)))
+        result = std::move(r);
     }
 
     // val(Hf, σ, s) = val(f ∧ WY(H(f), σ, s)
     void ValVisitor::visit(const PPLTLHistorically& x) {
         auto arg = x.get_arg(); // f
-        auto h = x.ctx().makePPLTLHistorically(arg); // H(f)
-        auto wyh = x.ctx().makePPLTLWeakYesterday(h); // WY(H(f))
-        auto r = x.ctx().makePPLTLAnd({arg, wyh});
-        result = std::move(apply(*r));
+        auto b = apply(*arg); // val(f)
+        auto y = x.ctx().makePPLTLWeakYesterday(x.ctx().makePPLTLHistorically(arg)); // WY(H(f))
+        auto yb = apply(*y); // val(WY(H(f)))
+        auto r = b * yb; // val(f) * val(WY(H(f)))
+        result = std::move(r);
     }
 
     // val(f1 T f2, σ, s) = val(f1 ∧ (f2 v WY(f1 T f2), σ, s)
     void ValVisitor::visit(const PPLTLTriggered& x) {
         auto arg1 = x.get_args()[0]; // f1
         auto arg2 = x.get_args()[1]; // f2
-        auto t = x.ctx().makePPLTLTriggered(arg1, arg2); // f1 T f2
-        auto wyt = x.ctx().makePPLTLWeakYesterday(t); // WY(f1 T f2)
-        auto r = x.ctx().makePPLTLOr({arg2, wyt}); // (f2 v WY(f1 T f2))
-        auto l = x.ctx().makePPLTLAnd({arg1, r}); // f1 ∧ (f2 v Y(f1 S f2))
-        result = std::move(apply(*l));
+        auto b1 = apply(*arg1); // val(f1)
+        auto b2 = apply(*arg2); // val(f2)
+        auto y = x.ctx().makePPLTLWeakYesterday(x.ctx().makePPLTLTriggered(arg1, arg2)); // WY(f1 T f2)
+        auto yb = apply(*y); // val(WY(f1 T f2))
+        auto r = b1 * (b2 + yb); // val(f1) * (val(f2) + val(WY(f1 T f2)))
+        result = std::move(r);
     }
 
     CUDD::BDD ValVisitor::apply(const PPLTLFormula& x) {
