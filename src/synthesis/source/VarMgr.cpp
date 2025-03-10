@@ -137,6 +137,10 @@ CUDD::BDD VarMgr::state_variable(std::size_t automaton_id, std::size_t i)
     const {
   return state_variables_[automaton_id][i];
 }
+
+std::vector<CUDD::BDD> VarMgr::get_state_variables(std::size_t automaton_id) const {
+  return state_variables_[automaton_id];
+}
   
 CUDD::BDD VarMgr::state_vector_to_bdd(std::size_t automaton_id,
 				      const std::vector<int>& state_vector)
