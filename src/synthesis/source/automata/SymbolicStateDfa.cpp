@@ -370,7 +370,7 @@ namespace Syft {
         init_state.push_back(0);
 
         // final states
-        CUDD::BDD final_states = val(*ynf, mgr);
+        CUDD::BDD final_states = mgr->name_to_variable(final_str);
 
         // output 
         SymbolicStateDfa dfa(std::move(mgr));
@@ -387,6 +387,7 @@ namespace Syft {
         auto final_str = "F"+std::to_string(sdfa.automaton_id());
         auto final_var = mgr->name_to_variable(final_str);
         auto transition_function = sdfa.transition_function();
+        auto final_states = sdfa.final_states();
         auto lst = transition_function.size() - 1;
 
         // transform final states into sinks
@@ -394,13 +395,13 @@ namespace Syft {
 
         // remove initial state from final states
         auto init_state_bdd = sdfa.initial_state_bdd();
-        auto final_states = transition_function[lst] * !init_state_bdd;
+        auto new_final_states = final_states * !init_state_bdd;
 
         SymbolicStateDfa edfa(std::move(mgr));
         edfa.automaton_id_ = edfa.automaton_id(); 
         edfa.initial_state_ = sdfa.initial_state(); // same initial state
         edfa.transition_function_ = std::move(transition_function);        
-        edfa.final_states_ = std::move(final_states);
+        edfa.final_states_ = std::move(new_final_states);
 
         return edfa;
     }
@@ -410,18 +411,22 @@ namespace Syft {
         auto final_str = "F"+std::to_string(sdfa.automaton_id());
         auto final_var = mgr->name_to_variable(final_str);
         auto transition_function = sdfa.transition_function();
+        auto final_states = sdfa.final_states();
         auto lst = transition_function.size() - 1;
 
         // transform non-final states into sinks
-        transition_function[lst] = transition_function[lst] * final_var;
+        transition_function[lst] = transition_function[lst] * final_states;
 
         // add initial state to final states
-        auto init_state_bdd = sdfa.initial_state_bdd();
-        auto final_states = transition_function[lst] + init_state_bdd;
+        // auto init_state_bdd = sdfa.initial_state_bdd();
+        // auto new_final_states = final_states;
+
+        auto new_init_state = sdfa.initial_state();
+        new_init_state[lst] = 1;
 
         SymbolicStateDfa adfa(std::move(mgr));
         adfa.automaton_id_ = adfa.automaton_id();
-        adfa.initial_state_ = sdfa.initial_state(); // same initial state
+        adfa.initial_state_ = std::move(new_init_state);
         adfa.transition_function_ = std::move(transition_function);
         adfa.final_states_ = std::move(final_states);
 
