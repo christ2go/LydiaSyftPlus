@@ -30,7 +30,7 @@ void interactive(const Syft::SymbolicStateDfa& d) {
         interpretation.reserve(n_atoms + n_state_vars);
         for (int i = 0; i < n_atoms; ++i) {
             std::string atom_name = var_mgr->index_to_name(i);
-            if (atom_name[0] == 'Y' || atom_name[0] == 'W') continue;
+            if (atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'F') continue;
             std::cout << "Enter value for atom " << atom_name << ": ";
             int value;
             std::cin >> value;
@@ -62,6 +62,12 @@ void interactive(const Syft::SymbolicStateDfa& d) {
             new_state.push_back(eval);
         }
         state = new_state;
+
+        std::string exit;
+        std::cout << "Do you want to exit interactive mode? (y/n): ";
+        std::cin >> exit;
+        if (exit == "y") return;
+    
         std::cout << "--------------------------------" << std::endl;
     }
 }
@@ -98,6 +104,8 @@ int main(int argc, char** argv) {
 
     // symbolic DFA construction
     auto sdfa = Syft::SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl);
+    auto edfa = Syft::SymbolicStateDfa::get_exists_dfa(sdfa);
+    auto adfa = Syft::SymbolicStateDfa::get_forall_dfa(sdfa);
 
     // print alphabet and state variables
     sdfa.var_mgr()->print_mgr();
@@ -121,5 +129,34 @@ int main(int argc, char** argv) {
     std::string interactive_mode;
     std::cout << "Do you want to enter interactive mode? (y/n): ";
     std::cin >> interactive_mode;
-    if (interactive_mode == "y") interactive(sdfa);
+    if (interactive_mode == "y") interactive(sdfa);    
+
+    std::cout << "E(dfa) initial state: ";
+    for (const auto& b : edfa.initial_state()) std::cout << b;
+    std::cout << std::endl;
+
+    std::cout << "E(dfa) transition function: " << std::endl;
+    for (const auto& bdd : edfa.transition_function()) std::cout << bdd << std::endl;
+
+    std::cout << "E(dfa) final states: " << edfa.final_states() << std::endl;
+
+    std::string interactive_emode;
+    std::cout << "Do you want to enter interactive mode for E(ppltl)? (y/n): ";
+    std::cin >> interactive_emode;
+    if (interactive_emode == "y") interactive(edfa);
+
+    // print initial state, transition function and final states for A(dfa)
+    std::cout << "A(dfa) initial state: ";
+    for (const auto& b : adfa.initial_state()) std::cout << b;
+    std::cout << std::endl;
+
+    std::cout << "A(dfa) transition function: " << std::endl;
+    for (const auto& bdd : adfa.transition_function()) std::cout << bdd << std::endl;
+
+    std::cout << "A(dfa) final states: " << adfa.final_states() << std::endl;
+
+    std::string interactive_amode;
+    std::cout << "Do you want to enter interactive mode for A(ppltl)? (y/n): ";
+    std::cin >> interactive_amode;
+    if (interactive_amode == "y") interactive(adfa);
 }

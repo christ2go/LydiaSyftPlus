@@ -129,7 +129,15 @@ namespace Syft {
     }
 
     CUDD::BDD SymbolicStateDfa::initial_state_bdd() const {
-        return state_to_bdd(var_mgr_, automaton_id_, 1);
+        auto sv = var_mgr()->get_state_variables(automaton_id_);
+        auto is = initial_state();
+        CUDD::BDD bdd = var_mgr()->cudd_mgr()->bddOne();
+        for (int i = 0; i < is.size(); ++i) {
+            if (is[i]) bdd *= sv[i];
+            else if (!is[i]) bdd *= !sv[i];
+        }
+        return bdd;
+        // return state_to_bdd(var_mgr_, automaton_id_, 1);
     }
 
     CUDD::BDD SymbolicStateDfa::final_states() const {
@@ -325,18 +333,20 @@ namespace Syft {
 
         // creates Boolean variables for Y and WY subformulas
         std::vector<std::string> str_sub;
-        std::vector<int> init_state;
-        str_sub.reserve(y_sub.size() + wy_sub.size());
-        init_state.reserve(y_sub.size() + wy_sub.size());
+        str_sub.reserve(y_sub.size() + wy_sub.size() + 1);
         for (const auto& a : y_sub) str_sub.push_back(p.apply(*a));
         for (const auto& a : wy_sub) str_sub.push_back(p.apply(*a));
+        auto final_str = "F"+std::to_string(mgr->automaton_num());
+        str_sub.push_back(final_str);
         auto dfa_id = mgr->create_named_state_variables(str_sub);
 
         // transition function and initial state
         // Z = (Y0, ..., Yn, WY0, ...., WYm) {0, 1}
         // d = (dY0, ..., dYn, dWY0, ..., dWYm) {BDD}
         std::vector<CUDD::BDD> transition_function;
-        transition_function.reserve(y_sub.size() + wy_sub.size());
+        transition_function.reserve(y_sub.size() + wy_sub.size() + 1);
+        std::vector<int> init_state;
+        init_state.reserve(y_sub.size() + wy_sub.size() + 1);
         ValVisitor v(mgr);
 
         // Y state vars
@@ -355,6 +365,9 @@ namespace Syft {
             transition_function.push_back(bdd);
             init_state.push_back(1);
         }
+        // final state var
+        transition_function.push_back(val(*ynf, mgr));
+        init_state.push_back(0);
 
         // final states
         CUDD::BDD final_states = val(*ynf, mgr);
@@ -367,6 +380,52 @@ namespace Syft {
         dfa.final_states_ = std::move(final_states);
 
         return dfa;
+    }
+
+    SymbolicStateDfa SymbolicStateDfa::get_exists_dfa(const SymbolicStateDfa& sdfa) {
+        auto mgr = sdfa.var_mgr();
+        auto final_str = "F"+std::to_string(sdfa.automaton_id());
+        auto final_var = mgr->name_to_variable(final_str);
+        auto transition_function = sdfa.transition_function();
+        auto lst = transition_function.size() - 1;
+
+        // transform final states into sinks
+        transition_function[lst] = transition_function[lst] + final_var;
+
+        // remove initial state from final states
+        auto init_state_bdd = sdfa.initial_state_bdd();
+        auto final_states = transition_function[lst] * !init_state_bdd;
+
+        SymbolicStateDfa edfa(std::move(mgr));
+        edfa.automaton_id_ = edfa.automaton_id(); 
+        edfa.initial_state_ = sdfa.initial_state(); // same initial state
+        edfa.transition_function_ = std::move(transition_function);        
+        edfa.final_states_ = std::move(final_states);
+
+        return edfa;
+    }
+
+    SymbolicStateDfa SymbolicStateDfa::get_forall_dfa(const SymbolicStateDfa& sdfa) {
+        auto mgr = sdfa.var_mgr();
+        auto final_str = "F"+std::to_string(sdfa.automaton_id());
+        auto final_var = mgr->name_to_variable(final_str);
+        auto transition_function = sdfa.transition_function();
+        auto lst = transition_function.size() - 1;
+
+        // transform non-final states into sinks
+        transition_function[lst] = transition_function[lst] * final_var;
+
+        // add initial state to final states
+        auto init_state_bdd = sdfa.initial_state_bdd();
+        auto final_states = transition_function[lst] + init_state_bdd;
+
+        SymbolicStateDfa adfa(std::move(mgr));
+        adfa.automaton_id_ = adfa.automaton_id();
+        adfa.initial_state_ = sdfa.initial_state(); // same initial state
+        adfa.transition_function_ = std::move(transition_function);
+        adfa.final_states_ = std::move(final_states);
+
+        return adfa;
     }
 }
 

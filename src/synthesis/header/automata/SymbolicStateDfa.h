@@ -192,6 +192,22 @@ namespace Syft {
      * \return The corresponding symbolic-state DFA
      */
         static SymbolicStateDfa dfa_of_ppltl_formula(const whitemech::lydia::PPLTLFormula& formula);
+
+    /**
+     * \brief Construct symbolic-state DFA for E(sdfa)
+     * 
+     * \param sdfa A symbolic-state DFA
+     * \return The symbolic-state DFA for E(sdfa) 
+     */
+        static SymbolicStateDfa get_exists_dfa(const SymbolicStateDfa& sdfa);
+
+    /**
+     * \brief Construct symbolic-state DFA for A(sdfa)
+     * 
+     * \param sdfa A symbolic-state DFA
+     * \return The symbolic-state DFA for A(sdfa) 
+     */
+        static SymbolicStateDfa get_forall_dfa(const SymbolicStateDfa& sdfa);
     };
 
 }
