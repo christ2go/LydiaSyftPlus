@@ -21,9 +21,29 @@ void interactive(const Syft::SymbolicStateDfa& d) {
     while (true) {
         std::cout << "--------------------------------" << std::endl;
 
+        std::cout << "Current trace: ";
+        for (const auto& t : trace) std::cout << t;
+        std::cout << std::endl;
+
         std::cout << "Current state: ";
         for (const auto& b : state) std::cout << b;
         std::cout << std::endl;
+
+        std::vector<int> state_eval;
+        state_eval.reserve(n_atoms + n_state_vars);
+        for (int i = 0; i < n_atoms ; ++i) {
+            std::string atom_name = var_mgr->index_to_name(i);
+            if (!(atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'F')) state_eval.push_back(0);
+        }
+        for (const auto& b : state) state_eval.push_back(b);
+
+        // print state_eval
+        std::cout << "State evaluation: ";
+        for (const auto& i : state_eval) std::cout << i;
+        std::cout << std::endl;
+
+        if (final_states.Eval(state_eval.data()).IsOne()) std::cout << "Current state is FINAL" << std::endl;
+        else std::cout << "Current state is NOT FINAL" << std::endl;
 
         std::vector<int> interpretation;
         std::string interpretation_string = "";
@@ -42,13 +62,6 @@ void interactive(const Syft::SymbolicStateDfa& d) {
         for (const auto& b : state) interpretation.push_back(b);
 
         trace.push_back(interpretation_string);
-
-        std::cout << "Current trace: ";
-        for (const auto& t : trace) std::cout << t;
-        std::cout << std::endl;
-
-        if (final_states.Eval(interpretation.data()).IsOne()) std::cout << "Current state is FINAL" << std::endl;
-        else std::cout << "Current state is NOT FINAL" << std::endl;
 
         std::cout << "Interpretation: ";
         for (const auto& i : interpretation) std::cout << i;
@@ -131,6 +144,7 @@ int main(int argc, char** argv) {
     std::cin >> interactive_mode;
     if (interactive_mode == "y") interactive(sdfa);    
 
+    std::cout << "--------------------------------" << std::endl;
     std::cout << "E(dfa) initial state: ";
     for (const auto& b : edfa.initial_state()) std::cout << b;
     std::cout << std::endl;
@@ -144,8 +158,9 @@ int main(int argc, char** argv) {
     std::cout << "Do you want to enter interactive mode for E(ppltl)? (y/n): ";
     std::cin >> interactive_emode;
     if (interactive_emode == "y") interactive(edfa);
+    std::cout << "--------------------------------" << std::endl;
 
-    // print initial state, transition function and final states for A(dfa)
+    std::cout << "--------------------------------" << std::endl;
     std::cout << "A(dfa) initial state: ";
     for (const auto& b : adfa.initial_state()) std::cout << b;
     std::cout << std::endl;
@@ -159,4 +174,5 @@ int main(int argc, char** argv) {
     std::cout << "Do you want to enter interactive mode for A(ppltl)? (y/n): ";
     std::cin >> interactive_amode;
     if (interactive_amode == "y") interactive(adfa);
+    std::cout << "--------------------------------" << std::endl;
 }
