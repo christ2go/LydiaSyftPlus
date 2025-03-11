@@ -33,7 +33,7 @@ void interactive(const Syft::SymbolicStateDfa& d) {
         state_eval.reserve(n_atoms + n_state_vars);
         for (int i = 0; i < n_atoms ; ++i) {
             std::string atom_name = var_mgr->index_to_name(i);
-            if (!(atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'F')) state_eval.push_back(0);
+            if (!(atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'V')) state_eval.push_back(0);
         }
         for (const auto& b : state) state_eval.push_back(b);
 
@@ -50,7 +50,7 @@ void interactive(const Syft::SymbolicStateDfa& d) {
         interpretation.reserve(n_atoms + n_state_vars);
         for (int i = 0; i < n_atoms; ++i) {
             std::string atom_name = var_mgr->index_to_name(i);
-            if (atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'F') continue;
+            if (atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'V') continue;
             std::cout << "Enter value for atom " << atom_name << ": ";
             int value;
             std::cin >> value;
