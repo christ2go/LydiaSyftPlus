@@ -133,6 +133,14 @@ std::size_t VarMgr::create_product_state_space(
         return complement_automaton_id;
     }
 
+std::size_t VarMgr::copy_state_space(std::size_t automaton_id) {
+  std::size_t new_automaton_id = state_variables_.size();
+
+  state_variables_.emplace_back(state_variables_[automaton_id]);
+
+  return new_automaton_id;
+}
+
 CUDD::BDD VarMgr::state_variable(std::size_t automaton_id, std::size_t i)
     const {
   return state_variables_[automaton_id][i];

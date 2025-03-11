@@ -304,6 +304,12 @@ namespace Syft {
          */
         std::size_t create_complement_state_space(
                 const std::size_t automaton_id);
+
+        /**
+         * \brief Create the state space when applying forall and exists quantification
+         * 
+         */
+        std::size_t copy_state_space(const std::size_t automaton_id);
     };
 
 }
