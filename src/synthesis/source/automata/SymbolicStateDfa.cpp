@@ -336,8 +336,8 @@ namespace Syft {
         str_sub.reserve(y_sub.size() + wy_sub.size() + 1);
         for (const auto& a : y_sub) str_sub.push_back(p.apply(*a));
         for (const auto& a : wy_sub) str_sub.push_back(p.apply(*a));
-        auto final_str = "F"+std::to_string(mgr->automaton_num());
-        str_sub.push_back(final_str);
+        auto val_str = "VAL"+std::to_string(mgr->automaton_num());
+        str_sub.push_back(val_str);
         auto dfa_id = mgr->create_named_state_variables(str_sub);
 
         // transition function and initial state
@@ -370,7 +370,7 @@ namespace Syft {
         init_state.push_back(0);
 
         // final states
-        CUDD::BDD final_states = mgr->name_to_variable(final_str);
+        CUDD::BDD final_states = mgr->name_to_variable(val_str);
 
         // output 
         SymbolicStateDfa dfa(std::move(mgr));
@@ -384,21 +384,29 @@ namespace Syft {
 
     SymbolicStateDfa SymbolicStateDfa::get_exists_dfa(const SymbolicStateDfa& sdfa) {
         auto mgr = sdfa.var_mgr();
-        auto final_str = "F"+std::to_string(sdfa.automaton_id());
-        auto final_var = mgr->name_to_variable(final_str);
+        auto edfa_id = mgr->copy_state_space(sdfa.automaton_id());
+        auto val_str = "VAL"+std::to_string(sdfa.automaton_id());
+        auto val_var = mgr->name_to_variable(val_str);
         auto transition_function = sdfa.transition_function();
         auto final_states = sdfa.final_states();
         auto lst = transition_function.size() - 1;
 
         // transform final states into sinks
-        transition_function[lst] = transition_function[lst] + final_var;
+        // transition_function[lst] is the transition function of val_var
+        // we modify such transtion function as follows:
+        // in the next time step val_var evaluates to 1 iff 
+        // val or val_var hold in the current time step
+        // it follows that, if val_var evaluates to 1 once
+        // i.e., a final state has been visited
+        // val_var will evaluate to 1 forever
+        transition_function[lst] = transition_function[lst] + val_var;
 
         // remove initial state from final states
         auto init_state_bdd = sdfa.initial_state_bdd();
         auto new_final_states = final_states * !init_state_bdd;
 
         SymbolicStateDfa edfa(std::move(mgr));
-        edfa.automaton_id_ = edfa.automaton_id(); 
+        edfa.automaton_id_ = edfa_id; 
         edfa.initial_state_ = sdfa.initial_state(); // same initial state
         edfa.transition_function_ = std::move(transition_function);        
         edfa.final_states_ = std::move(new_final_states);
@@ -408,27 +416,36 @@ namespace Syft {
 
     SymbolicStateDfa SymbolicStateDfa::get_forall_dfa(const SymbolicStateDfa& sdfa) {
         auto mgr = sdfa.var_mgr();
-        auto final_str = "F"+std::to_string(sdfa.automaton_id());
-        auto final_var = mgr->name_to_variable(final_str);
+        auto adfa_id = mgr->copy_state_space(sdfa.automaton_id());
+        auto val_str = "VAL"+std::to_string(sdfa.automaton_id());
+        auto val_var = mgr->name_to_variable(val_str);
         auto transition_function = sdfa.transition_function();
         auto final_states = sdfa.final_states();
         auto lst = transition_function.size() - 1;
 
         // transform non-final states into sinks
-        transition_function[lst] = transition_function[lst] * final_states;
-
-        // add initial state to final states
-        // auto init_state_bdd = sdfa.initial_state_bdd();
-        // auto new_final_states = final_states;
+        // transition_function[lst] is the transition function of val_var
+        // we modify such transtion function as follows:
+        // in the next time step val_var evaluates to 1 iff
+        // val and val_var hold in the current time step
+        // it follows that, if val_var evaluates to 0 once
+        // i.e., a non-final state has been visited
+        // then it will evaluate to 0 forever
+        transition_function[lst] = transition_function[lst] * val_var;
 
         auto new_init_state = sdfa.initial_state();
         new_init_state[lst] = 1;
 
         SymbolicStateDfa adfa(std::move(mgr));
-        adfa.automaton_id_ = adfa.automaton_id();
+        adfa.automaton_id_ = adfa_id;
         adfa.initial_state_ = std::move(new_init_state);
         adfa.transition_function_ = std::move(transition_function);
-        adfa.final_states_ = std::move(final_states);
+
+        // remove initial state from final states
+        auto init_state_bdd = adfa.initial_state_bdd();
+        auto new_final_states = final_states * !init_state_bdd;
+
+        adfa.final_states_ = std::move(new_final_states);
 
         return adfa;
     }
