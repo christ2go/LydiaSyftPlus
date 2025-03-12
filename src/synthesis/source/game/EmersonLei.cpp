@@ -5,7 +5,7 @@
 #include "game/EmersonLei.hpp"
 
 namespace Syft {
-  EmersonLei::EmersonLei(const SymbolicStateDfa &spec, const std::string color_formula, Player starting_player,
+  EmersonLei::EmersonLei(const SymbolicStateDfa &spec, std::string color_formula, Player starting_player,
                          Player protagonist_player,
                          const std::vector<CUDD::BDD> &colorBDDs,
                          const CUDD::BDD &state_space,
@@ -13,6 +13,9 @@ namespace Syft {
                          const CUDD::BDD &instant_losing)
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula), Colors_(colorBDDs),
       state_space_(state_space), instant_winning_(instant_winning), instant_losing_(instant_losing) {
+
+    // build Zielonka tree; parse formula from PHI_FILE, number of colors taken from Colors
+    z_tree_ = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
   }
 
   SynthesisResult EmersonLei::run() const {
@@ -30,13 +33,12 @@ namespace Syft {
     //   std::cout << Colors_[i] << '\n';
     // }
 
-    // build Zielonka tree; parse formula from PHI_FILE, number of colors taken from Colors
-    ZielonkaTree *Ztree = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
+
 
 
 
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
-    CUDD::BDD winning_states = EmersonLeiSolve(Ztree->get_root(), instant_winning_);
+    CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
 
     // update result according to computed solution
     ELSynthesisResult result;
@@ -46,7 +48,7 @@ namespace Syft {
       EL_output_function op;
       std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
       result.output_function = ExtractStrategy_Explicit(op, winning_states, spec_.initial_state_bdd(),
-                                                        Ztree->get_root());
+                                                        z_tree_->get_root());
       return result;
     } else {
       result.realizability = false;
@@ -329,6 +331,109 @@ namespace Syft {
     }
     return temp;
   }
+  /*
+  EmersonLei::OneStepSynReturn EmersonLei::ExtractStrategy_Explicit_OneStep(EL_output_function op, CUDD::BDD winning_states,
+                                                          CUDD::BDD gameNode, ZielonkaNode *t, CUDD::BDD X) const {
+    //	t: tree node, s (anchor node): lowest ancester of t that includes all colors of gameNode
+    EL_output_function temp = op;
+    // stop recursion if the strategy has already been defined for (gameNode,t)
+
+    // std::cout << "-----------\ngameNode: " << gameNode;
+    // gameNode.PrintCover();
+    // std::cout << "tree node: " << t->order << "\n";
+
+    std::pair<CUDD::BDD, ZielonkaNode *> curr;
+    curr.first = gameNode;
+    curr.second = t;
+    for (auto item: op) {
+      // std::cout << item.gameNode << " " << item.t->order << "\n";
+      // std::cout << item.Y << " " << item.u->order << "\n";
+      if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order)) {
+        // std::cout << "defined! " << gameNode << " " << t->order << "\n";
+        // gameNode.PrintCover();
+        // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
+        // item.gameNode.PrintCover();
+        OneStepSynReturn res;
+        res.op_ = op;
+        res.game_state_ = gameNode;
+        res.tree_node_ = t->order;
+        res.Y_ = item.Y;
+        return res;
+      }
+    }
+
+    // the following assumes that system moves first and environment moves second
+
+    ZielonkaNode *s = get_anchor(gameNode, t);
+
+    // BDD that will be used to encode a single choice for system, default bddZero
+    CUDD::BDD Y = var_mgr_->cudd_mgr()->bddZero();
+
+    // pick one choice for system that is winning for system from gameNode for objective s
+    if (s->children.empty()) {
+      // have just a single winningmoves BDD
+      Y = getUniqueSystemChoice(gameNode, s->winningmoves[0]);
+      // Y = getUniqueSystemChoice(gameNode,s->winningmoves[0]);
+    } else {
+      // iterate through all winningmoves BDD until a choice for system is found that is winning from gameNode for objective s; one is guaranteed to be found
+      for (int i = 0; i < s->children.size(); i++) {
+        Y = getUniqueSystemChoice(gameNode, s->winningmoves[i]);
+        if (Y != var_mgr_->cudd_mgr()->bddZero()) {
+          break;
+        }
+      }
+    }
+
+    // get next memory value; t: old memory value, s: anchor node, move: system choice that has been picked
+    ZielonkaNode *u = get_leaf(t, s, s, Y);
+
+    // add system choice and resulting new memory to extracted strategy,
+    // currently assumes result has component "strategy" which is vector of (gameNode, ZielonkaNode), (CUDD::BDD,ZielonkaNode)
+    ELWinningMove move;
+    move.gameNode = gameNode;
+    move.t = t;
+    move.Y = Y;
+    move.u = u;
+    temp.push_back(move);
+    // std::cout << " --> \n";
+    // std::cout << "Y: " << Y << "\n";
+    // std::cout << "tree node: " << u->order << "\n\n";
+
+    // compute game nodes that can result by taking system choice from gameNode
+    CUDD::BDD newGameNode = getSuccsWithXYZ(gameNode, Y, X);
+
+
+    EL_output_function temp_new = ExtractStrategy_Explicit(temp, winning_states, newGameNode, u);
+    OneStepSynReturn res;
+    res.op_ = temp_new;
+    res.game_state_ = newGameNode;
+    res.tree_node_ = u->order;
+    res.Y_ = Y;
+
+    return res;
+  }
+*/
+  CUDD::BDD EmersonLei::getSuccsWithXYZ(CUDD::BDD gameNode, CUDD::BDD Y, CUDD::BDD X) const {
+    std::vector<CUDD::BDD> succs;
+    std::vector<CUDD::BDD> transition_vector = transition_function();
+    std::vector<CUDD::BDD> transition_vector_fix_Y_Z;
+    for (int i = 0; i < transition_vector.size(); i++) {
+      CUDD::BDD transition_fix_Y_Z = (transition_vector[i] * gameNode * Y * X).ExistAbstract(
+        var_mgr_->state_variables_cube(spec_id())).ExistAbstract(var_mgr_->output_cube()).ExistAbstract(var_mgr_->input_cube());
+      transition_vector_fix_Y_Z.push_back(transition_fix_Y_Z);
+    }
+
+    CUDD::BDD succ = var_mgr_->cudd_mgr()->bddOne();
+    for (int i = 0; i < transition_vector_fix_Y_Z.size(); i++) {
+      CUDD::BDD Z_var = var_mgr_->state_variable(spec_id(), i);
+      if (transition_vector_fix_Y_Z[i].IsOne()) {
+        succ = succ * Z_var;
+      } else {
+        succ = succ * !Z_var;
+      }
+    }
+    return succ;
+  }
 
   std::vector<CUDD::BDD> EmersonLei::getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const {
     std::vector<CUDD::BDD> succs;
@@ -508,4 +613,18 @@ namespace Syft {
     // return stabilized fixpoint
     return X;
   }
+
+  // EmersonLei::OneStepSynReturn EmersonLei::synthesize(std::string X, ELSynthesisResult result) {
+  //   if (syn_flag_ == false) {
+  //     syn_flag_ = true;
+  //     curr_state_.emplace(spec_.initial_state_bdd());
+  //     curr_tree_node_.emplace(z_tree_->get_root());
+  //   } else {
+  //     CUDD::BDD X;
+  //     //TODO = ExtractStrategy_Explicit_OneStep(result.output_function, result.winning_states, curr_state_.value(), curr_tree_node_.value(), X);
+  //   }
+  //   OneStepSynReturn result;
+  //
+  // }
+
 }

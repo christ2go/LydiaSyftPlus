@@ -4,6 +4,10 @@
 
 #include "synthesizer/LTLfPlusSynthesizer.h"
 #include "game/EmersonLei.hpp"
+#include "lydia/logic/ltlfplus/base.hpp"
+#include "lydia/logic/pnf.hpp"
+#include "lydia/parser/ltlfplus/driver.hpp"
+#include "lydia/utils/print.hpp"
 
 namespace Syft {
   LTLfPlusSynthesizer::LTLfPlusSynthesizer(LTLfPlus ltlf_plus_formula,
@@ -12,7 +16,7 @@ namespace Syft {
     : ltlf_plus_formula_(ltlf_plus_formula),
       color_formula_(ltlf_plus_formula.color_formula_), starting_player_(starting_player),
       protagonist_player_(protagonist_player) {
-    std::shared_ptr<Syft::VarMgr> var_mgr = std::make_shared<Syft::VarMgr>();
+    std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
     var_mgr->create_named_variables(partition.input_variables);
     var_mgr->create_named_variables(partition.output_variables);
 
@@ -23,7 +27,7 @@ namespace Syft {
 
   // TODO create a run
   ELSynthesisResult LTLfPlusSynthesizer::run() const {
-    std::vector<Syft::SymbolicStateDfa> vec_spec;
+    std::vector<SymbolicStateDfa> vec_spec;
     std::vector<CUDD::BDD> goal_states;
     // ensures that the "order" of colors is respected
     std::map<int, SymbolicStateDfa> color_to_dfa;
@@ -31,7 +35,7 @@ namespace Syft {
 
     for (const auto &[ltlf_plus_arg, prefix_quantifier]: ltlf_plus_formula_.formula_to_quantification_) {
       whitemech::lydia::ltlf_ptr ltlf_arg = ltlf_plus_arg->ltlf_arg();
-      Syft::ExplicitStateDfa explicit_dfa = Syft::ExplicitStateDfa::dfa_of_formula(*ltlf_arg);
+      ExplicitStateDfa explicit_dfa = ExplicitStateDfa::dfa_of_formula(*ltlf_arg);
 
       std::cout << "LTLf formula: " << whitemech::lydia::to_string(*ltlf_arg) << std::endl;
       std::cout << "------ original DFA: \n";
@@ -39,9 +43,9 @@ namespace Syft {
 
       switch (prefix_quantifier) {
         case whitemech::lydia::PrefixQuantifier::ForallExists: {
-          Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+          ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa);
-          Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+          SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
           color_to_dfa.insert({std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa});
@@ -53,9 +57,9 @@ namespace Syft {
           break;
         }
         case whitemech::lydia::PrefixQuantifier::ExistsForall: {
-          Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+          ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa);
-          Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+          SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
           color_to_dfa.insert({std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa});
@@ -67,14 +71,14 @@ namespace Syft {
           break;
         }
         case whitemech::lydia::PrefixQuantifier::Forall: {
-          ExplicitStateDfa trimmed_explicit_dfa = Syft::ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
+          ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
 
           std::cout << "------ trimmed DFA Gphi: \n";
           trimmed_explicit_dfa.dfa_print();
 
-          Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
+          ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             trimmed_explicit_dfa);
-          Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(
+          SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
           color_to_dfa.insert({std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa});
@@ -126,8 +130,15 @@ namespace Syft {
 
     SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
     arena.dump_dot("arena.dot");
-    EmersonLei solver(arena, color_formula_, starting_player_, protagonist_player_,
+    std::shared_ptr<EmersonLei> emerson_lei = std::make_shared<EmersonLei>(arena, color_formula_, starting_player_, protagonist_player_,
                       goal_states, var_mgr_->cudd_mgr()->bddOne(), var_mgr_->cudd_mgr()->bddZero(), var_mgr_->cudd_mgr()->bddZero());
-    return solver.run_EL();
+    emerson_lei_ = emerson_lei;
+    return emerson_lei_->run_EL();
   }
+
+  // EmersonLei::OneStepSynReturn LTLfPlusSynthesizer::synthesize(std::string X, ELSynthesisResult result) const {
+  //   return emerson_lei_->synthesize(X, result);
+  // }
+
+
 }
