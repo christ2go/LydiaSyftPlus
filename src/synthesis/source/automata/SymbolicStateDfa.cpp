@@ -307,9 +307,11 @@ namespace Syft {
         return complement_automaton;
     }
 
-    SymbolicStateDfa SymbolicStateDfa::dfa_of_ppltl_formula(const whitemech::lydia::PPLTLFormula& formula) {
+    SymbolicStateDfa SymbolicStateDfa::dfa_of_ppltl_formula(
+        const whitemech::lydia::PPLTLFormula& formula,
+        std::shared_ptr<VarMgr> mgr) {
         
-        std::shared_ptr<VarMgr> mgr = std::make_shared<VarMgr>();
+        // std::shared_ptr<VarMgr> mgr = std::make_shared<VarMgr>();
 
         whitemech::lydia::StrPrinter p;
 
