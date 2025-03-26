@@ -71,12 +71,14 @@ namespace Syft {
                                              const std::string &formula) {
         std::stringstream formula_stream(formula);
         driver->parse(formula_stream);
-        whitemech::lydia::ltlf_ptr parsed_formula = driver->get_result();
+        auto parsed_formula = driver->get_result();
+        // convert ast_ptr to ltlf_ptr
+        auto ltlf_formula = std::static_pointer_cast<const whitemech::lydia::LTLfFormula>(parsed_formula);
         // Apply no-empty semantics
         auto context = driver->context;
         auto not_end = context->makeLtlfNotEnd();
-        parsed_formula = context->makeLtlfAnd({parsed_formula, not_end});
-        return parsed_formula;
+        ltlf_formula = context->makeLtlfAnd({ltlf_formula, not_end});
+        return ltlf_formula;
     }
 
     std::shared_ptr<Syft::VarMgr> build_var_mgr(const Syft::InputOutputPartition &partition) {

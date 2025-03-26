@@ -140,5 +140,4 @@ namespace Syft {
   //   return emerson_lei_->synthesize(X, result);
   // }
 
-
 }

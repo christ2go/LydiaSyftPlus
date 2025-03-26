@@ -4,6 +4,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 #include "cuddObj.hh"
 
@@ -36,6 +37,11 @@ namespace Syft {
         VarMgr();
 
         /**
+         * \brief Prints the VarMgr
+         */
+        void print_mgr() const;
+
+        /**
          * \brief Creates BDD variables and associates each with a name.
          *
          * \param variable_names The names of the variables to create. A new variable
@@ -54,6 +60,18 @@ namespace Syft {
          * \return The automaton ID the variables are associated with.
          */
         std::size_t create_state_variables(std::size_t variable_count);
+
+        /**
+         * \brief Creates and stores named state variables
+         * 
+         * Multiple calls of this function create separate groups of state variables.
+         * The call generates an ID for the automaton whose state space the variables
+         * represent, so that the correct group of variables can be retrieved later.
+         *
+         * \param variable_count The number of state variables to create.
+         * \return The automaton ID the variables are associated with.
+         */
+        std::size_t create_named_state_variables(const std::vector<std::string>& variable_names);
 
         /**
          * \brief Registers a new automaton ID associated with a product state space.
@@ -75,6 +93,11 @@ namespace Syft {
          * \brief Returns the i-th state variable for a given automaton.
          */
         CUDD::BDD state_variable(std::size_t automaton_id, std::size_t i) const;
+
+        /**
+         * \brief Returns the state variables for a given automaton.
+         */
+        std::vector<CUDD::BDD> get_state_variables(std::size_t automaton_id) const;
 
         /**
          * \brief Converts a state vector to a BDD.
@@ -285,6 +308,12 @@ namespace Syft {
          */
         std::size_t create_complement_state_space(
                 const std::size_t automaton_id);
+
+        /**
+         * \brief Create the state space when applying forall and exists quantification
+         * 
+         */
+        std::size_t copy_state_space(const std::size_t automaton_id);
     };
 
 }

@@ -61,6 +61,10 @@ int main(int argc, char** argv) {
     driver->parse(formula_stream);
     auto result = driver->get_result();
 
+    // cast ast_ptr into ltlf_plus_ptr. Necessary since AbstractDriver is not template anymore
+    auto ptr_ltlf_plus_formula =
+        std::static_pointer_cast<const whitemech::lydia::LTLfPlusFormula>(result);
+
     // transform formula in PNF
     auto pnf = whitemech::lydia::get_pnf_result(*result);
     Syft::LTLfPlus ltlf_plus_formula;
@@ -138,6 +142,5 @@ int main(int argc, char** argv) {
             std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
         }
     }
-
 
 }

@@ -7,6 +7,10 @@
 #include <cuddObj.hh>
 
 #include "ExplicitStateDfaAdd.h"
+#include "automata/ppltl/ValVisitor.h"
+#include <lydia/logic/nnf.hpp>
+#include <lydia/logic/ynf.hpp>
+#include <lydia/utils/print.hpp>
 
 namespace Syft {
 
@@ -181,6 +185,33 @@ namespace Syft {
     * \return A symbolic DFA of the complement.
     */
         static SymbolicStateDfa complement(const SymbolicStateDfa dfa);
+
+    /**
+     * \brief Construct a symbolic-state DFA from a given PPLTL formula 
+     * 
+     * \param formula A PPLTL Formula
+     * \param mgr The variable manager of the output DFA
+     * \return The symbolic-state DFA of the PPLTL formula
+     */
+        static SymbolicStateDfa dfa_of_ppltl_formula(
+            const whitemech::lydia::PPLTLFormula& formula,
+            std::shared_ptr<VarMgr> mgr);
+
+    /**
+     * \brief Construct symbolic-state DFA for E(sdfa)
+     * 
+     * \param sdfa A symbolic-state DFA
+     * \return The symbolic-state DFA for E(sdfa) 
+     */
+        static SymbolicStateDfa get_exists_dfa(const SymbolicStateDfa& sdfa);
+
+    /**
+     * \brief Construct symbolic-state DFA for A(sdfa)
+     * 
+     * \param sdfa A symbolic-state DFA
+     * \return The symbolic-state DFA for A(sdfa) 
+     */
+        static SymbolicStateDfa get_forall_dfa(const SymbolicStateDfa& sdfa);
     };
 
 }

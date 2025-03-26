@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include "lydia/logic/ltlf/base.hpp"
+#include "lydia/logic/ppltl/base.hpp"
 #include "lydia/dfa/mona_dfa.hpp"
 #include "VarMgr.h"
 

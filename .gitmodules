@@ -1,6 +1,7 @@
 [submodule "submodules/lydia"]
 	path = submodules/lydia
 	url = https://github.com/GianmarcoDIAG/lydia.git
+	branch = main
 [submodule "submodules/slugs"]
 	path = submodules/slugs
 	url = https://github.com/VerifiableRobotics/slugs

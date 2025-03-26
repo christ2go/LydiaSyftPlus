@@ -11,6 +11,40 @@ VarMgr::VarMgr() {
   mgr_ = std::make_shared<CUDD::Cudd>();
 }
 
+void VarMgr::print_mgr() const {
+  // prints the number of managed automata
+  std::cout << "Number of managed automata: " << state_variables_.size() << std::endl;
+
+  // prints number of vars
+  std::cout << "Number of variables: " << total_variable_count() << std::endl;
+
+  // prints named variables
+  std::cout << "Named variables (name, var): " << std::endl;
+
+  for (const auto& name_var : name_to_variable_)
+    std::cout << "Name: " << name_var.first << ". Var: " << name_var.second << std::endl;
+  
+  std::cout << "Var indexes (index, name): " << std::endl;
+
+  for (const auto& index_name: index_to_name_)
+    std::cout << "Index: " << index_name.first << ". Name: " << index_name.second << std::endl;
+
+  // prints X vars
+  std::cout << "Input variables: " << std::endl;
+  for (const auto& var: input_variables_) std::cout << "Var: " << var << std::endl;
+
+  // prints Y vars
+  std::cout << "Output variables: " << std::endl;
+  for (const auto& var: output_variables_) std::cout << "Var: " << var << std::endl;  
+
+  // prints Z vars for each managed automaton
+  for (int i = 0; i < state_variables_.size(); ++i) {
+    std::cout << "Automaton ID " << i << " state variables" << std::endl;
+    for (const auto& var: state_variables_[i]) std::cout << var << " ";
+    std::cout << std::endl;
+  }
+}
+
 void VarMgr::create_named_variables(
     const std::vector<std::string>& variable_names) {
   for (const std::string& name : variable_names) {
@@ -55,6 +89,27 @@ std::size_t VarMgr::create_state_variables(std::size_t variable_count) {
   return automaton_id;
 }
 
+std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>& vars) {
+  std::size_t automaton_id = state_variables_.size();
+
+  // Creates an additional space for variables at index automaton_id,
+  // then reserves enough memory for all the new variables
+  state_variables_.emplace_back();
+  state_variables_[automaton_id].reserve(vars.size());
+
+  for (int i = 0; i < vars.size(); ++i) {
+    // Creates a new variable at the top of the variable ordering
+    CUDD::BDD new_state_variable = mgr_->bddNewVarAtLevel(0);
+
+    state_variables_[automaton_id].push_back(new_state_variable);
+    name_to_variable_[vars[i]] = new_state_variable;
+    index_to_name_[new_state_variable.NodeReadIndex()] = vars[i]; 
+  }
+
+  state_variable_count_ += vars.size();
+  return automaton_id;
+}
+
 std::size_t VarMgr::create_product_state_space(
     const std::vector<std::size_t>& automaton_ids) {
   std::size_t product_automaton_id = state_variables_.size();
@@ -85,9 +140,21 @@ std::size_t VarMgr::create_product_state_space(
         return complement_automaton_id;
     }
 
+std::size_t VarMgr::copy_state_space(std::size_t automaton_id) {
+  std::size_t new_automaton_id = state_variables_.size();
+
+  state_variables_.emplace_back(state_variables_[automaton_id]);
+
+  return new_automaton_id;
+}
+
 CUDD::BDD VarMgr::state_variable(std::size_t automaton_id, std::size_t i)
     const {
   return state_variables_[automaton_id][i];
+}
+
+std::vector<CUDD::BDD> VarMgr::get_state_variables(std::size_t automaton_id) const {
+  return state_variables_[automaton_id];
 }
   
 CUDD::BDD VarMgr::state_vector_to_bdd(std::size_t automaton_id,

@@ -6,6 +6,7 @@
 #include "game/Transducer.h"
 #include "game/ZielonkaTree.hh"
 #include "lydia/logic/pnf.hpp"
+#include "lydia/logic/pp_pnf.hpp"
 #include <optional>
 
 
@@ -59,6 +60,12 @@ namespace Syft {
         std::string color_formula_;
         std::unordered_map<whitemech::lydia::ltlf_plus_ptr, std::string> formula_to_color_;
         std::unordered_map<whitemech::lydia::ltlf_plus_ptr, whitemech::lydia::PrefixQuantifier> formula_to_quantification_;
+    };
+
+    struct PPLTLPlus {
+        std::string color_formula_;
+        std::unordered_map<whitemech::lydia::ppltl_plus_ptr, std::string> formula_to_color_;
+        std::unordered_map<whitemech::lydia::ppltl_plus_ptr, whitemech::lydia::PrefixQuantifier> formula_to_quantification_;
     };
 
 /**
