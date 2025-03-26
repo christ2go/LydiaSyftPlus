@@ -38,7 +38,7 @@ namespace Syft {
   }
 
   void MannaPnueli::print_FG_dag() const{
-    std::cout << "FG DAG:\n";
+    std::cout << "EL DAG:\n";
     for (auto& [id, node] : dag_) {
       std::cout << "Dag Node " << node->id << " (";
       for (int bit : node->F) std::cout << bit;
@@ -375,9 +375,13 @@ namespace Syft {
           instant_winning = instant_winning | (child_winnning_states * Colors_[color_flipped]);
           instant_losing = instant_losing | (!child_winnning_states * Colors_[color_flipped]);
         } else {
-          instant_winning = instant_winning | (child_winnning_states * !Colors_[color_flipped]);
-          instant_losing = instant_losing | (!child_winnning_states * !Colors_[color_flipped]);
+          // instant_winning = instant_winning | (child_winnning_states * !(Colors_[color_flipped] | spec_.initial_state_bdd()));
+          // instant_losing = instant_losing | (!child_winnning_states * !(Colors_[color_flipped] | spec_.initial_state_bdd()));
+          instant_winning = instant_winning | (child_winnning_states * !(Colors_[color_flipped]));
+          instant_losing = instant_losing | (!child_winnning_states * !(Colors_[color_flipped]));
         }
+        std::cout << "instant_winning: " << instant_winning << std::endl;
+        std::cout << "instant_losing: " << instant_losing << std::endl;
 
       }
 

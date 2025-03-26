@@ -39,7 +39,7 @@ namespace Syft {
 
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
     CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
-
+    std::cout << "winning_states: " << winning_states << std::endl;
     // update result according to computed solution
     ELSynthesisResult result;
     if (includes_initial_state(winning_states)) {

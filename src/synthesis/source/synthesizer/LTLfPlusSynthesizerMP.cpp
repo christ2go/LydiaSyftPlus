@@ -94,12 +94,14 @@ namespace Syft {
         case whitemech::lydia::PrefixQuantifier::Forall: {
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa);
+
           SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
           color_to_dfa.insert({std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa});
+          CUDD::BDD final_states = symbolic_dfa.final_states() | symbolic_dfa.initial_state_bdd();
           color_to_final_states.insert({
-            std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa.final_states()
+            std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), final_states
           });
           // vec_spec.push_back(symbolic_dfa);
           // goal_states.push_back(symbolic_dfa.final_states());
