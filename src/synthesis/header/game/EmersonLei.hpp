@@ -7,6 +7,7 @@
 
 #include "game/DfaGameSynthesizer.h"
 #include "game/ZielonkaTree.hh"
+#include <optional>
 
 namespace Syft {
 	/**
@@ -26,7 +27,14 @@ namespace Syft {
 		* \brief The Emerson-Lei condition represented as a Boolean formula \beta over colors
 		*/
 		std::vector<CUDD::BDD> Colors_;
-        std::string color_formula_;
+		std::string color_formula_;
+		CUDD::BDD instant_winning_;
+		CUDD::BDD instant_losing_;
+
+		std::optional<CUDD::BDD> curr_state_;
+		std::optional<ZielonkaNode*> curr_tree_node_;
+		ZielonkaTree* z_tree_;
+		bool syn_flag_ = false;
 		
 		public:
 		
@@ -39,25 +47,33 @@ namespace Syft {
 		* \param Colors The Emerson-Lei condition represented as a Boolean formula \beta over colors.
 		* \param state_space The state space.
 		*/
-		EmersonLei(const SymbolicStateDfa &spec, const std::string color_formula, Player starting_player, Player protagonist_player,
-		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space);
+		EmersonLei(const SymbolicStateDfa &spec, std::string color_formula, Player starting_player, Player protagonist_player,
+			const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, const CUDD::BDD &instant_winning, const CUDD::BDD &instant_losing);
 
-        CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
-        CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
-		ZielonkaNode* get_next_t(CUDD::BDD state, ZielonkaNode *anchor_node, ZielonkaNode *current_node, CUDD::BDD Y) const;
-
-		ZielonkaNode* get_anchor(ZielonkaNode *root, ZielonkaNode *current_node, CUDD::BDD Y) const;
-		
-		
-		/**
-		* \brief Solves the Emerson-Lei game.
-		*
-		* \return The result consists of
-		* realizability
-		* a set of agent winning states
-		* a transducer representing a winning strategy or nullptr if the game is unrealizable.
-		*/
+		CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
+    CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
+		EL_output_function ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD winning_states, CUDD::BDD gameNode, ZielonkaNode *t) const;
+		CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, CUDD::BDD winningmoves) const;
+		// CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, std::unique_ptr<Transducer> transducer) const;
+		std::vector<CUDD::BDD> getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const;
+		CUDD::BDD getSuccsWithXYZ(CUDD::BDD gameNode, CUDD::BDD Y, CUDD::BDD X) const;
+		int index_below(ZielonkaNode *anchor_node, ZielonkaNode *old_memory) const;
+		ZielonkaNode* get_anchor(CUDD::BDD game_node, ZielonkaNode *memory_value) const;
+		ZielonkaNode* get_leaf(ZielonkaNode *old_memory, ZielonkaNode *anchor_node, ZielonkaNode *curr, CUDD::BDD Y) const;
+		inline std::vector<CUDD::BDD> transition_function() const {return spec_.transition_function();}
+		inline int spec_id() const {return spec_.automaton_id();}
 		SynthesisResult run() const final;
+		ELSynthesisResult run_EL() const;
+
+		// struct OneStepSynReturn {
+		// 	EL_output_function op_;
+		// 	CUDD::BDD game_state_;
+		// 	size_t tree_node_;
+		// 	CUDD::BDD Y_;
+		// };
+		// OneStepSynReturn ExtractStrategy_Explicit_OneStep(EL_output_function op, CUDD::BDD winning_states, CUDD::BDD gameNode, ZielonkaNode *t, CUDD::BDD X) const;
+		// OneStepSynReturn synthesize(std::string X, ELSynthesisResult result );
+
 		
 	};
 }

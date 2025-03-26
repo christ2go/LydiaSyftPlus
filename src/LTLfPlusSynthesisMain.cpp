@@ -59,11 +59,15 @@ int main(int argc, char** argv) {
     auto result = driver->get_result();
 
     // cast ast_ptr into ltlf_plus_ptr. Necessary since AbstractDriver is not template anymore
-    auto ltlf_plus_formula =
+    auto ptr_ltlf_plus_formula =
         std::static_pointer_cast<const whitemech::lydia::LTLfPlusFormula>(result);
 
     // transform formula in PNF
-    auto pnf = whitemech::lydia::get_pnf_result(*ltlf_plus_formula);
+    auto pnf = whitemech::lydia::get_pnf_result(*ptr_ltlf_plus_formula);
+    Syft::LTLfPlus ltlf_plus_formula;
+    ltlf_plus_formula.color_formula_ = pnf.color_formula_;
+    ltlf_plus_formula.formula_to_color_= pnf.subformula_to_color_;
+    ltlf_plus_formula.formula_to_quantification_= pnf.subformula_to_quantifier_;
 
     // debug
     for (const auto& [formula, color] : pnf.subformula_to_color_) {
@@ -93,14 +97,22 @@ int main(int argc, char** argv) {
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
 
+    // construct LTLfPlusSynthesizer obj
     Syft::LTLfPlusSynthesizer synthesizer(
-        pnf.subformula_to_color_,
-        pnf.subformula_to_quantifier_,
-        pnf.color_formula_,
+        ltlf_plus_formula,
         partition,
         starting_player,
         Syft::Player::Agent
     );
+
+    // Syft::LTLfPlusSynthesizer synthesizer(
+    //     pnf.subformula_to_color_,
+    //     pnf.subformula_to_quantifier_,
+    //     pnf.color_formula_,
+    //     partition,
+    //     starting_player,
+    //     Syft::Player::Agent
+    // );
 
     // do synthesis
     auto synthesis_result = synthesizer.run();

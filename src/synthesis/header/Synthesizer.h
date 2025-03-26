@@ -4,7 +4,8 @@
 #include <memory>
 
 #include "game/Transducer.h"
-#include <tuple>
+#include "game/ZielonkaTree.hh"
+#include "lydia/logic/pnf.hpp"
 #include <optional>
 
 
@@ -21,6 +22,28 @@ namespace Syft {
         CUDD::BDD safe_states;
     };
 
+    struct ELWinningMove {
+        CUDD::BDD gameNode;
+        ZielonkaNode* t;
+        CUDD::BDD Y;
+        ZielonkaNode* u;
+    };
+
+    typedef std::vector<ELWinningMove> EL_output_function;
+    struct ELSynthesisResult {
+        bool realizability;
+        CUDD::BDD winning_states;
+        EL_output_function output_function;
+        CUDD::BDD safe_states;
+    };
+
+    struct MPSynthesisResult {
+        bool realizability;
+        CUDD::BDD winning_states;
+        // TODO how to store the strategy?
+        // MP_output_function output_function;
+    };
+
     struct MaxSetSynthesisResult {
         bool realizability;
         CUDD::BDD deferring_strategy;
@@ -32,16 +55,10 @@ namespace Syft {
         CUDD::BDD winning_move;
     };
 
-    enum class LTLfLabel {
-        GF,
-        FG,
-        G,
-        F,
-    };
-
     struct LTLfPlus {
-        std::string formula_;
-        LTLfLabel label_;
+        std::string color_formula_;
+        std::unordered_map<whitemech::lydia::ltlf_plus_ptr, std::string> formula_to_color_;
+        std::unordered_map<whitemech::lydia::ltlf_plus_ptr, whitemech::lydia::PrefixQuantifier> formula_to_quantification_;
     };
 
 /**
