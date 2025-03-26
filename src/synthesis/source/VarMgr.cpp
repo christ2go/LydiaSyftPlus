@@ -91,12 +91,16 @@ std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>&
   state_variables_[automaton_id].reserve(vars.size());
 
   for (int i = 0; i < vars.size(); ++i) {
-    // Creates a new variable at the top of the variable ordering
-    CUDD::BDD new_state_variable = mgr_->bddNewVarAtLevel(0);
-
-    state_variables_[automaton_id].push_back(new_state_variable);
-    name_to_variable_[vars[i]] = new_state_variable;
-    index_to_name_[new_state_variable.NodeReadIndex()] = vars[i]; 
+    // Create a new variable if this named variable does not already exist
+    // add the new variable to the state variables of the automaton 
+    if (name_to_variable_.find(vars[i]) == name_to_variable_.end()) {
+        CUDD::BDD new_state_variable = mgr_->bddNewVarAtLevel(0);
+        state_variables_[automaton_id].push_back(new_state_variable);
+        name_to_variable_[vars[i]] = new_state_variable;
+        index_to_name_[new_state_variable.NodeReadIndex()] = vars[i]; 
+    } else { // Else add the existing variable to the state variables of the automaton
+      state_variables_[automaton_id].push_back(name_to_variable_[vars[i]]);
+    }
   }
 
   state_variable_count_ += vars.size();
