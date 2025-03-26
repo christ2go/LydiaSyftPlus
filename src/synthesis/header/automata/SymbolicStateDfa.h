@@ -189,9 +189,12 @@ namespace Syft {
      * \brief Construct a symbolic-state DFA from a given PPLTL formula 
      * 
      * \param formula A PPLTL Formula
-     * \return The corresponding symbolic-state DFA
+     * \param mgr The variable manager of the output DFA
+     * \return The symbolic-state DFA of the PPLTL formula
      */
-        static SymbolicStateDfa dfa_of_ppltl_formula(const whitemech::lydia::PPLTLFormula& formula);
+        static SymbolicStateDfa dfa_of_ppltl_formula(
+            const whitemech::lydia::PPLTLFormula& formula,
+            std::shared_ptr<VarMgr> mgr);
 
     /**
      * \brief Construct symbolic-state DFA for E(sdfa)

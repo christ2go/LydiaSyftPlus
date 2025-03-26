@@ -116,7 +116,9 @@ int main(int argc, char** argv) {
     std::cout << "YNF: " << s_ynf << std::endl;
 
     // symbolic DFA construction
-    auto sdfa = Syft::SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl);
+    std::shared_ptr<Syft::VarMgr> var_mgr = std::make_shared<Syft::VarMgr>();
+
+    auto sdfa = Syft::SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl, var_mgr);
     auto edfa = Syft::SymbolicStateDfa::get_exists_dfa(sdfa);
     auto adfa = Syft::SymbolicStateDfa::get_forall_dfa(sdfa);
 
