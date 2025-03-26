@@ -37,8 +37,8 @@ namespace Syft {
 
         for (const auto& [ppltl_plus_arg, prefix_quantifier] : ppltl_plus_formula_.formula_to_quantification_) {
             whitemech::lydia::ppltl_ptr ppltl_arg = ppltl_plus_arg->ppltl_arg();
-            SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_);
             std::cout << "PPLTL formula: " << whitemech::lydia::to_string(*ppltl_arg) << std::endl;
+            SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_);
 
             switch (prefix_quantifier) {
                 case whitemech::lydia::PrefixQuantifier::ForallExists:
