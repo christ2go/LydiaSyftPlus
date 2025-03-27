@@ -50,7 +50,7 @@ namespace Syft {
                 case whitemech::lydia::PrefixQuantifier::ExistsForall:
                     {color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
                     color_to_final_states.insert({
-                      std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa.final_states()
+                      std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), !sdfa.final_states()
                     });
                     break;}
                 case whitemech::lydia::PrefixQuantifier::Exists:
