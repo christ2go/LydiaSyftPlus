@@ -12,6 +12,7 @@
 #include <cctype>
 #include <sstream>
 #include <regex>
+#include <queue>
 
 namespace Syft {
   MannaPnueli::MannaPnueli(const SymbolicStateDfa &spec, const std::string color_formula, std::vector<int> F_colors,
