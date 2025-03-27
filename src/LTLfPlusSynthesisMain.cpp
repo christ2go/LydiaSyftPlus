@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
         std::static_pointer_cast<const whitemech::lydia::LTLfPlusFormula>(result);
 
     // transform formula in PNF
-    auto pnf = whitemech::lydia::get_pnf_result(*result);
+    auto pnf = whitemech::lydia::get_pnf_result(*ptr_ltlf_plus_formula);
     Syft::LTLfPlus ltlf_plus_formula;
     ltlf_plus_formula.color_formula_ = pnf.color_formula_;
     ltlf_plus_formula.formula_to_color_= pnf.subformula_to_color_;
