@@ -61,7 +61,7 @@ namespace Syft {
                     });
                     break;}
                 case whitemech::lydia::PrefixQuantifier::Forall:
-                    {SymbolicStateDfa adfa = SymbolicStateDfa::get_exists_dfa(sdfa);
+                    {SymbolicStateDfa adfa = SymbolicStateDfa::get_forall_dfa(sdfa);
                     color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), adfa});
                     color_to_final_states.insert({
                       std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), adfa.final_states()
