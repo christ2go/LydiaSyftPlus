@@ -191,24 +191,24 @@ void printNTree(ZielonkaNode* x, std::vector<bool> flag, int depth = 0, bool isL
     // node is the root node
     if (depth == 0) {
         std::cout << label_to_string(x->label) << " " << (x->winning ? 'W' : 'L') << '\n';
-        std::cout << " target nodes: " << x->targetnodes << '\n';
-        std::cout << " safe nodes: " << x->safenodes << '\n';
+        // std::cout << " target nodes: " << x->targetnodes << '\n';
+        // std::cout << " safe nodes: " << x->safenodes << '\n';
     }
     // Condition when the node is 
     // the last node of 
     // the exploring depth
     else if (isLast) {
         std::cout << "└── " << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
-        std::cout << " target nodes: " << x->targetnodes << '\n';
-        std::cout << " safe nodes: " << x->safenodes << '\n';
+        // std::cout << " target nodes: " << x->targetnodes << '\n';
+        // std::cout << " safe nodes: " << x->safenodes << '\n';
         // No more childrens turn it 
         // to the non-exploring depth
         flag[depth] = false;
     }
     else {
         std::cout << "├── " << label_to_string(x->label) << " " << (x->winning? 'W' : 'L') << '\n';
-        std::cout << " target nodes: " << x->targetnodes << '\n';
-        std::cout << " safe nodes: " << x->safenodes << '\n';
+        // std::cout << " target nodes: " << x->targetnodes << '\n';
+        // std::cout << " safe nodes: " << x->safenodes << '\n';
     }
  
     size_t it = 0;

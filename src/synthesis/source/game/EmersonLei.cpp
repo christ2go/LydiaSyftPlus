@@ -534,7 +534,7 @@ namespace Syft {
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
       }
     }
-    std::cout << "cpre: " << result << "\n";
+    // std::cout << "cpre: " << result << "\n";
     return result;
   }
 
@@ -570,8 +570,8 @@ namespace Syft {
 
     // loop until fixpoint has stabilized
     while (true) {
-      std::cout << "Node: " << t->order << "\n";
-      std::cout << X << "\n";
+      // std::cout << "Node: " << t->order << "\n";
+      // std::cout << X << "\n";
 
       // if t is a leaf
       if (t->children.empty()) {
