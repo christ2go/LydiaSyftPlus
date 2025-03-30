@@ -25,6 +25,10 @@ namespace Syft {
         std::vector<CUDD::BDD> output_variables_;
         std::size_t total_variable_count_ = 0;
 
+     // for debugging
+        std::vector<std::pair<int, std::string>> index_to_name_vec_;
+        std::vector<std::pair<std::string, CUDD::BDD>> name_to_variable_vec_;
+
     public:
 
         /**

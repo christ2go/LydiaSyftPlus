@@ -1,13 +1,13 @@
 #include <memory>
 
 #include "game/InputOutputPartition.h"
-#include "Preprocessing.h"
 #include "Utils.h"
 #include <lydia/logic/ltlfplus/base.hpp>
 #include <lydia/logic/ltlfplus/duality.hpp>
 #include <lydia/parser/ltlfplus/driver.hpp>
 #include <lydia/logic/pnf.hpp>
 #include "synthesizer/LTLfPlusSynthesizer.h"
+#include "synthesizer/LTLfPlusSynthesizerMP.h"
 #include <CLI/CLI.hpp>
 
 int main(int argc, char** argv) {
@@ -26,19 +26,22 @@ int main(int argc, char** argv) {
     // app.add_flag("-t,--print-time", print_times, "Print running times of each step (default: false)");
 
     std::string ltlf_plus_file, partition_file;
-    int starting_player_id;
+    int starting_player_id, game_solver;
 
-    CLI::Option* ltlf_plus_file_opt;
+    // CLI::Option* ltlf_plus_file_opt;
     app.add_option("-i,--input-file", ltlf_plus_file, "Path to LTLf+ formula file")->
             required() -> check(CLI::ExistingFile);
 
-    CLI::Option* partition_file_opt;
+    // CLI::Option* partition_file_opt;
     app.add_option("-p,--partition-file", partition_file, "Path to partition file")->
             required() -> check(CLI::ExistingFile);
 
-    CLI::Option* starting_player_opt =
-        app.add_option("-s,--starting-player", starting_player_id, "Starting player:\nagent=1;\nenvironment=0.")->
-            required(); 
+    // CLI::Option* starting_player_opt =
+    app.add_option("-s,--starting-player", starting_player_id, "Starting player:\nagent=1;\nenvironment=0.")->
+            required();
+
+    app.add_option("-g,--game", game_solver, "Game:\nManna-Pnueli=1;\nEmerson-Lei=0.")->
+            required();
 
     CLI11_PARSE(app, argc, argv);
 
@@ -91,33 +94,53 @@ int main(int argc, char** argv) {
 
     // construct LTLfPlusSynthesizer obj
     Syft::Player starting_player;
-    if (starting_player_id) starting_player == Syft::Player::Agent;
-    else starting_player == Syft::Player::Environment;
+    if (starting_player_id) {
+        starting_player == Syft::Player::Agent;
+    } else {
+        starting_player == Syft::Player::Environment;
+    }
 
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
 
-    // construct LTLfPlusSynthesizer obj
-    Syft::LTLfPlusSynthesizer synthesizer(
+    if (game_solver == 0) {
+        Syft::LTLfPlusSynthesizer synthesizer(
+            ltlf_plus_formula,
+            partition,
+            starting_player,
+            Syft::Player::Agent
+        );
+        auto synthesis_result = synthesizer.run();
+
+        if (synthesis_result.realizability) {
+            std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
+            for (auto item : synthesis_result.output_function) {
+                std::cout << "state: " << item.gameNode;
+                item.gameNode.PrintCover();
+
+                std::cout << "tree node: " << item.t->order << "\n";
+                std::cout << " -> \n";
+                std::cout << "Y: " << item.Y;
+                item.Y.PrintCover();
+                std::cout << "tree node: " << item.u->order << "\n\n";
+            }
+        } else {
+            std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
+        }
+    } else {
+        Syft::LTLfPlusSynthesizerMP synthesizerMP(
         ltlf_plus_formula,
         partition,
         starting_player,
         Syft::Player::Agent
     );
 
-    // Syft::LTLfPlusSynthesizer synthesizer(
-    //     pnf.subformula_to_color_,
-    //     pnf.subformula_to_quantifier_,
-    //     pnf.color_formula_,
-    //     partition,
-    //     starting_player,
-    //     Syft::Player::Agent
-    // );
+        auto synthesis_result_MP = synthesizerMP.run();
+        if (synthesis_result_MP.realizability) {
+            std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
+        } else {
+            std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
+        }
+    }
 
-    // do synthesis
-    auto synthesis_result = synthesizer.run();
-
-    // show result
-    if (synthesis_result.realizability) std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
-    else std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
 }

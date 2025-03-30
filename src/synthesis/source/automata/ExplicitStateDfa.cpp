@@ -76,6 +76,8 @@ namespace Syft {
 
     ExplicitStateDfa
     ExplicitStateDfa::dfa_to_Gdfa(ExplicitStateDfa &d) {
+        // std::cout << "--------- d:\n";
+        // d.dfa_print();
         int d_ns = d.get_nb_states();
         int new_ns = d.get_final().size() + 2; // initial state is "0" and sink state is "new_ns"
         int n = d.get_nb_variables();
@@ -148,9 +150,12 @@ namespace Syft {
 
         DFA *tmp = dfaBuild(statuses.data());
         ExplicitStateDfa res1(tmp, d.names);
+
         res1.dfa_print();
         result = dfaMinimize(tmp);
         ExplicitStateDfa res(result, d.names);
+        // std::cout << "--------- Gd:\n";
+        // res.dfa_print();
         return res;
     }
 

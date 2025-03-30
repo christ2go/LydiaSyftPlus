@@ -3,7 +3,7 @@
 
 namespace Syft {
 
-    DfaGameSynthesizer::DfaGameSynthesizer(SymbolicStateDfa spec,
+    DfaGameSynthesizer::DfaGameSynthesizer(const SymbolicStateDfa spec,
                                            Player starting_player,
                                            Player protagonist_player)
             : Synthesizer<SymbolicStateDfa>(spec), starting_player_(starting_player),

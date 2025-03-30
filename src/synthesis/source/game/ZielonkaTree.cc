@@ -13,12 +13,10 @@ bool cmp_descending_count_true(const std::vector<bool>& a, const std::vector<boo
     return std::count(a.begin(), a.end(), true) > std::count(b.begin(), b.end(), true);
 }
 
-// Private
-size_t leaves = 0;
-size_t total_nodes = 0;
+
 
 void ZielonkaTree::generate() {
-    //std::cout << "generating... \n";
+    std::cout << "generating... \n";
     std::queue<ZielonkaNode*> q;
     q.push(root);
     std::vector<std::vector<bool>> ps = ELHelpers::powerset(root->label.size());
@@ -53,12 +51,13 @@ void ZielonkaTree::generate() {
 		            .targetnodes = current->safenodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, color_set), colorBDDs_, var_mgr_),
                     .level = current->level + 1,
                     .order = order++,
-                    .winning = !(current->winning)
+                    .winning = !(current->winning),
+                    .transducers = {}
                 };
-                child_zn->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
+                //child_zn->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 seen_from_parent.push_back(color_set);
                 current->children.push_back(child_zn);
-                current->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
+                //current->winningmoves.push_back(var_mgr_->cudd_mgr()->bddZero());
                 q.push(child_zn);
             }
         }
@@ -88,7 +87,8 @@ void ZielonkaTree::generate_parity() {
 	        .targetnodes = current->safenodes & ELHelpers::unionOf(ELHelpers::label_difference(current->label, colors), colorBDDs_, var_mgr_),
             .level = current->level + 1,
             .order = order++,
-            .winning = !(current->winning)
+            .winning = !(current->winning),
+            .transducers = {}
         };
         current->children.push_back(child_zn);
         current = child_zn;
@@ -240,7 +240,8 @@ ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CU
 	    .targetnodes = var_mgr_->cudd_mgr()->bddOne(),
         .level = 1,
         .order = 1,
-        .winning = evaluate_phi(label)
+        .winning = evaluate_phi(label),
+        .transducers = {}
     };
 //    this.colorBDDs = colorBDDs;
     generate();

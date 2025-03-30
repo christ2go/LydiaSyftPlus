@@ -107,6 +107,11 @@ namespace Syft {
         std::vector<CUDD::BDD> transition_function = symbolic_transition_function(
                 var_mgr, automaton_id, explicit_dfa.transition_function());
 
+        // std::vector<CUDD::BDD> transition_to_state_var_index;
+        // for (std::size_t i = 0; i < bit_count; ++i) {
+        //     tra
+        // }
+
         SymbolicStateDfa symbolic_dfa(var_mgr);
         symbolic_dfa.automaton_id_ = automaton_id;
         symbolic_dfa.initial_state_ = std::move(initial_state);

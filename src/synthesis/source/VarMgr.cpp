@@ -54,8 +54,12 @@ void VarMgr::create_named_variables(
       int new_index = new_variable.NodeReadIndex();
       name_to_variable_[name] = new_variable;
       index_to_name_[new_index] = name;
+      // for Debugging
+      name_to_variable_vec_.emplace_back(name, new_variable);
+      index_to_name_vec_.emplace_back(new_index, name);
     }
   }
+
 }
 
 std::size_t VarMgr::create_state_variables(std::size_t variable_count) {
@@ -75,6 +79,9 @@ std::size_t VarMgr::create_state_variables(std::size_t variable_count) {
         std::string name = "Z"+std::to_string(state_variable_count_+i);
         name_to_variable_[name] = new_state_variable;
         index_to_name_[new_index] = name;
+      // for Debugging
+      name_to_variable_vec_.emplace_back(name, new_state_variable);
+      index_to_name_vec_.emplace_back(new_index, name);
     }
 
   state_variable_count_ += variable_count;
@@ -209,7 +216,7 @@ std::string VarMgr::index_to_name(int index) const {
 }
 
 std::size_t VarMgr::total_variable_count() const {
-  return name_to_variable_.size() + total_state_variable_count();
+  return name_to_variable_.size();
 }
   
 std::size_t VarMgr::total_state_variable_count() const {

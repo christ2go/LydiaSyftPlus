@@ -80,7 +80,7 @@ namespace Syft {
          * \param starting_player The player that moves first each turn.
          * \param protagonist_player The player for which we aim to find the winning strategy.
          */
-        DfaGameSynthesizer(SymbolicStateDfa spec, Player starting_player, Player protagonist_player);
+        DfaGameSynthesizer(const SymbolicStateDfa spec, Player starting_player, Player protagonist_player);
 
 
         /**

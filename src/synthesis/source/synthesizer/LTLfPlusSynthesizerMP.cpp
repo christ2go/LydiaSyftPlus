@@ -1,20 +1,15 @@
 //
-// Created by shuzhu on 04/12/24.
+// Created by Shufang Zhu on 05/03/2025.
 //
 
-#include "synthesizer/LTLfPlusSynthesizer.h"
-#include "game/EmersonLei.hpp"
-#include "lydia/logic/ltlfplus/base.hpp"
-#include "lydia/logic/pnf.hpp"
-#include "lydia/parser/ltlfplus/driver.hpp"
-#include "lydia/utils/print.hpp"
+#include "synthesizer/LTLfPlusSynthesizerMP.h"
+#include "game/MannaPnueli.hpp"
 
 namespace Syft {
-  LTLfPlusSynthesizer::LTLfPlusSynthesizer(LTLfPlus ltlf_plus_formula,
-                                           InputOutputPartition partition, Player starting_player,
-                                           Player protagonist_player)
-    : ltlf_plus_formula_(ltlf_plus_formula),
-      color_formula_(ltlf_plus_formula.color_formula_), starting_player_(starting_player),
+  LTLfPlusSynthesizerMP::LTLfPlusSynthesizerMP(LTLfPlus ltlf_plus_formula,
+                                               InputOutputPartition partition, Player starting_player,
+                                               Player protagonist_player)
+    : ltlf_plus_formula_(ltlf_plus_formula), starting_player_(starting_player),
       protagonist_player_(protagonist_player) {
     std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
     var_mgr->create_named_variables(partition.input_variables);
@@ -23,10 +18,36 @@ namespace Syft {
     var_mgr->partition_variables(partition.input_variables,
                                  partition.output_variables);
     var_mgr_ = var_mgr;
+    for (const auto &[ltlf_plus_arg, prefix_quantifier]: ltlf_plus_formula_.formula_to_quantification_) {
+      switch (prefix_quantifier) {
+        case whitemech::lydia::PrefixQuantifier::ForallExists: {
+          break;
+        }
+        case whitemech::lydia::PrefixQuantifier::ExistsForall: {
+          break;
+        }
+        case whitemech::lydia::PrefixQuantifier::Forall: {
+          int color = std::stoi(ltlf_plus_formula_.formula_to_color_[ltlf_plus_arg]);
+          if (std::find(G_colors_.begin(), G_colors_.end(), color) == G_colors_.end()) {
+            G_colors_.push_back(color);
+          }
+          break;
+        }
+        case whitemech::lydia::PrefixQuantifier::Exists: {
+          int color = std::stoi(ltlf_plus_formula_.formula_to_color_[ltlf_plus_arg]);
+          if (std::find(F_colors_.begin(), F_colors_.end(), color) == F_colors_.end()) {
+            F_colors_.push_back(color);
+          }
+          break;
+        }
+        default:
+          throw std::runtime_error("Invalid argument in map LTLf+ formula to prefix quantification");
+      }
+    }
   }
 
-  // TODO create a run
-  ELSynthesisResult LTLfPlusSynthesizer::run() const {
+
+  MPSynthesisResult LTLfPlusSynthesizerMP::run() const {
     std::vector<SymbolicStateDfa> vec_spec;
     std::vector<CUDD::BDD> goal_states;
     // ensures that the "order" of colors is respected
@@ -71,33 +92,24 @@ namespace Syft {
           break;
         }
         case whitemech::lydia::PrefixQuantifier::Forall: {
-          ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
-
-          std::cout << "------ trimmed DFA Gphi: \n";
-          trimmed_explicit_dfa.dfa_print();
-
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
-            trimmed_explicit_dfa);
+            explicit_dfa);
+
           SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
           color_to_dfa.insert({std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa});
+          CUDD::BDD final_states = symbolic_dfa.final_states() | symbolic_dfa.initial_state_bdd();
           color_to_final_states.insert({
-            std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), symbolic_dfa.final_states()
+            std::stoi(ltlf_plus_formula_.formula_to_color_.at(ltlf_plus_arg)), final_states
           });
           // vec_spec.push_back(symbolic_dfa);
           // goal_states.push_back(symbolic_dfa.final_states());
           break;
         }
         case whitemech::lydia::PrefixQuantifier::Exists: {
-          std::vector<size_t> final_states = explicit_dfa.get_final();
-
-          ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa(explicit_dfa);
-          std::cout << "------ trimmed DFA Fphi: \n";
-          trimmed_explicit_dfa.dfa_print();
-
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
-            trimmed_explicit_dfa);
+            explicit_dfa);
           SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
@@ -130,14 +142,9 @@ namespace Syft {
 
     SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
     arena.dump_dot("arena.dot");
-    std::shared_ptr<EmersonLei> emerson_lei = std::make_shared<EmersonLei>(arena, color_formula_, starting_player_, protagonist_player_,
-                      goal_states, var_mgr_->cudd_mgr()->bddOne(), var_mgr_->cudd_mgr()->bddZero(), var_mgr_->cudd_mgr()->bddZero());
-    emerson_lei_ = emerson_lei;
-    return emerson_lei_->run_EL();
+    MannaPnueli solver(arena, ltlf_plus_formula_.color_formula_, F_colors_, G_colors_, starting_player_,
+                       protagonist_player_,
+                       goal_states, var_mgr_->cudd_mgr()->bddOne());
+    return solver.run_MP();
   }
-
-  // EmersonLei::OneStepSynReturn LTLfPlusSynthesizer::synthesize(std::string X, ELSynthesisResult result) const {
-  //   return emerson_lei_->synthesize(X, result);
-  // }
-
 }

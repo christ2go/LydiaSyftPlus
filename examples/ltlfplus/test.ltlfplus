@@ -1,1 +1,1 @@
-AE(a) && EA(b) && (A(c) || E(d))
+(AE(F(e1 & X(ff))) -> AE(F(a1 & X(ff)))) & (EA(F(e2 & X(ff))) -> EA(F(a2 & X(ff)))) & (E(G(e3 -> F(a3))))

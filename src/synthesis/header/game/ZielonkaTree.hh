@@ -4,6 +4,7 @@
 #include <vector>
 #include "ELHelpers.hh"
 #include "VarMgr.h"
+#include "Transducer.h"
 
 struct ZielonkaNode {
     std::vector<ZielonkaNode*> children;
@@ -17,6 +18,7 @@ struct ZielonkaNode {
     size_t level;
     size_t order;
     bool winning;
+    std::vector<std::unique_ptr<Syft::Transducer>> transducers;
     // std::vector<ZielonkaNode*> ancestors;
 };
 
@@ -24,6 +26,8 @@ class ZielonkaTree {
 private:
     // Private Variables
     ZielonkaNode *root;
+    size_t leaves = 0;
+    size_t total_nodes = 0;
     std::vector<std::string> phi; // Emerson-Lei condition in tokenized postfix format
     std::vector<CUDD::BDD> colorBDDs_;
     std::shared_ptr<Syft::VarMgr> var_mgr_;
