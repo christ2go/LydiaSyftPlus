@@ -71,6 +71,7 @@ namespace Syft {
 		int precedence(char op) const;
 		std::string infix_to_postfix(const std::string &infix) const;
 		Node* bottom_node_Dag() const;
+		std::vector<CUDD::BDD> getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const;
 
 		void MP_solve();
 
@@ -90,6 +91,10 @@ namespace Syft {
 		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space);
 
 		CUDD::BDD boolean_string_to_bdd(const std::string &color_formula);
+
+		MP_output_function ExtractStrategy_Explicit(MP_output_function op, int curr_node_id, CUDD::BDD gameNode,
+																													ZielonkaNode *t,
+																													std::vector<ELSynthesisResult> EL_results) const;
 
 		MPSynthesisResult run_MP() const;
 

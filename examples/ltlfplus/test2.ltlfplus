@@ -1,1 +1,1 @@
-AE(a) && EA(b) && A(c) && E(d)
+AE(a) && EA(b) && A(c) || E(d)
