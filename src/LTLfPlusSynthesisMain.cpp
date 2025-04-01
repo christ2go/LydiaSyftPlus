@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     app.add_option("-s,--starting-player", starting_player_id, "Starting player:\nagent=1;\nenvironment=0.")->
             required();
 
-    app.add_option("-g,--game", game_solver, "Game:\nManna-Pnueli=1;\nEmerson-Lei=0.")->
+    app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli=1;\nEmerson-Lei=0.")->
             required();
 
     CLI11_PARSE(app, argc, argv);

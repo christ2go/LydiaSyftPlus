@@ -8,6 +8,7 @@
 #include <lydia/parser/ppltlplus/driver.hpp>
 #include <lydia/logic/pp_pnf.hpp>
 #include "synthesizer/PPLTLPlusSynthesizer.h"
+#include "synthesizer/PPLTLPlusSynthesizerMP.h"
 #include <CLI/CLI.hpp>
 
 int main(int argc, char** argv) {
@@ -18,7 +19,7 @@ int main(int argc, char** argv) {
 
     // arguments
     std::string ppltl_plus_file, partition_file;
-    int starting_player_id;
+    int starting_player_id, game_solver;
 
     CLI::Option* ppltl_plus_file_opt;
     app.add_option("-i,--input-file", ppltl_plus_file, "Path to PPLTL+ formula file")->
@@ -31,6 +32,10 @@ int main(int argc, char** argv) {
     CLI::Option* starting_player_opt =
         app.add_option("-s,--starting-player", starting_player_id, "Starting player:\nagent=1;\nenvironment=0.")->
             required();
+
+    CLI::Option* game_solver_opt =
+        app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli=1;\nEmerson-Lei=0.") ->
+        required();
 
     CLI11_PARSE(app, argc, argv);
 
@@ -89,16 +94,45 @@ int main(int argc, char** argv) {
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
 
-    Syft::PPLTLPlusSynthesizer synthesizer(
-        ppltl_plus_formula,
-        partition,
-        starting_player,
-        Syft::Player::Agent);
-
-    // do synthesis
-    auto synthesis_result = synthesizer.run();
-
     // show result
-    if (synthesis_result.realizability) std::cout << "PPLTL+ synthesis is REALIZABLE" << std::endl;
-    else std::cout << "PPLTL+ synthesis is UNREALIZABLE" << std::endl;
+    if (game_solver == 0) 
+    {
+        Syft::PPLTLPlusSynthesizer synthesizer(
+            ppltl_plus_formula,
+            partition,
+            starting_player,
+            Syft::Player::Agent);
+    
+        // do synthesis
+        auto synthesis_result = synthesizer.run();
+
+        if (synthesis_result.realizability) {
+            std::cout << "PPLTL+ synthesis is REALIZABLE" << std::endl;
+
+            for (auto item : synthesis_result.output_function) {
+                std::cout << "state: " << item.gameNode;
+                item.gameNode.PrintCover();
+
+                std::cout << "tree node: " << item.t->order << "\n";
+                std::cout << " -> \n";
+                std::cout << "Y: " << item.Y;
+                item.Y.PrintCover();
+                std::cout << "tree node: " << item.u->order << "\n\n";
+            }
+        } else std::cout << "PPLTL+ synthesis is UNREALIZABLE" << std::endl;
+    } else {
+        Syft::PPLTLPlusSynthesizerMP synthesizerMP(
+            ppltl_plus_formula,
+            partition,
+            starting_player,
+            Syft::Player::Agent
+        );
+
+        auto synthesis_result_MP = synthesizerMP.run();
+        if (synthesis_result_MP.realizability) {
+            std::cout << "PPLTL+ synthesis is REALIZABLE" << std::endl;
+        } else {
+            std::cout << "PPLTL+ synthesis is UNREALIZABLE" << std::endl;
+        }
+    }
 }
