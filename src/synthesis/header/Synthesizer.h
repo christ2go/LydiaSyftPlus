@@ -35,14 +35,23 @@ namespace Syft {
         bool realizability;
         CUDD::BDD winning_states;
         EL_output_function output_function;
-        CUDD::BDD safe_states;
+        ZielonkaTree* z_tree = nullptr;
     };
 
+
+    struct MPWinningMove {
+        CUDD::BDD gameNode;
+        int currDagNodeId;
+        ZielonkaNode* t;
+        CUDD::BDD Y;
+        int newDagNodeId;
+        ZielonkaNode* u;
+    };
+    typedef std::vector<MPWinningMove> MP_output_function;
     struct MPSynthesisResult {
         bool realizability;
         CUDD::BDD winning_states;
-        // TODO how to store the strategy?
-        // MP_output_function output_function;
+        MP_output_function output_function;
     };
 
     struct MaxSetSynthesisResult {

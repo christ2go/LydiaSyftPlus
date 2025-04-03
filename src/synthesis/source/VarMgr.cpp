@@ -355,7 +355,8 @@ std::vector<std::string> VarMgr::state_variable_labels(
 	std::string id_string = "A" + std::to_string(automaton_id);
 
 	for (std::size_t i = 0; i < state_variables_[automaton_id].size(); ++i) {
-		labels.push_back(id_string + ":Z" + std::to_string(i));
+		// labels.push_back(id_string + ":Z" + std::to_string(i));
+	  labels.push_back("Z" + std::to_string(i));
 	}
 
 	return labels;

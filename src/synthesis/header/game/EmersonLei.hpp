@@ -35,6 +35,8 @@ namespace Syft {
 		std::optional<ZielonkaNode*> curr_tree_node_;
 		ZielonkaTree* z_tree_;
 		bool syn_flag_ = false;
+
+		CUDD::BDD getOneUnprocessedState(CUDD::BDD state_state, CUDD::BDD processed) const;
 		
 		public:
 		

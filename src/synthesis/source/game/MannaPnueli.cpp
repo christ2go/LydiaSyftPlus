@@ -33,33 +33,32 @@ namespace Syft {
     for (const auto &pair: bdd_id_to_color_) {
       std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second << std::endl;
     }
-    tie(dag_,node_to_id_) = build_FG_dag();
+    tie(dag_, node_to_id_) = build_FG_dag();
     print_FG_dag();
-
   }
 
-  void MannaPnueli::print_FG_dag() const{
+  void MannaPnueli::print_FG_dag() const {
     std::cout << "EL DAG:\n";
-    for (auto& [id, node] : dag_) {
+    for (auto &[id, node]: dag_) {
       std::cout << "Dag Node " << node->id << " (";
-      for (int bit : node->F) std::cout << bit;
+      for (int bit: node->F) std::cout << bit;
       std::cout << ", ";
-      for (int bit : node->G) std::cout << bit;
+      for (int bit: node->G) std::cout << bit;
       std::cout << ") <- {";
-      for (Node* parent : node->parents) {
+      for (Node *parent: node->parents) {
         std::cout << " Dag Node " << parent->id << " (";
-        for (int bit : parent->F) std::cout << bit;
+        for (int bit: parent->F) std::cout << bit;
         std::cout << ", ";
-        for (int bit : parent->G) std::cout << bit;
+        for (int bit: parent->G) std::cout << bit;
         std::cout << ") ";
       }
       std::cout << "}\n";
       std::cout << "-> {";
-      for (auto child : node->children) {
+      for (auto child: node->children) {
         std::cout << " Node " << child.first->id << " (";
-        for (int bit : child.first->F) std::cout << bit;
+        for (int bit: child.first->F) std::cout << bit;
         std::cout << ", ";
-        for (int bit : child.first->G) std::cout << bit;
+        for (int bit: child.first->G) std::cout << bit;
         std::cout << ") ";
         std::cout << child.second << " ";
       }
@@ -220,8 +219,7 @@ namespace Syft {
     return bdd_stack.top();
   }
 
-  std::string MannaPnueli::color_formula_bdd_to_string(const CUDD::BDD &color_formula_bdd) const{
-
+  std::string MannaPnueli::color_formula_bdd_to_string(const CUDD::BDD &color_formula_bdd) const {
     std::string formula_str = color_formula_bdd.FactoredFormString();
     formula_str = std::regex_replace(formula_str, std::regex("x(\\d+)"), "$1");
 
@@ -231,9 +229,10 @@ namespace Syft {
     std::sregex_iterator end;
 
     for (; it != end; ++it) {
-      int prop = std::stoi(it->str());  // Convert matched string to integer
+      int prop = std::stoi(it->str()); // Convert matched string to integer
       if (bdd_id_to_color_.find(prop) != bdd_id_to_color_.end()) {
-        formula_str = std::regex_replace(formula_str, std::regex("\\b" + std::to_string(prop) + "\\b"), std::to_string(bdd_id_to_color_.at(prop)));
+        formula_str = std::regex_replace(formula_str, std::regex("\\b" + std::to_string(prop) + "\\b"),
+                                         std::to_string(bdd_id_to_color_.at(prop)));
       }
     }
 
@@ -246,16 +245,16 @@ namespace Syft {
     int m = F_colors_.size();
     int n = G_colors_.size();
     int nodeCounter = 0; // Sizes of F and G, and a counter for node IDs
-     // Map (F, G) states to node IDs
-    std::queue<Node*> q;
+    // Map (F, G) states to node IDs
+    std::queue<Node *> q;
     std::vector<int> initialF(m, 1), initialG(n, 0);
-    Node* root = new Node{initialF, initialG, nodeCounter++};
+    Node *root = new Node{initialF, initialG, nodeCounter++};
     dag[root->id] = root;
     node_to_id[{initialF, initialG}] = root->id;
     q.push(root);
 
     while (!q.empty()) {
-      Node* node = q.front();
+      Node *node = q.front();
       q.pop();
 
       int x = count(node->F.begin(), node->F.end(), 1);
@@ -264,21 +263,21 @@ namespace Syft {
       if (x == 0 && y == 0) continue; // Stop when F is all 0s and G is all 1s
 
       // Generate all possible children by reducing different 1s in F
-        for (int i = 0; i < m; i++) {
-          if (node->F[i] == 1) {
-            std::vector<int> newF = node->F;
-            newF[i] = 0;
-            if (node_to_id.find({newF, node->G}) == node_to_id.end()) {
-              Node* newNode = new Node{newF, node->G, nodeCounter++};
-              dag[newNode->id] = newNode;
-              node_to_id[{newF, node->G}] = newNode->id;
-              q.push(newNode);
-            }
-            Node* parent_node = dag[node_to_id[{newF, node->G}]];
-            node->parents.push_back(parent_node);
-            parent_node->children.push_back({node, F_colors_[i]});
+      for (int i = 0; i < m; i++) {
+        if (node->F[i] == 1) {
+          std::vector<int> newF = node->F;
+          newF[i] = 0;
+          if (node_to_id.find({newF, node->G}) == node_to_id.end()) {
+            Node *newNode = new Node{newF, node->G, nodeCounter++};
+            dag[newNode->id] = newNode;
+            node_to_id[{newF, node->G}] = newNode->id;
+            q.push(newNode);
           }
+          Node *parent_node = dag[node_to_id[{newF, node->G}]];
+          node->parents.push_back(parent_node);
+          parent_node->children.push_back({node, F_colors_[i]});
         }
+      }
 
       // Generate all possible children by reducing different 0s in G
       for (int i = 0; i < n; i++) {
@@ -286,12 +285,12 @@ namespace Syft {
           std::vector<int> newG = node->G;
           newG[i] = 1;
           if (node_to_id.find({node->F, newG}) == node_to_id.end()) {
-            Node* newNode = new Node{node->F, newG, nodeCounter++};
+            Node *newNode = new Node{node->F, newG, nodeCounter++};
             dag[newNode->id] = newNode;
             node_to_id[{node->F, newG}] = newNode->id;
             q.push(newNode);
           }
-          Node* parent_node = dag[node_to_id[{node->F, newG}]];
+          Node *parent_node = dag[node_to_id[{node->F, newG}]];
           node->parents.push_back(parent_node);
           parent_node->children.push_back({node, G_colors_[i]});
         }
@@ -300,7 +299,7 @@ namespace Syft {
     return {dag, node_to_id};
   }
 
-  std::string MannaPnueli::simplify_color_formula(std::vector<int> F_color, std::vector<int> G_color) const{
+  std::string MannaPnueli::simplify_color_formula(std::vector<int> F_color, std::vector<int> G_color) const {
     CUDD::BDD new_color_formula_bdd = color_formula_bdd_;
     // std::cout << new_color_formula_bdd.FactoredFormString()<< std::endl;
     for (int i = 0; i < F_color.size(); i++) {
@@ -314,7 +313,6 @@ namespace Syft {
       } else {
         new_color_formula_bdd = new_color_formula_bdd.Restrict(color_bdd);
       }
-
     }
     // std::cout << new_color_formula_bdd.FactoredFormString()<< std::endl;
     for (int i = 0; i < G_color.size(); i++) {
@@ -330,25 +328,158 @@ namespace Syft {
     }
     // std::cout << new_color_formula_bdd.FactoredFormString()<< std::endl;
     return color_formula_bdd_to_string(new_color_formula_bdd);
-
-
   }
 
-  MannaPnueli::Node* MannaPnueli::bottom_node_Dag() const{
+  MannaPnueli::Node *MannaPnueli::bottom_node_Dag() const {
     return dag_.at(0);
+  }
+
+  MP_output_function MannaPnueli::ExtractStrategy_Explicit(MP_output_function op, int curr_node_id, CUDD::BDD gameNode,
+                                                           ZielonkaNode *t,
+                                                           std::vector<ELSynthesisResult> EL_results) const {
+    std::cout << "-----------\ngameNode: " << gameNode;
+    gameNode.PrintCover();
+    std::cout << "dag node: " << curr_node_id << "\n";
+    std::cout << "tree node: " << t->order << "\n";
+
+    for (auto item: op) {
+      // std::cout << item.gameNode << " " << item.t->order << "\n";
+      // std::cout << item.Y << " " << item.u->order << "\n";
+      if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order) && (
+            item.currDagNodeId == curr_node_id)) {
+        std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
+        // gameNode.PrintCover();
+        // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
+        // item.gameNode.PrintCover();
+        return op;
+      }
+    }
+    //	t: tree node, s (anchor node): lowest ancester of t that includes all colors of gameNode
+    MP_output_function temp = op;
+    // stop recursion if the strategy has already been defined for (gameNode,t)
+
+
+
+    Node *curr_node = dag_.at(curr_node_id);
+
+    std::vector<int> newFcolors = curr_node->F; // need to add 1
+    std::vector<int> newGcolors = curr_node->G; // need to remove 0
+    for (int i = 0; i < F_colors_.size(); i++) {
+      int F_color = F_colors_[i];
+      CUDD::BDD F_color_bdd = Colors_[F_color];
+      if (gameNode.Restrict(F_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) {
+        newFcolors[i] = 1;
+      }
+    }
+
+    for (int i = 0; i < G_colors_.size(); i++) {
+      int G_color = G_colors_[i];
+      CUDD::BDD G_color_bdd = Colors_[G_color];
+      if (gameNode.Restrict(!G_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) { // if non-G color has been seen
+        newGcolors[i] = 0;
+      }
+    }
+
+    auto it = node_to_id_.find({newFcolors, newGcolors});
+    assert(it != node_to_id_.end());
+    int new_node_id = it->second;
+
+    CUDD::BDD winning_states = EL_results[new_node_id].winning_states;
+
+    // add system choice and resulting new memory to extracted strategy,
+    // currently assumes result has component "strategy" which is vector of (gameNode, ZielonkaNode), (CUDD::BDD,ZielonkaNode)
+    MPWinningMove move;
+    move.gameNode = gameNode;
+    move.t = t;
+    move.currDagNodeId = curr_node_id;
+
+
+    bool found = false;
+    if (curr_node_id == new_node_id) {
+      // get outputs from EL result
+      for (auto item : EL_results[new_node_id].output_function) {
+        if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order)) {
+          move.Y = item.Y;
+          move.u = item.u;
+          move.newDagNodeId = new_node_id;
+          found = true;
+          break;
+        }
+      }
+    } else {
+      for (auto item : EL_results[new_node_id].output_function) {
+        if (item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) {
+          move.Y = item.Y;
+          move.u = item.u;
+          move.newDagNodeId = new_node_id;
+          found = true;
+          break;
+        }
+      }
+    }
+    assert(found);
+
+
+    temp.push_back(move);
+    std::cout << " --> \n";
+    std::cout << "Y: " << move.Y << "\n";
+    std::cout << "dag node: " << move.newDagNodeId << "\n";
+    std::cout << "tree node: " << move.u->order << "\n\n";
+
+    // compute game nodes that can result by taking system choice from gameNode
+    std::vector<CUDD::BDD> newGameNodes = getSuccsWithYZ(gameNode, move.Y);
+
+    // continue strategy construction with each possible new game node and the new memory value
+    for (int i = 0; i < newGameNodes.size(); i++) {
+      MP_output_function temp_new = ExtractStrategy_Explicit(temp, new_node_id, newGameNodes[i], move.u,
+                                                             EL_results);
+
+      temp = temp_new;
+    }
+    return temp;
+  }
+
+  std::vector<CUDD::BDD> MannaPnueli::getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const {
+    std::vector<CUDD::BDD> succs;
+    std::vector<CUDD::BDD> transition_vector = spec_.transition_function();
+    std::vector<CUDD::BDD> transition_vector_fix_Y_Z;
+    for (int i = 0; i < transition_vector.size(); i++) {
+      CUDD::BDD transition_fix_Y_Z = (transition_vector[i] * gameNode * Y).ExistAbstract(
+        var_mgr_->state_variables_cube(spec_.automaton_id())).ExistAbstract(var_mgr_->output_cube());
+      transition_vector_fix_Y_Z.push_back(transition_fix_Y_Z);
+    }
+    std::vector<std::string> X_labels = var_mgr_->input_variable_labels();
+    int total = 1 << X_labels.size(); // 2^n
+    for (int mask = 0; mask < total; ++mask) {
+      std::vector<int> values(var_mgr_->total_variable_count(), 0);
+      for (int i = 0; i < X_labels.size(); ++i) {
+        CUDD::BDD X_var = var_mgr_->name_to_variable(X_labels[i]);
+        values[X_var.NodeReadIndex()] = (mask >> i) & 1; // Extract the i-th bit
+      }
+      std::vector<int> copy(values);
+      CUDD::BDD succ = var_mgr_->cudd_mgr()->bddOne();
+      for (int i = 0; i < transition_vector_fix_Y_Z.size(); i++) {
+        CUDD::BDD Z_var = var_mgr_->state_variable(spec_.automaton_id(), i);
+        if (transition_vector_fix_Y_Z[i].Eval(copy.data()).IsOne()) {
+          succ = succ * Z_var;
+        } else {
+          succ = succ * !Z_var;
+        }
+      }
+      succs.push_back(succ);
+    }
+    return succs;
   }
 
 
   MPSynthesisResult MannaPnueli::run_MP() const {
-
     std::vector<ELSynthesisResult> EL_results(dag_.size()); //TODO here initialized as Zero just for testing
     std::vector<bool> computed(dag_.size(), false);
 
     while (std::find(computed.begin(), computed.end(), false) != computed.end()) {
-
       auto it = std::find(computed.begin(), computed.end(), false);
       int index = distance(computed.begin(), it);
-      Node* node = dag_.at(index);
+      Node *node = dag_.at(index);
       // std::cout << "Now process: Dag Node " << node->id << " (";
       // for (int bit : node->F) std::cout << bit;
       // std::cout << ", ";
@@ -365,7 +496,7 @@ namespace Syft {
 
       CUDD::BDD instant_winning = var_mgr_->cudd_mgr()->bddZero();
       CUDD::BDD instant_losing = var_mgr_->cudd_mgr()->bddZero();
-      for (auto child : node->children) {
+      for (auto child: node->children) {
         CUDD::BDD child_winnning_states = EL_results[child.first->id].winning_states;
         int color_flipped = child.second; // the color that got flipped
         auto is_F_color = std::find(F_colors_.begin(), F_colors_.end(), color_flipped);
@@ -383,7 +514,6 @@ namespace Syft {
         }
         // std::cout << "instant_winning: " << instant_winning << std::endl;
         // std::cout << "instant_losing: " << instant_losing << std::endl;
-
       }
 
 
@@ -391,29 +521,29 @@ namespace Syft {
       // 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning
       //		 Add nodes from !winningStates for which curcolors&seencolors=colors to instantLosing
       EmersonLei solver(spec_, curColor_formula, starting_player_, protagonist_player_,
-                      Colors_, var_mgr_->cudd_mgr()->bddOne(), instant_winning, instant_losing);
+                        Colors_, var_mgr_->cudd_mgr()->bddOne(), instant_winning, instant_losing);
       ELSynthesisResult result = solver.run_EL();
       // solve EL game for curColor_formula
       //TODO change run_EL to take instantWinning, or change the constructor of EL
       // ELSynthesisResult el_synthesis_result = solver.run_EL(instantWinning, instantLosing);
       computed[index] = true;
       EL_results[index] = result;
-
-
-
     }
     // update result according to computed solution, TODO: store result for curcolors; also, winningmoves
     MPSynthesisResult result;
 
-    if (EL_results[dag_.size()-1].realizability) {
+    if (EL_results[dag_.size() - 1].realizability) {
       result.realizability = true;
-      result.winning_states = EL_results[dag_.size()-1].winning_states;
+      result.winning_states = EL_results[dag_.size() - 1].winning_states;
+      MP_output_function op;
+      std::cout << "Strategy: \n";
+      result.output_function = ExtractStrategy_Explicit(op, dag_.size() - 1, spec_.initial_state_bdd(),
+        EL_results[dag_.size() - 1].z_tree->get_root(), EL_results);
       return result;
     } else {
       result.realizability = false;
-      result.winning_states = EL_results[dag_.size()-1].winning_states;
+      result.winning_states = EL_results[dag_.size() - 1].winning_states;
       return result;
     }
-
   }
 }
