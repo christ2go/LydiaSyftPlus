@@ -104,7 +104,7 @@ std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>&
         CUDD::BDD new_state_variable = mgr_->bddNewVarAtLevel(0);
         state_variables_[automaton_id].push_back(new_state_variable);
         name_to_variable_[vars[i]] = new_state_variable;
-        index_to_name_[new_state_variable.NodeReadIndex()] = vars[i]; 
+        index_to_name_[new_state_variable.NodeReadIndex()] = vars[i];
     } else { // Else add the existing variable to the state variables of the automaton
       state_variables_[automaton_id].push_back(name_to_variable_[vars[i]]);
     }
