@@ -19,12 +19,15 @@ namespace Syft {
   }
 
   CUDD::BDD EmersonLei::getOneUnprocessedState(CUDD::BDD states, CUDD::BDD processed) const {
+    // std::cout << "states: " << states << "\n";
+    // std::cout << "processed: " << processed << "\n";
 
     DdNode *rawNode = (states * (!processed)).getNode();
     // std::cout << "gameNode * winningmoves: " << gameNode * winningmoves << "\n";
     // std::cout << "winningmoves: " << winningmoves << "\n";
     CUDD::BDD Zs(*(var_mgr_->cudd_mgr()), rawNode);
-    // std::cout << "All possible Ys: " << Ys << "\n";
+    // std::cout << "All possible Zs: " << Zs << "\n";
+
     int n_vars = var_mgr_->total_variable_count();
     int *cube = nullptr;
     CUDD_VALUE_TYPE value;
@@ -90,6 +93,9 @@ namespace Syft {
 
       CUDD::BDD processed = var_mgr_->cudd_mgr()->bddZero();
       while (winning_states.Xnor(processed) != var_mgr_->cudd_mgr()->bddOne()) {
+        // std::cout << "winning_states: " << winning_states << "\n";
+        // std::cout << "processed: " << processed << "\n";
+
         CUDD::BDD unprocessed_state = getOneUnprocessedState(winning_states, processed);
         EL_output_function temp = ExtractStrategy_Explicit(op, winning_states, unprocessed_state,
                                                         z_tree_->get_root());
@@ -567,13 +573,13 @@ namespace Syft {
     } else {
       CUDD::BDD transitions_to_target_states = preimage(target);
       if (t->winning) {
-        CUDD::BDD result = state_space_ & project_into_states(transitions_to_target_states);
+        result = state_space_ & project_into_states(transitions_to_target_states);
         // result = target | new_collected_target_states;
         CUDD::BDD new_target_moves = (result & transitions_to_target_states) & (!instant_losing_);
         // CUDD::BDD diffmoves = (!target) & transitions_to_target_states;
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
       } else {
-        CUDD::BDD result = state_space_ & project_into_states(transitions_to_target_states);
+        result = state_space_ & project_into_states(transitions_to_target_states);
         // result = target | new_collected_target_states;
         CUDD::BDD new_target_moves = (!target) & result & transitions_to_target_states & (!instant_losing_);
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;

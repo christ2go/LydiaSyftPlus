@@ -375,7 +375,7 @@ namespace Syft {
     for (int i = 0; i < G_colors_.size(); i++) {
       int G_color = G_colors_[i];
       CUDD::BDD G_color_bdd = Colors_[G_color];
-      if (gameNode.Restrict(G_color_bdd) != var_mgr_->cudd_mgr()->bddOne()) {
+      if (gameNode.Restrict(!G_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) { // if non-G color has been seen
         newGcolors[i] = 0;
       }
     }
@@ -384,46 +384,7 @@ namespace Syft {
     assert(it != node_to_id_.end());
     int new_node_id = it->second;
 
-
-    // CUDD::BDD newFcolors = curFcolors | (F_colors & gameNode);
-    // CUDD::BDD newGcolors = curGcolors & (G_colors & gameNode);
-    //
-    // currentDAGnode = colorsToDAGnode(curFcolors, curGcolors);
-
-    // ZielonkaTree *new_tree = EL_results[new_node_id].z_tree;
-    // ZielonkaNode* t_prime = t;
-    // if (new_node_id != curr_node_id) {
-    //   t_prime = new_tree->get_root();
-    // }
-
     CUDD::BDD winning_states = EL_results[new_node_id].winning_states;
-
-
-
-    // the following assumes that system moves first and environment moves second
-
-    // ZielonkaNode *s = get_anchor(gameNode, t);
-    //
-    // // BDD that will be used to encode a single choice for system, default bddZero
-    // CUDD::BDD Y = var_mgr_->cudd_mgr()->bddZero();
-    //
-    // // pick one choice for system that is winning for system from gameNode for objective s
-    // if (s->children.empty()) {
-    //   // have just a single winningmoves BDD
-    //   Y = getUniqueSystemChoice(gameNode, s->winningmoves[0]);
-    //   // Y = getUniqueSystemChoice(gameNode,s->winningmoves[0]);
-    // } else {
-    //   // iterate through all winningmoves BDD until a choice for system is found that is winning from gameNode for objective s; one is guaranteed to be found
-    //   for (int i = 0; i < s->children.size(); i++) {
-    //     Y = getUniqueSystemChoice(gameNode, s->winningmoves[i]);
-    //     if (Y != var_mgr_->cudd_mgr()->bddZero()) {
-    //       break;
-    //     }
-    //   }
-    // }
-    //
-    // // get next memory value; t: old memory value, s: anchor node, move: system choice that has been picked
-    // ZielonkaNode *u = get_leaf(t, s, s, Y);
 
     // add system choice and resulting new memory to extracted strategy,
     // currently assumes result has component "strategy" which is vector of (gameNode, ZielonkaNode), (CUDD::BDD,ZielonkaNode)
