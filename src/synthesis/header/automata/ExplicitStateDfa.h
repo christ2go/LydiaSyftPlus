@@ -141,6 +141,8 @@ namespace Syft {
           */
         static ExplicitStateDfa dfa_to_Fdfa(ExplicitStateDfa &d);
 
+        static ExplicitStateDfa dfa_remove_initial_self_loops(ExplicitStateDfa &d);
+
         /**
          * \brief Restrict a DFA with a given set of transitions.
          *

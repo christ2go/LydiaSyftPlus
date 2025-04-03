@@ -105,6 +105,10 @@ std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>&
         state_variables_[automaton_id].push_back(new_state_variable);
         name_to_variable_[vars[i]] = new_state_variable;
         index_to_name_[new_state_variable.NodeReadIndex()] = vars[i];
+
+      // for Debugging
+      name_to_variable_vec_.emplace_back(vars[i], new_state_variable);
+      index_to_name_vec_.emplace_back(new_state_variable.NodeReadIndex(), vars[i]);
     } else { // Else add the existing variable to the state variables of the automaton
       state_variables_[automaton_id].push_back(name_to_variable_[vars[i]]);
     }
@@ -356,7 +360,10 @@ std::vector<std::string> VarMgr::state_variable_labels(
 
 	for (std::size_t i = 0; i < state_variables_[automaton_id].size(); ++i) {
 		// labels.push_back(id_string + ":Z" + std::to_string(i));
-	  labels.push_back("Z" + std::to_string(i));
+	  int index = state_variables_[automaton_id][i].NodeReadIndex();
+	  std::string name = index_to_name(index);
+	  // labels.push_back("Z" + std::to_string(i));
+	  labels.push_back(name);
 	}
 
 	return labels;
