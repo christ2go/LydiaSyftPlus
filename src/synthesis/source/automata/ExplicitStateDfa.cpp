@@ -235,6 +235,98 @@ namespace Syft {
     }
 
     ExplicitStateDfa
+    ExplicitStateDfa::dfa_remove_initial_self_loops(ExplicitStateDfa &d) {
+         std::cout << "--------- remove initial loops:\n";
+        d.dfa_print();
+        int d_ns = d.get_nb_states();
+        int new_ns = d_ns + 1; // initial state is "0", and new state is new_ns-1
+        int n = d.get_nb_variables();
+        int new_len = d.names.size();
+
+        std::vector<size_t> final_states = d.get_final();
+
+        DFA *a = d.dfa_;
+        DFA *result;
+        paths state_paths, pp;
+        std::string statuses;
+
+        int indices[new_len];
+        for (int i = 0; i < d.indices.size(); i++) {
+            indices[i] = d.indices[i];
+        }
+
+        dfaSetup(new_ns, new_len, indices);
+
+        int next_state;
+        std::string next_guard;
+
+        auto transitions = std::vector<std::pair<int, std::string>>();
+        state_paths = pp = make_paths(a->bddm, a->q[0]);
+        // auto it = find(final_states.begin(), final_states.end(), i);
+
+        while (pp) {
+            auto guard = whitemech::lydia::get_path_guard(n, pp->trace);
+            transitions.emplace_back(pp->to+1, guard);
+            pp = pp->next;
+        }
+        statuses += "+";
+
+        // transitions
+        int nb_transitions = transitions.size();
+        dfaAllocExceptions(nb_transitions);
+        for (const auto &p: transitions) {
+            std::tie(next_state, next_guard) = p;
+            dfaStoreException(next_state, next_guard.data());
+        }
+        dfaStoreState(new_ns);
+        kill_paths(state_paths);
+
+        for (int i = 0; i < a->ns; i++) {
+            int next_state;
+            std::string next_guard;
+
+            auto transitions = std::vector<std::pair<int, std::string>>();
+            state_paths = pp = make_paths(a->bddm, a->q[i]);
+            auto it = find(final_states.begin(), final_states.end(), i);
+
+            while (pp) {
+                auto guard = whitemech::lydia::get_path_guard(n, pp->trace);
+                transitions.emplace_back(pp->to+1, guard);
+
+                pp = pp->next;
+            }
+
+
+
+
+            if (it != final_states.end()) {
+                statuses += "+";
+            } else {
+                statuses += "-";
+            }
+
+            // transitions
+            int nb_transitions = transitions.size();
+            dfaAllocExceptions(nb_transitions);
+            for (const auto &p: transitions) {
+                std::tie(next_state, next_guard) = p;
+                dfaStoreException(next_state, next_guard.data());
+            }
+            dfaStoreState(d_ns);
+            kill_paths(state_paths);
+        }
+
+//        statuses += "+";
+//        dfaAllocExceptions(0);
+//        dfaStoreState(d_ns);
+
+        DFA *tmp = dfaBuild(statuses.data());
+        // result = dfaMinimize(tmp);
+        ExplicitStateDfa res(tmp, d.names);
+        return res;
+    }
+
+    ExplicitStateDfa
     ExplicitStateDfa::dfa_to_Fdfa(ExplicitStateDfa &d) {
         int d_ns = d.get_nb_states();
         std::vector<size_t> final_states = d.get_final();
