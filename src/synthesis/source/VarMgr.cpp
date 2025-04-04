@@ -18,6 +18,9 @@ void VarMgr::print_mgr() const {
   // prints number of vars
   std::cout << "Number of variables: " << total_variable_count() << std::endl;
 
+  // prints number of state vars
+  std::cout << "Number of state variables: " << state_variable_count_ << std::endl;
+
   // prints named variables
   std::cout << "Named variables (name, var): " << std::endl;
 
@@ -55,8 +58,8 @@ void VarMgr::create_named_variables(
       name_to_variable_[name] = new_variable;
       index_to_name_[new_index] = name;
       // for Debugging
-      name_to_variable_vec_.emplace_back(name, new_variable);
-      index_to_name_vec_.emplace_back(new_index, name);
+      // name_to_variable_vec_.emplace_back(name, new_variable);
+      // index_to_name_vec_.emplace_back(new_index, name);
     }
   }
 
@@ -80,8 +83,8 @@ std::size_t VarMgr::create_state_variables(std::size_t variable_count) {
         name_to_variable_[name] = new_state_variable;
         index_to_name_[new_index] = name;
       // for Debugging
-      name_to_variable_vec_.emplace_back(name, new_state_variable);
-      index_to_name_vec_.emplace_back(new_index, name);
+      // name_to_variable_vec_.emplace_back(name, new_state_variable);
+      // index_to_name_vec_.emplace_back(new_index, name);
     }
 
   state_variable_count_ += variable_count;
@@ -91,6 +94,7 @@ std::size_t VarMgr::create_state_variables(std::size_t variable_count) {
 
 std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>& vars) {
   std::size_t automaton_id = state_variables_.size();
+  std::size_t added_vars = 0;
 
   // Creates an additional space for variables at index automaton_id,
   // then reserves enough memory for all the new variables
@@ -106,15 +110,16 @@ std::size_t VarMgr::create_named_state_variables(const std::vector<std::string>&
         name_to_variable_[vars[i]] = new_state_variable;
         index_to_name_[new_state_variable.NodeReadIndex()] = vars[i];
 
-      // for Debugging
-      name_to_variable_vec_.emplace_back(vars[i], new_state_variable);
-      index_to_name_vec_.emplace_back(new_state_variable.NodeReadIndex(), vars[i]);
+        // for Debugging
+        // name_to_variable_vec_.emplace_back(vars[i], new_state_variable);
+        // index_to_name_vec_.emplace_back(new_state_variable.NodeReadIndex(), vars[i]);
+        added_vars++;
     } else { // Else add the existing variable to the state variables of the automaton
       state_variables_[automaton_id].push_back(name_to_variable_[vars[i]]);
     }
   }
 
-  state_variable_count_ += vars.size();
+  state_variable_count_ += added_vars;
   return automaton_id;
 }
 
