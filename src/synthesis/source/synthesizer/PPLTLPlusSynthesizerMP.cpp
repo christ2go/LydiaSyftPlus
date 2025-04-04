@@ -57,31 +57,36 @@ namespace Syft {
         for (const auto& [ppltl_plus_arg, prefix_quantifier] : ppltl_plus_formula_.formula_to_quantification_) {
             whitemech::lydia::ppltl_ptr ppltl_arg = ppltl_plus_arg -> ppltl_arg();
             std::cout << "PPLTL formula: " << whitemech::lydia::to_string(*ppltl_arg) << std::endl;
-            SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_);
 
             switch (prefix_quantifier) {
                 case whitemech::lydia::PrefixQuantifier::ForallExists:
-                    {color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
+                    {
+                    SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_);    
+                    color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
                     color_to_final_states.insert({
                       std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa.final_states()
                     });
                     break;}
                 case whitemech::lydia::PrefixQuantifier::ExistsForall: 
-                    {color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
+                    {
+                    SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_); 
+                    color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
                     color_to_final_states.insert({
                       std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), !sdfa.final_states()
                     });
                     break;}
                 case whitemech::lydia::PrefixQuantifier::Forall: {
+                    SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula_remove_initial_self_loops(*ppltl_arg, var_mgr_); 
                     color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
-                    CUDD::BDD final_states = sdfa.final_states() + sdfa.initial_state_bdd();
+                    // CUDD::BDD final_states = sdfa.final_states() + sdfa.initial_state_bdd();
                     color_to_final_states.insert(
-                        {std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), final_states
+                        {std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa.final_states()
                     });
                     break;                    
                 }
                 case whitemech::lydia::PrefixQuantifier::Exists: 
                 {
+                    SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_); 
                     color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
                     color_to_final_states.insert(
                         {std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa.final_states()
