@@ -1,1 +1,1 @@
-(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(s3) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))
+(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(ff) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))

@@ -93,7 +93,7 @@ namespace Syft {
         }
         case whitemech::lydia::PrefixQuantifier::Forall: {
           ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(explicit_dfa);
-          // explicit_dfa_remove_initial_loops.dfa_print();
+          explicit_dfa_remove_initial_loops.dfa_print();
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa_remove_initial_loops);
           explicit_dfa_add.dump_dot("dfa_add.dot");

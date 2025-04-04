@@ -221,6 +221,7 @@ namespace Syft {
 
   std::string MannaPnueli::color_formula_bdd_to_string(const CUDD::BDD &color_formula_bdd) const {
     std::string formula_str = color_formula_bdd.FactoredFormString();
+
     formula_str = std::regex_replace(formula_str, std::regex("x(\\d+)"), "$1");
 
     // replace the bdd ID with their corresponding color
@@ -337,17 +338,17 @@ namespace Syft {
   MP_output_function MannaPnueli::ExtractStrategy_Explicit(MP_output_function op, int curr_node_id, CUDD::BDD gameNode,
                                                            ZielonkaNode *t,
                                                            std::vector<ELSynthesisResult> EL_results) const {
-    std::cout << "-----------\ngameNode: " << gameNode;
-    gameNode.PrintCover();
-    std::cout << "dag node: " << curr_node_id << "\n";
-    std::cout << "tree node: " << t->order << "\n";
+    // std::cout << "-----------\ngameNode: " << gameNode;
+    // gameNode.PrintCover();
+    // std::cout << "dag node: " << curr_node_id << "\n";
+    // std::cout << "tree node: " << t->order << "\n";
 
     for (auto item: op) {
       // std::cout << item.gameNode << " " << item.t->order << "\n";
       // std::cout << item.Y << " " << item.u->order << "\n";
-      if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order) && (
+      if (((item.gameNode | !gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order) && (
             item.currDagNodeId == curr_node_id)) {
-        std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
+        // std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
         // gameNode.PrintCover();
         // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
         // item.gameNode.PrintCover();
@@ -398,7 +399,7 @@ namespace Syft {
     if (curr_node_id == new_node_id) {
       // get outputs from EL result
       for (auto item : EL_results[new_node_id].output_function) {
-        if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order)) {
+        if (((item.gameNode | !gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order)) {
           move.Y = item.Y;
           move.u = item.u;
           move.newDagNodeId = new_node_id;
@@ -408,7 +409,7 @@ namespace Syft {
       }
     } else {
       for (auto item : EL_results[new_node_id].output_function) {
-        if (item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) {
+        if ((item.gameNode | !gameNode) == var_mgr_->cudd_mgr()->bddOne()) {
           move.Y = item.Y;
           move.u = item.u;
           move.newDagNodeId = new_node_id;
@@ -488,7 +489,7 @@ namespace Syft {
 
 
       std::string curColor_formula = simplify_color_formula(node->F, node->G);
-      std::cout << curColor_formula << std::endl;
+      // std::cout << curColor_formula << std::endl;
 
       // build Zielonka tree for current F- and G-colors
       // ZielonkaTree *Ztree = new ZielonkaTree(curColor_formula, Colors_, var_mgr_);
