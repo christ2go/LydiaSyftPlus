@@ -74,7 +74,7 @@ namespace Syft {
 
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
     CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
-    std::cout << "winning_states: " << winning_states << std::endl;
+    // std::cout << "winning_states: " << winning_states << std::endl;
     // update result according to computed solution
     ELSynthesisResult result;
     if (includes_initial_state(winning_states)) {
@@ -82,7 +82,7 @@ namespace Syft {
       result.winning_states = winning_states;
       result.z_tree = z_tree_;
       EL_output_function op;
-      std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
+      // std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
       result.output_function = ExtractStrategy_Explicit(op, winning_states, spec_.initial_state_bdd(),
                                                         z_tree_->get_root());
       return result;
@@ -92,7 +92,8 @@ namespace Syft {
       EL_output_function op;
 
       CUDD::BDD processed = var_mgr_->cudd_mgr()->bddZero();
-      while (winning_states.Xnor(processed) != var_mgr_->cudd_mgr()->bddOne()) {
+      while ((winning_states | !processed) != var_mgr_->cudd_mgr()->bddOne()) {
+      // while (winning_states.Xnor(processed) != var_mgr_->cudd_mgr()->bddOne()) {
         // std::cout << "winning_states: " << winning_states << "\n";
         // std::cout << "processed: " << processed << "\n";
 
@@ -325,12 +326,15 @@ namespace Syft {
     for (auto item: op) {
       // std::cout << item.gameNode << " " << item.t->order << "\n";
       // std::cout << item.Y << " " << item.u->order << "\n";
-      if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order)) {
-        // std::cout << "defined! " << gameNode << " " << t->order << "\n";
-        // gameNode.PrintCover();
-        // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
-        // item.gameNode.PrintCover();
-        return temp;
+      if ( (item.t->order == t->order)) {
+        // if ((item.gameNode.Xnor(gameNode) == var_mgr_->cudd_mgr()->bddOne())) {
+        if ((item.gameNode | !(gameNode)) == var_mgr_->cudd_mgr()->bddOne()) {
+          // std::cout << "defined! " << gameNode << " " << t->order << "\n";
+          // gameNode.PrintCover();
+          // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
+          // item.gameNode.PrintCover();
+          return temp;
+        }
       }
     }
 

@@ -166,6 +166,14 @@ namespace ELHelpers {
         return false;
     }
 
+    inline int precedence(const std::string& op) {
+        if (op == "!") return 3;     // highest
+        if (op == "&") return 2;
+        if (op == "|") return 1;
+        return 0;
+    }
+
+
     // Takes tokenized input string (in infix) and translates to postfix
     inline std::vector<std::string> infix2postfix(std::vector<std::string> tokens){
         std::vector<std::string> opStack;
@@ -173,18 +181,24 @@ namespace ELHelpers {
 
         for (std::string s : tokens){
             if (isOperator(s)){
-                if (opStack.empty())
-                    opStack.push_back(s);
-                else{
-                    if (opStack.back() == "(" || s == "!"){
-                        opStack.push_back(s);
-                        continue;
-                    }
-                    std::string tmp = opStack.back();
+                while (!opStack.empty() && opStack.back() != "(" &&
+                   precedence(opStack.back()) >= precedence(s)) {
+                    outputStack.push_back(opStack.back());
                     opStack.pop_back();
-                    outputStack.push_back(tmp);
-                    opStack.push_back(s);
-                }
+                   }
+                opStack.push_back(s);
+                // if (opStack.empty())
+                //     opStack.push_back(s);
+                // else{
+                //     if (opStack.back() == "(" || s == "!"){
+                //         opStack.push_back(s);
+                //         continue;
+                //     }
+                //     std::string tmp = opStack.back();
+                //     opStack.pop_back();
+                //     outputStack.push_back(tmp);
+                //     opStack.push_back(s);
+                // }
             }
             else if (isNumber(s)){
                 outputStack.push_back(s);
@@ -227,6 +241,7 @@ namespace ELHelpers {
 
         return outputStack;
     }
+
 
     inline bool eval_postfix (std::vector<std::string> postfix, std::vector<bool> colors){
         std::reverse(postfix.begin(), postfix.end());
