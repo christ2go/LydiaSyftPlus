@@ -404,7 +404,7 @@ namespace Syft {
         // in the next time step val_var evaluates to 1 iff 
         // val or val_var hold in the current time step
         // it follows that, if val_var evaluates to 1 once
-        // i.e., a final state has been visited
+        // i.e., a final state has bconst SymbolicStateDfa& sdfaeen visited
         // val_var will evaluate to 1 forever
         transition_function[lst] = transition_function[lst] + val_var;
 
@@ -455,6 +455,88 @@ namespace Syft {
         adfa.final_states_ = std::move(new_final_states);
 
         return adfa;
+    }
+
+    SymbolicStateDfa SymbolicStateDfa::dfa_of_ppltl_formula_remove_initial_self_loops(
+        const whitemech::lydia::PPLTLFormula& formula,
+        std::shared_ptr<VarMgr> mgr
+    )  {
+        whitemech::lydia::StrPrinter p;
+
+        // get NNF
+        whitemech::lydia::NNFTransformer t;
+        auto nnf = t.apply(formula);
+
+        // get YNF
+        whitemech::lydia::YNFTransformer yt;
+        auto ynf = yt.apply(*nnf);
+
+        // get subformulas
+        auto y_sub = yt.get_y_sub();
+        auto wy_sub = yt.get_wy_sub();
+        auto atoms  = yt.get_atoms();
+
+        // creates Boolean variables for the atoms
+        std::vector<std::string> str_atoms;
+        for (const auto& a : atoms) str_atoms.push_back(p.apply(*a));
+        mgr->create_named_variables(str_atoms);
+
+        // creates Boolean variables for Y and WY subformulas
+        std::vector<std::string> str_sub;
+        str_sub.reserve(y_sub.size() + wy_sub.size() + 2);
+        for (const auto& a : y_sub) str_sub.push_back(p.apply(*a));
+        for (const auto& a : wy_sub) str_sub.push_back(p.apply(*a));
+
+        // create state variables for val and nli
+        auto val_str = "VAL"+std::to_string(mgr->automaton_num());
+        str_sub.push_back(val_str);
+        auto nli_str = "NLI"+std::to_string(mgr->automaton_num());
+        str_sub.push_back(nli_str);
+
+        auto dfa_id = mgr->create_named_state_variables(str_sub);
+
+        // transition function and initial state
+        // Z = (Y0, ..., Yn, WY0, ...., WYm) {0, 1}
+        // d = (dY0, ..., dYn, dWY0, ..., dWYm) {BDD}
+        std::vector<CUDD::BDD> transition_function;
+        transition_function.reserve(y_sub.size() + wy_sub.size() + 2);
+        std::vector<int> init_state;
+        init_state.reserve(y_sub.size() + wy_sub.size() + 2);
+        ValVisitor v(mgr);
+
+        // Y state vars
+        for (const auto& f : y_sub) {
+            auto ya = std::static_pointer_cast<const whitemech::lydia::PPLTLYesterday>(f);
+            auto arg = ya->get_arg();
+            auto bdd = val(*arg, mgr);
+            transition_function.push_back(bdd);
+            init_state.push_back(0);
+        }
+        // WY state vars
+        for (const auto& f : wy_sub) {
+            auto wya = std::static_pointer_cast<const whitemech::lydia::PPLTLWeakYesterday>(f);
+            auto arg = wya->get_arg();
+            auto bdd = val(*arg, mgr);
+            transition_function.push_back(bdd);
+            init_state.push_back(1);
+        }
+        // final state var
+        transition_function.push_back(val(*ynf, mgr));
+        init_state.push_back(0);
+        // no loop initial state var
+        transition_function.push_back(mgr->cudd_mgr()->bddZero());
+        init_state.push_back(1);
+
+        // final states
+        CUDD::BDD final_states = mgr->name_to_variable(val_str) + mgr->name_to_variable(nli_str);
+
+        // output 
+        SymbolicStateDfa dfa(std::move(mgr));
+        dfa.automaton_id_ = dfa_id;
+        dfa.initial_state_ = std::move(init_state);
+        dfa.transition_function_ = std::move(transition_function);
+        dfa.final_states_ = std::move(final_states);
+        return dfa;
     }
 }
 

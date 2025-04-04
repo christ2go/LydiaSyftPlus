@@ -212,6 +212,18 @@ namespace Syft {
      * \return The symbolic-state DFA for A(sdfa) 
      */
         static SymbolicStateDfa get_forall_dfa(const SymbolicStateDfa& sdfa);
+
+    /**
+     * \brief Construct the symbolic-state DFA of a PPLTL formula and remove loops in the initial state
+     * 
+     * \param formula. A PPLTL formula
+     * \param mgr. The variable manager of the output DFA
+     * \return The symbolic-state DFA of the PPLTL formula with no loops in the initial state
+     */
+        static SymbolicStateDfa dfa_of_ppltl_formula_remove_initial_self_loops(
+            const whitemech::lydia::PPLTLFormula& formula,
+            std::shared_ptr<VarMgr> mgr
+        );
     };
 
 }

@@ -33,13 +33,14 @@ void interactive(const Syft::SymbolicStateDfa& d) {
         state_eval.reserve(n_atoms + n_state_vars);
         for (int i = 0; i < n_atoms ; ++i) {
             std::string atom_name = var_mgr->index_to_name(i);
-            if (!(atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'V')) state_eval.push_back(0);
+            if (!(atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'V' || atom_name[0] == 'N')) state_eval.push_back(0);
         }
         for (const auto& b : state) state_eval.push_back(b);
 
         // print state_eval
         std::cout << "State evaluation: ";
         for (const auto& i : state_eval) std::cout << i;
+        std::cout << ". Size: " << state_eval.size() << std::endl;
         std::cout << std::endl;
 
         if (final_states.Eval(state_eval.data()).IsOne()) std::cout << "Current state is FINAL" << std::endl;
@@ -50,7 +51,7 @@ void interactive(const Syft::SymbolicStateDfa& d) {
         interpretation.reserve(n_atoms + n_state_vars);
         for (int i = 0; i < n_atoms; ++i) {
             std::string atom_name = var_mgr->index_to_name(i);
-            if (atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'V') continue;
+            if (atom_name[0] == 'Y' || atom_name[0] == 'W' || atom_name[0] == 'V' || atom_name[0] == 'N') continue;
             std::cout << "Enter value for atom " << atom_name << ": ";
             int value;
             std::cin >> value;
@@ -117,10 +118,12 @@ int main(int argc, char** argv) {
 
     // symbolic DFA construction
     std::shared_ptr<Syft::VarMgr> var_mgr = std::make_shared<Syft::VarMgr>();
+    std::shared_ptr<Syft::VarMgr> var_mgr2 = std::make_shared<Syft::VarMgr>();
 
     auto sdfa = Syft::SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl, var_mgr);
     auto edfa = Syft::SymbolicStateDfa::get_exists_dfa(sdfa);
     auto adfa = Syft::SymbolicStateDfa::get_forall_dfa(sdfa);
+    auto adfa_no_loops = Syft::SymbolicStateDfa::dfa_of_ppltl_formula_remove_initial_self_loops(*ppltl, var_mgr2);
 
     // print alphabet and state variables
     sdfa.var_mgr()->print_mgr();
@@ -176,5 +179,23 @@ int main(int argc, char** argv) {
     std::cout << "Do you want to enter interactive mode for A(ppltl)? (y/n): ";
     std::cin >> interactive_amode;
     if (interactive_amode == "y") interactive(adfa);
+    std::cout << "--------------------------------" << std::endl;
+
+    // do the same for A'(dfa), where A' is obtained using dfa_of_ppltl_formula_remove_initial_self_loops
+    var_mgr2->print_mgr();
+    std::cout << "--------------------------------" << std::endl;
+    std::cout << "A'(dfa) initial state: ";
+    for (const auto& b : adfa_no_loops.initial_state()) std::cout << b;
+    std::cout << std::endl;
+
+    std::cout << "A'(dfa) transition function: " << std::endl;
+    for (const auto& bdd : adfa_no_loops.transition_function()) std::cout << bdd << std::endl;
+
+    std::cout << "A'(dfa) final states: " << adfa_no_loops.final_states() << std::endl;
+
+    std::string interactive_amode_no_loops;
+    std::cout << "Do you want to enter interactive mode for A'(ppltl)? (y/n): ";
+    std::cin >> interactive_amode_no_loops;
+    if (interactive_amode_no_loops == "y") interactive(adfa_no_loops);
     std::cout << "--------------------------------" << std::endl;
 }
