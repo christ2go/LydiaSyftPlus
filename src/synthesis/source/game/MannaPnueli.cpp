@@ -24,15 +24,15 @@ namespace Syft {
       F_colors_(F_colors), G_colors_(G_colors), Colors_(colorBDDs), state_space_(state_space) {
     color_mgr_ = CUDD::Cudd();
     color_formula_bdd_ = boolean_string_to_bdd(color_formula_);
-    std::cout << "Mapping of integer propositions to BDD variables:" << std::endl;
-    for (const auto &pair: color_to_variable_) {
-      std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second.NodeReadIndex() << std::endl;
-    }
-
-    std::cout << "Mapping of BDD variables ID to integer propositions:" << std::endl;
-    for (const auto &pair: bdd_id_to_color_) {
-      std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second << std::endl;
-    }
+    // std::cout << "Mapping of integer propositions to BDD variables:" << std::endl;
+    // for (const auto &pair: color_to_variable_) {
+    //   std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second.NodeReadIndex() << std::endl;
+    // }
+    //
+    // std::cout << "Mapping of BDD variables ID to integer propositions:" << std::endl;
+    // for (const auto &pair: bdd_id_to_color_) {
+    //   std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second << std::endl;
+    // }
     tie(dag_, node_to_id_) = build_FG_dag();
     print_FG_dag();
   }
@@ -368,7 +368,7 @@ namespace Syft {
     for (int i = 0; i < F_colors_.size(); i++) {
       int F_color = F_colors_[i];
       CUDD::BDD F_color_bdd = Colors_[F_color];
-      if (gameNode.Restrict(F_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) {
+      if (gameNode.Constrain(F_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) {
         newFcolors[i] = 1;
       }
     }
@@ -376,7 +376,7 @@ namespace Syft {
     for (int i = 0; i < G_colors_.size(); i++) {
       int G_color = G_colors_[i];
       CUDD::BDD G_color_bdd = Colors_[G_color];
-      if (gameNode.Restrict(!G_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) { // if non-G color has been seen
+      if (gameNode.Constrain(!G_color_bdd) != var_mgr_->cudd_mgr()->bddZero()) { // if non-G color has been seen
         newGcolors[i] = 0;
       }
     }

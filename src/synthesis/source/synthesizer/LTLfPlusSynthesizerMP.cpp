@@ -58,7 +58,7 @@ namespace Syft {
       whitemech::lydia::ltlf_ptr ltlf_arg = ltlf_plus_arg->ltlf_arg();
       ExplicitStateDfa explicit_dfa = ExplicitStateDfa::dfa_of_formula(*ltlf_arg);
 
-      std::cout << "LTLf formula: " << whitemech::lydia::to_string(*ltlf_arg) << std::endl;
+      // std::cout << "LTLf formula: " << whitemech::lydia::to_string(*ltlf_arg) << std::endl;
       // std::cout << "------ original DFA: \n";
       // explicit_dfa.dfa_print();
 
@@ -93,10 +93,10 @@ namespace Syft {
         }
         case whitemech::lydia::PrefixQuantifier::Forall: {
           ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(explicit_dfa);
-          explicit_dfa_remove_initial_loops.dfa_print();
+          // explicit_dfa_remove_initial_loops.dfa_print();
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa_remove_initial_loops);
-          explicit_dfa_add.dump_dot("dfa_add.dot");
+          // explicit_dfa_add.dump_dot("dfa_add.dot");
           SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 

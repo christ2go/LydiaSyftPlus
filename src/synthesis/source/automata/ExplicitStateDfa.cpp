@@ -151,7 +151,7 @@ namespace Syft {
         DFA *tmp = dfaBuild(statuses.data());
         ExplicitStateDfa res1(tmp, d.names);
 
-        res1.dfa_print();
+        // res1.dfa_print();
         result = dfaMinimize(tmp);
         ExplicitStateDfa res(result, d.names);
         // std::cout << "--------- Gd:\n";
@@ -236,8 +236,8 @@ namespace Syft {
 
     ExplicitStateDfa
     ExplicitStateDfa::dfa_remove_initial_self_loops(ExplicitStateDfa &d) {
-         std::cout << "--------- remove initial loops:\n";
-        d.dfa_print();
+        //  std::cout << "--------- remove initial loops:\n";
+        // d.dfa_print();
         int d_ns = d.get_nb_states();
         int new_ns = d_ns + 1; // initial state is "0", and new state is new_ns-1
         int n = d.get_nb_variables();

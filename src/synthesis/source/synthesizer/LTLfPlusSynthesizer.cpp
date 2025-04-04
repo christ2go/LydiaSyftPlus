@@ -37,9 +37,9 @@ namespace Syft {
       whitemech::lydia::ltlf_ptr ltlf_arg = ltlf_plus_arg->ltlf_arg();
       ExplicitStateDfa explicit_dfa = ExplicitStateDfa::dfa_of_formula(*ltlf_arg);
 
-      std::cout << "LTLf formula: " << whitemech::lydia::to_string(*ltlf_arg) << std::endl;
-      std::cout << "------ original DFA: \n";
-      explicit_dfa.dfa_print();
+      // std::cout << "LTLf formula: " << whitemech::lydia::to_string(*ltlf_arg) << std::endl;
+      // std::cout << "------ original DFA: \n";
+      // explicit_dfa.dfa_print();
 
       switch (prefix_quantifier) {
         case whitemech::lydia::PrefixQuantifier::ForallExists: {
@@ -73,8 +73,8 @@ namespace Syft {
         case whitemech::lydia::PrefixQuantifier::Forall: {
           ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
 
-          std::cout << "------ trimmed DFA Gphi: \n";
-          trimmed_explicit_dfa.dfa_print();
+          // std::cout << "------ trimmed DFA Gphi: \n";
+          // trimmed_explicit_dfa.dfa_print();
 
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             trimmed_explicit_dfa);
@@ -93,8 +93,8 @@ namespace Syft {
           std::vector<size_t> final_states = explicit_dfa.get_final();
 
           ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa(explicit_dfa);
-          std::cout << "------ trimmed DFA Fphi: \n";
-          trimmed_explicit_dfa.dfa_print();
+          // std::cout << "------ trimmed DFA Fphi: \n";
+          // trimmed_explicit_dfa.dfa_print();
 
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             trimmed_explicit_dfa);
@@ -124,12 +124,12 @@ namespace Syft {
       goal_states.push_back(!goal_states[i]);
     }
 
-    for (auto j = 0; j < vec_spec.size(); j++) {
-      vec_spec[j].dump_dot("dfa" + std::to_string(j) + ".dot");
-    }
+    // for (auto j = 0; j < vec_spec.size(); j++) {
+    //   vec_spec[j].dump_dot("dfa" + std::to_string(j) + ".dot");
+    // }
 
     SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
-    arena.dump_dot("arena.dot");
+    // arena.dump_dot("arena.dot");
     std::shared_ptr<EmersonLei> emerson_lei = std::make_shared<EmersonLei>(arena, color_formula_, starting_player_, protagonist_player_,
                       goal_states, var_mgr_->cudd_mgr()->bddOne(), var_mgr_->cudd_mgr()->bddZero(), var_mgr_->cudd_mgr()->bddZero());
     emerson_lei_ = emerson_lei;

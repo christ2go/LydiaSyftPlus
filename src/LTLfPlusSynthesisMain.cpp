@@ -73,24 +73,24 @@ int main(int argc, char** argv) {
     ltlf_plus_formula.formula_to_quantification_= pnf.subformula_to_quantifier_;
 
     // debug
-    for (const auto& [formula, color] : pnf.subformula_to_color_) {
-        std::cout << "LTLf+ Formula: " << whitemech::lydia::to_string(*formula) << ". Color: " << color << std::flush;
-        switch (pnf.subformula_to_quantifier_[formula]) {
-            case whitemech::lydia::PrefixQuantifier::ForallExists: {
-                std::cout << ". Prefix Quantifier: AE" << std::endl;
-                break;}
-            case whitemech::lydia::PrefixQuantifier::ExistsForall: {
-                std::cout << ". Prefix Quantifier: EA" << std::endl;
-                break;}
-            case whitemech::lydia::PrefixQuantifier::Forall: {
-                std::cout << ". Prefix Quantifier: A" << std::endl;
-                break;}
-            case whitemech::lydia::PrefixQuantifier::Exists: {
-                std::cout << ". Prefix Quantifier: E" << std::endl;
-                break;}
-        }
-    }
-    std::cout << "Color formula: " << pnf.color_formula_ << std::endl;
+    // for (const auto& [formula, color] : pnf.subformula_to_color_) {
+    //     std::cout << "LTLf+ Formula: " << whitemech::lydia::to_string(*formula) << ". Color: " << color << std::flush;
+    //     switch (pnf.subformula_to_quantifier_[formula]) {
+    //         case whitemech::lydia::PrefixQuantifier::ForallExists: {
+    //             std::cout << ". Prefix Quantifier: AE" << std::endl;
+    //             break;}
+    //         case whitemech::lydia::PrefixQuantifier::ExistsForall: {
+    //             std::cout << ". Prefix Quantifier: EA" << std::endl;
+    //             break;}
+    //         case whitemech::lydia::PrefixQuantifier::Forall: {
+    //             std::cout << ". Prefix Quantifier: A" << std::endl;
+    //             break;}
+    //         case whitemech::lydia::PrefixQuantifier::Exists: {
+    //             std::cout << ". Prefix Quantifier: E" << std::endl;
+    //             break;}
+    //     }
+    // }
+    // std::cout << "Color formula: " << pnf.color_formula_ << std::endl;
 
     // construct LTLfPlusSynthesizer obj
     Syft::Player starting_player;
