@@ -107,12 +107,12 @@ namespace Syft {
               goal_states.push_back(!goal_states[i]);
             }
         
-            // for (auto j = 0; j < vec_spec.size(); j++) {
-            //   vec_spec[j].dump_dot("dfa" + std::to_string(j) + ".dot");
-            // }
+            for (auto j = 0; j < vec_spec.size(); j++) {
+              vec_spec[j].dump_dot("dfa" + std::to_string(j) + ".dot");
+            }
         
             SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
-            // arena.dump_dot("arena.dot");
+            arena.dump_dot("arena.dot");
             MannaPnueli solver(arena, ppltl_plus_formula_.color_formula_, F_colors_, G_colors_, starting_player_,
                                protagonist_player_,
                                goal_states, var_mgr_->cudd_mgr()->bddOne());

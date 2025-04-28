@@ -481,15 +481,15 @@ namespace Syft {
       auto it = std::find(computed.begin(), computed.end(), false);
       int index = distance(computed.begin(), it);
       Node *node = dag_.at(index);
-      // std::cout << "Now process: Dag Node " << node->id << " (";
-      // for (int bit : node->F) std::cout << bit;
-      // std::cout << ", ";
-      // for (int bit : node->G) std::cout << bit;
-      // std::cout << ")\n";
+      std::cout << "Now process: Dag Node " << node->id << " (";
+      for (int bit : node->F) std::cout << bit;
+      std::cout << ", ";
+      for (int bit : node->G) std::cout << bit;
+      std::cout << ")\n";
 
 
       std::string curColor_formula = simplify_color_formula(node->F, node->G);
-      // std::cout << curColor_formula << std::endl;
+      std::cout << curColor_formula << std::endl;
 
       // build Zielonka tree for current F- and G-colors
       // ZielonkaTree *Ztree = new ZielonkaTree(curColor_formula, Colors_, var_mgr_);
@@ -513,8 +513,8 @@ namespace Syft {
           instant_winning = instant_winning | (child_winnning_states * !(Colors_[color_flipped]));
           instant_losing = instant_losing | (!child_winnning_states * !(Colors_[color_flipped]));
         }
-        // std::cout << "instant_winning: " << instant_winning << std::endl;
-        // std::cout << "instant_losing: " << instant_losing << std::endl;
+        std::cout << "instant_winning: " << instant_winning << std::endl;
+        std::cout << "instant_losing: " << instant_losing << std::endl;
       }
 
 

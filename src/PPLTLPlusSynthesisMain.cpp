@@ -1,6 +1,6 @@
 #include <memory>
-
 #include "game/InputOutputPartition.h"
+// #include "game/InputOutputPartition.h"
 #include "Preprocessing.h"
 #include "Utils.h"
 #include <lydia/logic/ppltlplus/base.hpp>
@@ -88,9 +88,11 @@ int main(int argc, char** argv) {
 
     // construct PPLTLPlusSynthesizer obj
     Syft::Player starting_player;
-    if (starting_player_id) starting_player == Syft::Player::Agent;
-    else starting_player == Syft::Player::Environment;
-
+    if (starting_player_id) {
+        starting_player = Syft::Player::Agent;
+    } else {
+        starting_player = Syft::Player::Environment;
+    }
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
 

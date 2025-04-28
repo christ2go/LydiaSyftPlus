@@ -67,7 +67,11 @@ namespace Syft {
         // Need to create a copy if we want to define the function as const, since
         // CUDD::BDD::Eval does not take the data as const
         std::vector<int> copy(initial_vector_);
-
+        std::cout << "initial_vector: ";
+        for (auto i:initial_vector_) {
+            std::cout << i;
+        }
+        std::cout<<"\n";
         return winning_states.Eval(copy.data()).IsOne();
     }
 

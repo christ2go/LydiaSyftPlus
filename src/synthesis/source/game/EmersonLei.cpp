@@ -63,10 +63,10 @@ namespace Syft {
   }
 
   ELSynthesisResult EmersonLei::run_EL() const {
-    // std::cout << "Colors: \n";
-    // for (size_t i = 0; i < Colors_.size(); i++) {
-    //   std::cout << Colors_[i] << '\n';
-    // }
+    std::cout << "Colors: \n";
+    for (size_t i = 0; i < Colors_.size(); i++) {
+      std::cout << Colors_[i] << '\n';
+    }
 
 
 
@@ -74,7 +74,8 @@ namespace Syft {
 
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
     CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
-    // std::cout << "winning_states: " << winning_states << std::endl;
+    std::cout << "winning_states: " << winning_states << std::endl;
+    std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
     // update result according to computed solution
     ELSynthesisResult result;
     if (includes_initial_state(winning_states)) {
@@ -82,7 +83,7 @@ namespace Syft {
       result.winning_states = winning_states;
       result.z_tree = z_tree_;
       EL_output_function op;
-      // std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
+      
       result.output_function = ExtractStrategy_Explicit(op, winning_states, spec_.initial_state_bdd(),
                                                         z_tree_->get_root());
       return result;
@@ -594,6 +595,7 @@ namespace Syft {
   }
 
   CUDD::BDD EmersonLei::EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const {
+    std::cout << "term: " << term << std::endl;
     CUDD::BDD X, XX;
 
     // initialize variables for fixpoint computation (gfp for winning / lfp for losing)
@@ -630,6 +632,8 @@ namespace Syft {
 
       // if t is a leaf
       if (t->children.empty()) {
+        std::cout << cpre(t, 0, X & (!instant_losing_)) << "\n";
+        std::cout << t->safenodes << "\n";
         XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
       }
 
@@ -657,6 +661,8 @@ namespace Syft {
           }
         }
       }
+      std::cout << "X: " << X << std::endl;
+      std::cout << "XX: " << XX << std::endl;
 
       if (X == XX) {
         break;
