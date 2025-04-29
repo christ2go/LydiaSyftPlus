@@ -53,6 +53,8 @@ namespace Syft {
         CUDD::BDD winning_transitions =
                 winning_states.VectorCompose(transition_vector_);
 
+        // std::cout << "winning_transitions: " << winning_transitions << std::endl;
+
         // Quantify all variables that the outputs don't depend on
         return quantify_independent_variables_->apply(winning_transitions);
     }
@@ -67,11 +69,11 @@ namespace Syft {
         // Need to create a copy if we want to define the function as const, since
         // CUDD::BDD::Eval does not take the data as const
         std::vector<int> copy(initial_vector_);
-        std::cout << "initial_vector: ";
-        for (auto i:initial_vector_) {
-            std::cout << i;
-        }
-        std::cout<<"\n";
+        // std::cout << "initial_vector: ";
+        // for (auto i:initial_vector_) {
+        //     std::cout << i;
+        // }
+        // std::cout<<"\n";
         return winning_states.Eval(copy.data()).IsOne();
     }
 

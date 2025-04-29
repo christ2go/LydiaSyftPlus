@@ -1,14 +1,13 @@
 #include <memory>
 #include "game/InputOutputPartition.h"
-// #include "game/InputOutputPartition.h"
 #include "Preprocessing.h"
 #include "Utils.h"
 #include <lydia/logic/ppltlplus/base.hpp>
 #include <lydia/logic/ppltlplus/duality.hpp>
 #include <lydia/parser/ppltlplus/driver.hpp>
 #include <lydia/logic/pp_pnf.hpp>
-#include "synthesizer/PPLTLPlusSynthesizer.h"
-#include "synthesizer/PPLTLPlusSynthesizerMP.h"
+#include "synthesizer/PPLTLfPlusSynthesizer.h"
+#include "synthesizer/PPLTLfPlusSynthesizerMP.h"
 #include <CLI/CLI.hpp>
 
 int main(int argc, char** argv) {
@@ -99,7 +98,7 @@ int main(int argc, char** argv) {
     // show result
     if (game_solver == 0) 
     {
-        Syft::PPLTLPlusSynthesizer synthesizer(
+        Syft::PPLTLfPlusSynthesizer synthesizer(
             ppltl_plus_formula,
             partition,
             starting_player,
@@ -123,7 +122,7 @@ int main(int argc, char** argv) {
             }
         } else std::cout << "PPLTL+ synthesis is UNREALIZABLE" << std::endl;
     } else {
-        Syft::PPLTLPlusSynthesizerMP synthesizerMP(
+        Syft::PPLTLfPlusSynthesizerMP synthesizerMP(
             ppltl_plus_formula,
             partition,
             starting_player,

@@ -74,8 +74,9 @@ namespace Syft {
 
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
     CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
-    std::cout << "winning_states: " << winning_states << std::endl;
-    std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
+    // std::cout << "winning_states: " << winning_states << std::endl;
+    // std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
+    // var_mgr_->dump_dot(winning_states.Add(), "winning_states.dot");
     // update result according to computed solution
     ELSynthesisResult result;
     if (includes_initial_state(winning_states)) {
@@ -559,23 +560,28 @@ namespace Syft {
 
     if (starting_player_ == Player::Agent) {
       CUDD::BDD quantified_X_transitions_to_winning_states = preimage(target);
+      // std::cout << "quantified_X_transitions_to_winning_states: " << quantified_X_transitions_to_winning_states << std::endl;
       //             CUDD::BDD new_target_moves = target |
       //                                 (state_space_ & (!target) & quantified_X_transitions_to_winning_states);
       //             result = project_into_states(new_target_moves);
       // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
       if (t->winning) {
         CUDD::BDD new_target_moves = (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
-        result = target | project_into_states(new_target_moves);
+        result = project_into_states(new_target_moves);
+        // std::cout << "project into states: " << project_into_states(new_target_moves) << std::endl;
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
       } else {
-        CUDD::BDD new_target_moves =
-            (state_space_ & (!target) & quantified_X_transitions_to_winning_states) & (!instant_losing_);
-        result = target | project_into_states(new_target_moves);
+        CUDD::BDD new_target_moves_with_loops =
+            (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
+        CUDD::BDD new_target_moves = (!target) & new_target_moves_with_loops;
+        result = project_into_states(new_target_moves_with_loops);
+        // std::cout << "project into states: " << project_into_states(new_target_moves) << std::endl;
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
       }
     } else {
+      //TODO need to double-check
       CUDD::BDD transitions_to_target_states = preimage(target);
       if (t->winning) {
         result = state_space_ & project_into_states(transitions_to_target_states);
@@ -595,7 +601,7 @@ namespace Syft {
   }
 
   CUDD::BDD EmersonLei::EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const {
-    std::cout << "term: " << term << std::endl;
+    // std::cout << "term: " << term << std::endl;
     CUDD::BDD X, XX;
 
     // initialize variables for fixpoint computation (gfp for winning / lfp for losing)
@@ -632,8 +638,8 @@ namespace Syft {
 
       // if t is a leaf
       if (t->children.empty()) {
-        std::cout << cpre(t, 0, X & (!instant_losing_)) << "\n";
-        std::cout << t->safenodes << "\n";
+        // std::cout << "cpre:" << cpre(t, 0, X & (!instant_losing_)) << "\n";
+        // std::cout << "t->safenodes:" <<  t->safenodes << "\n";
         XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
       }
 
@@ -661,8 +667,8 @@ namespace Syft {
           }
         }
       }
-      std::cout << "X: " << X << std::endl;
-      std::cout << "XX: " << XX << std::endl;
+      // std::cout << "X: " << X << std::endl;
+      // std::cout << "XX: " << XX << std::endl;
 
       if (X == XX) {
         break;

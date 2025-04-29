@@ -2,7 +2,7 @@
 // Created by Gianmarco Chris on 03/11/25.
 //
 
-#include "synthesizer/PPLTLPlusSynthesizer.h"
+#include "synthesizer/PPLTLfPlusSynthesizer.h"
 #include "game/EmersonLei.hpp"
 #include "lydia/logic/ppltlplus/base.hpp"
 #include "lydia/logic/pp_pnf.hpp"
@@ -10,7 +10,7 @@
 #include "lydia/utils/print.hpp"
 
 namespace Syft {
-    PPLTLPlusSynthesizer::PPLTLPlusSynthesizer(
+    PPLTLfPlusSynthesizer::PPLTLfPlusSynthesizer(
         PPLTLPlus ppltl_plus_formula,
         InputOutputPartition partition,
         Player starting_player,
@@ -28,7 +28,7 @@ namespace Syft {
         var_mgr_ = var_mgr;
     }
 
-    ELSynthesisResult PPLTLPlusSynthesizer::run() const {
+    ELSynthesisResult PPLTLfPlusSynthesizer::run() const {
         std::vector<Syft::SymbolicStateDfa> vec_spec;
         std::vector<CUDD::BDD> goal_states;
         // ensures that the "order" of colors is respected

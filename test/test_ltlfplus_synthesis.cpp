@@ -1,5 +1,5 @@
 //
-// Created by shuzhu on 04/12/24.
+// Created by shuzhu on 28/04/25.
 //
 
 #include "catch2/catch_test_macros.hpp"
@@ -11,35 +11,123 @@
 #include "Synthesizer.h"
 #include "synthesizer/LTLfPlusSynthesizer.h"
 
+TEST_CASE("LTLf+ EL game test", "[test]")
+{
 
+    std::string boolean_formula = "(AE(F(e1 & X(ff))) -> AE(F(a1 & X(ff)))) & (EA(F(e2 & X(ff))) -> EA(F(a2 & X(ff)))) & (E(G(e3 -> F(a3))))";
 
-
-
-TEST_CASE("Game construction of email example", "[game construction]") {
-
-    std::string boolean_formula = "p1 & !p2 & (p3 | p4)";
-    Syft::LTLfPlus GFPhi_1, FGPhi_2, FPhi_3, GPhi_4;
-    GFPhi_1.formula_ = "a";
-    GFPhi_1.label_ = Syft::LTLfLabel::GF;
-    FGPhi_2.formula_ = "b";
-    FGPhi_2.label_ = Syft::LTLfLabel::FG;
-    FPhi_3.formula_ = "c U b";
-    FPhi_3.label_ = Syft::LTLfLabel::F;
-    GPhi_4.formula_ = "d";
-    GPhi_4.label_ = Syft::LTLfLabel::G;
-
-std::map<char, Syft::LTLfPlus> spec = {
-        { 'p1', GFPhi_1},
-        { 'p2', FGPhi_2},
-        { 'p3', FPhi_3},
-        { 'p4', GPhi_4}
-    };
-
-bool expected = false;
-   INFO("tested\n");
+    bool expected = true;
+    INFO("tested\n");
     std::cout.flush();
-bool actual = Syft::Test::get_realizability_ltlfplus_from_input(spec, boolean_formula, vars{"d"}, vars{"a", "b", "c"});
-REQUIRE(actual == expected);
+    bool actual = Syft::Test::get_realizability_ltlfplus_from_input(boolean_formula, vars{"e1", "e2", "e3"}, vars{"a1", "a2", "a3"});
+    REQUIRE(actual == expected);
+}
 
+TEST_CASE("LTLf+ EL game test1", "[test1]")
+{
+
+    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(ff) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplus_from_input(boolean_formula, vars{"e1", "e2", "e3", "e4", "e5", "e6"}, vars{"s1", "s2", "s3", "s4", "s5", "s6"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ EL game test2", "[test2]")
+{
+
+    std::string boolean_formula = "AE(a) && EA(b) && A(c) || E(d) || E(d1)";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplus_from_input(boolean_formula, vars{"d", "d1"}, vars{"a", "b", "c"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ EL game test3", "[test3]")
+{
+
+    std::string boolean_formula = "A(F((a & X[!](a | !a) & !(X[!](X[!](a | !a))))))";
+
+    bool expected = false;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplus_from_input(boolean_formula, vars{}, vars{"a"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ EL game test4", "[test4]")
+{
+
+    std::string boolean_formula = "(AE(a) & AE(b)) | EA(c) | EA(d) | A(e)";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplus_from_input(boolean_formula, vars{"c", "d", "e"}, vars{"a", "b"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ MP game test", "[test]")
+{
+
+    std::string boolean_formula = "(AE(F(e1 & X(ff))) -> AE(F(a1 & X(ff)))) & (EA(F(e2 & X(ff))) -> EA(F(a2 & X(ff)))) & (E(G(e3 -> F(a3))))";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplusMP_from_input(boolean_formula, vars{"e1", "e2", "e3"}, vars{"a1", "a2", "a3"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ MP game test1", "[test1]")
+{
+
+    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(ff) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplusMP_from_input(boolean_formula, vars{"e1", "e2", "e3", "e4", "e5", "e6"}, vars{"s1", "s2", "s3", "s4", "s5", "s6"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ MP game test2", "[test2]")
+{
+
+    std::string boolean_formula = "AE(a) && EA(b) && A(c) || E(d) || E(d1)";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplusMP_from_input(boolean_formula, vars{"d", "d1"}, vars{"a", "b", "c"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ MP game test3", "[test3]")
+{
+
+    std::string boolean_formula = "A(F((a & X[!](a | !a) & !(X[!](X[!](a | !a))))))";
+
+    bool expected = false;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplusMP_from_input(boolean_formula, vars{"b"}, vars{"a"});
+    REQUIRE(actual == expected);
+}
+
+TEST_CASE("LTLf+ MP game test4", "[test4]")
+{
+
+    std::string boolean_formula = "(AE(a) & AE(b)) | EA(c) | EA(d) | A(e)";
+
+    bool expected = true;
+    INFO("tested\n");
+    std::cout.flush();
+    bool actual = Syft::Test::get_realizability_ltlfplusMP_from_input(boolean_formula, vars{"c", "d", "e"}, vars{"a", "b"});
+    REQUIRE(actual == expected);
 }
 

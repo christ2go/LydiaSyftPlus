@@ -58,7 +58,7 @@ namespace Syft {
 				return hashF ^ hashG;
 			}
 		};
-		typedef std::map<int, Node*> Dag; // Store nodes by their unique ID
+		typedef std::unordered_map<int, Node*> Dag; // Store nodes by their unique ID
 		typedef std::unordered_map<std::pair<std::vector<int>, std::vector<int>>, int, VectorHash> Node_to_Id;
 		Dag dag_; // The bottom node is having all F-bits as 1 and G-bits as 0, the id of this node is 0
 		Node_to_Id node_to_id_;

@@ -16,7 +16,7 @@
 #include "lydia/utils/print.hpp"
 
 namespace Syft {
-  class PPLTLPlusSynthesizerMP {
+  class PPLTLfPlusSynthesizerMP {
 
   private:
     std::shared_ptr<VarMgr> var_mgr_;
@@ -27,7 +27,7 @@ namespace Syft {
     std::vector<int> G_colors_;
 
   public:
-  PPLTLPlusSynthesizerMP(
+  PPLTLfPlusSynthesizerMP(
       PPLTLPlus ppltl_plus_formula,
       InputOutputPartition partition,
       Player starting_player,

@@ -27,7 +27,7 @@ namespace Syft {
     // typedef whitemech::lydia::ppltl_ptr ppltl_ptr;
     // typedef whitemech::lydia::PrefixQuantifier PrefixQuantifier;
 
-    class PPLTLPlusSynthesizer {
+    class PPLTLfPlusSynthesizer {
         private:
             /**
              * \brief Variable manager.
@@ -50,9 +50,9 @@ namespace Syft {
 
         public:
             /**
-             * \brief Construct an PPLTLPlusSynthesizer.
+             * \brief Construct an f.
              */
-            PPLTLPlusSynthesizer(
+            PPLTLfPlusSynthesizer(
                 PPLTLPlus ppltl_plus_formula,
                 InputOutputPartition partition,
                 Player starting_player,

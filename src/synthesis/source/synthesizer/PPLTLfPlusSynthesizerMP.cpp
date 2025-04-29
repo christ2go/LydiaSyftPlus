@@ -2,11 +2,11 @@
 // Created by Gianmarco&Chris on 04/01/2025
 // 
 
-#include "synthesizer/PPLTLPlusSynthesizerMP.h"
+#include "synthesizer/PPLTLfPlusSynthesizerMP.h"
 #include "game/MannaPnueli.hpp"
 
 namespace Syft {
-    PPLTLPlusSynthesizerMP::PPLTLPlusSynthesizerMP(
+    PPLTLfPlusSynthesizerMP::PPLTLfPlusSynthesizerMP(
         PPLTLPlus ppltl_plus_formula,
         InputOutputPartition partition,
         Player starting_player,
@@ -47,7 +47,7 @@ namespace Syft {
         }
     }
 
-    MPSynthesisResult PPLTLPlusSynthesizerMP::run() const {
+    MPSynthesisResult PPLTLfPlusSynthesizerMP::run() const {
         std::vector<SymbolicStateDfa> vec_spec;
         std::vector<CUDD::BDD> goal_states;
         // ensures that the "order" of colors is respected

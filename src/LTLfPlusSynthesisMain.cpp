@@ -95,9 +95,9 @@ int main(int argc, char** argv) {
     // construct LTLfPlusSynthesizer obj
     Syft::Player starting_player;
     if (starting_player_id) {
-        starting_player == Syft::Player::Agent;
+        starting_player = Syft::Player::Agent;
     } else {
-        starting_player == Syft::Player::Environment;
+        starting_player = Syft::Player::Environment;
     }
 
     Syft::InputOutputPartition partition =
