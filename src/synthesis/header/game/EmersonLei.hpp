@@ -53,7 +53,7 @@ namespace Syft {
 			const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, const CUDD::BDD &instant_winning, const CUDD::BDD &instant_losing);
 
 		CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
-    CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
+    	CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
 		EL_output_function ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD winning_states, CUDD::BDD gameNode, ZielonkaNode *t) const;
 		CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, CUDD::BDD winningmoves) const;
 		// CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, std::unique_ptr<Transducer> transducer) const;

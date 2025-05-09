@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     app.add_option("-s,--starting-player", starting_player_id, "Starting player:\nagent=1;\nenvironment=0.")->
             required();
 
-    app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli=1;\nEmerson-Lei=0.")->
+    app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0.")->
             required();
 
     CLI11_PARSE(app, argc, argv);
@@ -128,11 +128,17 @@ int main(int argc, char** argv) {
             std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
         }
     } else {
+        if ((game_solver != 1) & (game_solver != 2)) {
+            std::cout << "Please specify a correct game solver. \nGame:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0" << std::endl;
+            return 0;
+        }
+
         Syft::LTLfPlusSynthesizerMP synthesizerMP(
         ltlf_plus_formula,
         partition,
         starting_player,
-        Syft::Player::Agent
+        Syft::Player::Agent,
+        game_solver
     );
 
         auto synthesis_result_MP = synthesizerMP.run();

@@ -19,9 +19,9 @@ namespace Syft {
                            std::vector<int> G_colors, Player starting_player,
                            Player protagonist_player,
                            const std::vector<CUDD::BDD> &colorBDDs,
-                           const CUDD::BDD &state_space)
+                           const CUDD::BDD &state_space, int game_solver)
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula),
-      F_colors_(F_colors), G_colors_(G_colors), Colors_(colorBDDs), state_space_(state_space) {
+      F_colors_(F_colors), G_colors_(G_colors), Colors_(colorBDDs), state_space_(state_space), game_solver_(game_solver){
     color_mgr_ = CUDD::Cudd();
     color_formula_bdd_ = boolean_string_to_bdd(color_formula_);
     // std::cout << "Mapping of integer propositions to BDD variables:" << std::endl;
@@ -472,11 +472,27 @@ namespace Syft {
     return succs;
   }
 
+  CUDD::BDD MannaPnueli::cpre(CUDD::BDD target) const {
+    CUDD::BDD result;
+    if (starting_player_ == Player::Agent) {
+      CUDD::BDD quantified_X_transitions_to_winning_states = preimage(target);
+      CUDD::BDD new_target_moves = state_space_ & quantified_X_transitions_to_winning_states;
+      result = project_into_states(new_target_moves);
+    } else {
+      CUDD::BDD transitions_to_target_states = preimage(target);
+      result = project_into_states(transitions_to_target_states);
+    }
+    return result;
+  }
+
 
   MPSynthesisResult MannaPnueli::run_MP() const {
     std::vector<ELSynthesisResult> EL_results(dag_.size()); //TODO here initialized as Zero just for testing
     std::vector<bool> computed(dag_.size(), false);
 
+    // new MP: 
+    CUDD::BDD adv_winning = var_mgr_->cudd_mgr()->bddZero();
+    CUDD::BDD adv_losing = var_mgr_->cudd_mgr()->bddZero();
     while (std::find(computed.begin(), computed.end(), false) != computed.end()) {
       auto it = std::find(computed.begin(), computed.end(), false);
       int index = distance(computed.begin(), it);
@@ -486,6 +502,8 @@ namespace Syft {
       // std::cout << ", ";
       // for (int bit : node->G) std::cout << bit;
       // std::cout << ")\n";
+
+      
 
 
       std::string curColor_formula = simplify_color_formula(node->F, node->G);
@@ -521,6 +539,34 @@ namespace Syft {
       // TODO: loop over existing entries in the vector result.winning_states; each entry is a pair (colors,winningStates).
       // 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning
       //		 Add nodes from !winningStates for which curcolors&seencolors=colors to instantLosing
+
+      // new MP: state space is the conjunction of the acc states of colors appearing in {F, G}, and the non-acc of the colors not appearing
+      CUDD::BDD EL_state_space = var_mgr_->cudd_mgr()->bddOne();
+      
+      for (int i = 0; i < node->F.size(); i++) {
+        // retrive the i-th F color
+        int color = F_colors_[i];
+        if (node->F[i] == 1){
+          EL_state_space = EL_state_space * Colors_[color];
+        } else {
+          EL_state_space = EL_state_space * !Colors_[color];
+        }
+      }
+      // std::cout << new_color_formula_bdd.FactoredFormString()<< std::endl;
+      for (int i = 0; i < node->G.size(); i++) {
+        // retrive the i-th G color
+        int color = G_colors_[i];
+        if (node->G[i] == 1){
+          EL_state_space = EL_state_space * Colors_[color];
+        } else {
+          EL_state_space = EL_state_space * !Colors_[color];
+        }
+      }
+
+      // new MP: 
+      CUDD::BDD adv_instant_winning = EL_state_space & cpre(adv_winning);
+      CUDD::BDD adv_instant_losing = EL_state_space & !cpre(EL_state_space | adv_winning);
+
       EmersonLei solver(spec_, curColor_formula, starting_player_, protagonist_player_,
                         Colors_, var_mgr_->cudd_mgr()->bddOne(), instant_winning, instant_losing);
       ELSynthesisResult result = solver.run_EL();
@@ -529,6 +575,10 @@ namespace Syft {
       // ELSynthesisResult el_synthesis_result = solver.run_EL(instantWinning, instantLosing);
       computed[index] = true;
       EL_results[index] = result;
+      // new MP: 
+      adv_winning = adv_winning | result.winning_states;
+      // new MP: 
+      adv_losing = adv_losing | !(result.winning_states);
     }
     // update result according to computed solution, TODO: store result for curcolors; also, winningmoves
     MPSynthesisResult result;

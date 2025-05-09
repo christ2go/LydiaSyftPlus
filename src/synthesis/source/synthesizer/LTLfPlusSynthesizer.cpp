@@ -72,6 +72,7 @@ namespace Syft {
         }
         case whitemech::lydia::PrefixQuantifier::Forall: {
           ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
+          // new MP: add a new line of dfa_remove_initial_self_loops
 
           // std::cout << "------ trimmed DFA Gphi: \n";
           // trimmed_explicit_dfa.dfa_print();
@@ -92,6 +93,7 @@ namespace Syft {
         case whitemech::lydia::PrefixQuantifier::Exists: {
           std::vector<size_t> final_states = explicit_dfa.get_final();
 
+          // new MP: as it is  
           ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa(explicit_dfa);
           // std::cout << "------ trimmed DFA Fphi: \n";
           // trimmed_explicit_dfa.dfa_print();

@@ -108,7 +108,7 @@ namespace Syft
         }
 
         bool get_realizability_ltlfplusMP_from_input(const std::string &ltlfplus_formula, const std::vector<std::string> &input_variables,
-                                                     const std::vector<std::string> &output_variables)
+                                                     const std::vector<std::string> &output_variables, int mp_solver)
         {
             // LTLf+ driver
             std::shared_ptr<whitemech::lydia::parsers::ltlfplus::LTLfPlusDriver> driver =
@@ -137,7 +137,8 @@ namespace Syft
                 ltlf_plus_formula,
                 partition,
                 starting_player,
-                Syft::Player::Agent);
+                Syft::Player::Agent,
+                mp_solver);
             auto synthesis_result = synthesizer.run();
             return synthesis_result.realizability;
         }
@@ -179,7 +180,7 @@ namespace Syft
         }
 
         bool get_realizability_ppltlfplusMP_from_input(const std::string &ppltlplus_formula, const std::vector<std::string> &input_variables,
-                                                     const std::vector<std::string> &output_variables)
+                                                     const std::vector<std::string> &output_variables, int mp_solver)
         {
             // PPLTL+ driver
             std::shared_ptr<whitemech::lydia::parsers::ppltlplus::PPLTLPlusDriver> driver =
@@ -209,7 +210,8 @@ namespace Syft
                 ppltl_plus_formula,
                 partition,
                 starting_player,
-                Syft::Player::Agent);
+                Syft::Player::Agent,
+                mp_solver);
             auto synthesis_result = synthesizer.run();
             return synthesis_result.realizability;
         }

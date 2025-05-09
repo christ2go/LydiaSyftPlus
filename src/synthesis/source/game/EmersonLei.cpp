@@ -63,10 +63,10 @@ namespace Syft {
   }
 
   ELSynthesisResult EmersonLei::run_EL() const {
-    std::cout << "Colors: \n";
-    for (size_t i = 0; i < Colors_.size(); i++) {
-      std::cout << Colors_[i] << '\n';
-    }
+    // std::cout << "Colors: \n";
+    // for (size_t i = 0; i < Colors_.size(); i++) {
+    //   std::cout << Colors_[i] << '\n';
+    // }
 
 
 

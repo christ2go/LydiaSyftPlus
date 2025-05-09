@@ -10,9 +10,10 @@ namespace Syft {
         PPLTLPlus ppltl_plus_formula,
         InputOutputPartition partition,
         Player starting_player,
-        Player protagonist_player
+        Player protagonist_player,
+        int game_solver
     ) : ppltl_plus_formula_(ppltl_plus_formula), starting_player_(starting_player),
-        protagonist_player_(protagonist_player) {
+        protagonist_player_(protagonist_player), game_solver_(game_solver) {
         std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
         var_mgr->create_named_variables(partition.input_variables);
         var_mgr->create_named_variables(partition.output_variables);
@@ -76,6 +77,7 @@ namespace Syft {
                     });
                     break;}
                 case whitemech::lydia::PrefixQuantifier::Forall: {
+                    // TODO, if game_solver_ == 2,  build forall_dfa, then remove initial self loops
                     SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula_remove_initial_self_loops(*ppltl_arg, var_mgr_); 
                     color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
                     // CUDD::BDD final_states = sdfa.final_states() + sdfa.initial_state_bdd();
@@ -86,6 +88,7 @@ namespace Syft {
                 }
                 case whitemech::lydia::PrefixQuantifier::Exists: 
                 {
+                    // TODO, if game_solver_ == 2,  build exists_dfa
                     SymbolicStateDfa sdfa = SymbolicStateDfa::dfa_of_ppltl_formula(*ppltl_arg, var_mgr_); 
                     color_to_dfa.insert({std::stoi(ppltl_plus_formula_.formula_to_color_.at(ppltl_plus_arg)), sdfa});
                     color_to_final_states.insert(
@@ -113,9 +116,10 @@ namespace Syft {
         
             SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
             arena.dump_dot("arena.dot");
+            
             MannaPnueli solver(arena, ppltl_plus_formula_.color_formula_, F_colors_, G_colors_, starting_player_,
                                protagonist_player_,
-                               goal_states, var_mgr_->cudd_mgr()->bddOne());
+                               goal_states, var_mgr_->cudd_mgr()->bddOne(), 1);
             return solver.run_MP();
     }
 }
