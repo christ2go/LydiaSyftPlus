@@ -564,11 +564,17 @@ namespace Syft {
       }
 
       // new MP: 
-      CUDD::BDD adv_instant_winning = EL_state_space & cpre(adv_winning);
-      CUDD::BDD adv_instant_losing = EL_state_space & !cpre(EL_state_space | adv_winning);
+      // CUDD::BDD adv_instant_winning = EL_state_space & cpre(adv_winning);
+      // CUDD::BDD adv_instant_losing = EL_state_space & !cpre(EL_state_space | adv_winning);
+
+      instant_winning = (game_solver_ == 1) ? instant_winning : adv_winning;
+      instant_losing = (game_solver_ == 1) ? instant_losing : adv_losing;
+
+      bool adv_mp = (game_solver_ == 2) ? true : false;
+      EL_state_space = (game_solver_ == 2) ? EL_state_space : var_mgr_->cudd_mgr()->bddOne();
 
       EmersonLei solver(spec_, curColor_formula, starting_player_, protagonist_player_,
-                        Colors_, var_mgr_->cudd_mgr()->bddOne(), instant_winning, instant_losing);
+                        Colors_, EL_state_space, instant_winning, instant_losing, adv_mp);
       ELSynthesisResult result = solver.run_EL();
       // solve EL game for curColor_formula
       //TODO change run_EL to take instantWinning, or change the constructor of EL
@@ -577,8 +583,11 @@ namespace Syft {
       EL_results[index] = result;
       // new MP: 
       adv_winning = adv_winning | result.winning_states;
+
       // new MP: 
-      adv_losing = adv_losing | !(result.winning_states);
+      adv_losing = adv_losing | (EL_state_space * !(result.winning_states));
+      std::cout << "adv_winning: " << adv_winning << std::endl;
+      var_mgr_->dump_dot(adv_winning.Add(), "adv_winning.dot");
     }
     // update result according to computed solution, TODO: store result for curcolors; also, winningmoves
     MPSynthesisResult result;

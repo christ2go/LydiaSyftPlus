@@ -10,9 +10,10 @@ namespace Syft {
                          const std::vector<CUDD::BDD> &colorBDDs,
                          const CUDD::BDD &state_space,
                          const CUDD::BDD &instant_winning,
-                         const CUDD::BDD &instant_losing)
+                         const CUDD::BDD &instant_losing,
+                         bool adv_mp)
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula), Colors_(colorBDDs),
-      state_space_(state_space), instant_winning_(instant_winning), instant_losing_(instant_losing) {
+      state_space_(state_space), instant_winning_(instant_winning), instant_losing_(instant_losing), adv_mp_(adv_mp) {
 
     // build Zielonka tree; parse formula from PHI_FILE, number of colors taken from Colors
     z_tree_ = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
@@ -67,10 +68,6 @@ namespace Syft {
     // for (size_t i = 0; i < Colors_.size(); i++) {
     //   std::cout << Colors_[i] << '\n';
     // }
-
-
-
-
 
     // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
     CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
@@ -566,14 +563,25 @@ namespace Syft {
       //             result = project_into_states(new_target_moves);
       // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
       if (t->winning) {
-        CUDD::BDD new_target_moves = (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
+        CUDD::BDD new_target_moves;
+        if (adv_mp_) {
+          new_target_moves = (state_space_ & quantified_X_transitions_to_winning_states);
+        } else {
+          new_target_moves = (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
+        }
+        
         result = project_into_states(new_target_moves);
         // std::cout << "project into states: " << project_into_states(new_target_moves) << std::endl;
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
       } else {
-        CUDD::BDD new_target_moves_with_loops =
-            (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
+        CUDD::BDD new_target_moves_with_loops;
+        if (adv_mp_) {
+          new_target_moves_with_loops = (state_space_ & quantified_X_transitions_to_winning_states);
+        } else {
+          new_target_moves_with_loops = (state_space_ & quantified_X_transitions_to_winning_states) & (!instant_losing_);
+        }
+        
         CUDD::BDD new_target_moves = (!target) & new_target_moves_with_loops;
         result = project_into_states(new_target_moves_with_loops);
         // std::cout << "project into states: " << project_into_states(new_target_moves) << std::endl;
@@ -586,21 +594,33 @@ namespace Syft {
       if (t->winning) {
         result = state_space_ & project_into_states(transitions_to_target_states);
         // result = target | new_collected_target_states;
-        CUDD::BDD new_target_moves = (result & transitions_to_target_states) & (!instant_losing_);
+        CUDD::BDD new_target_moves;
+        if (adv_mp_) {
+          new_target_moves = (result & transitions_to_target_states);
+        } else {
+          new_target_moves = (result & transitions_to_target_states) & (!instant_losing_);
+        }
         // CUDD::BDD diffmoves = (!target) & transitions_to_target_states;
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
       } else {
         result = state_space_ & project_into_states(transitions_to_target_states);
         // result = target | new_collected_target_states;
-        CUDD::BDD new_target_moves = (!target) & result & transitions_to_target_states & (!instant_losing_);
+        
+        CUDD::BDD new_target_moves;
+        if (adv_mp_) {
+          new_target_moves = (!target) & result & transitions_to_target_states;
+        } else {
+          new_target_moves = (!target) & result & transitions_to_target_states & (!instant_losing_);
+        }
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
       }
     }
-    // std::cout << "cpre: " << result << "\n";
+    std::cout << "cpre: " << result << "\n";
     return result;
   }
 
   CUDD::BDD EmersonLei::EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const {
+    std::cout << "state space: " << state_space_ << std::endl;
     // std::cout << "term: " << term << std::endl;
     CUDD::BDD X, XX;
 
@@ -610,12 +630,22 @@ namespace Syft {
       if (t->children.empty()) {
         // t->winningmoves[0]=var_mgr_->cudd_mgr()->bddOne();
         // t->winningmoves.push_back(var_mgr_->cudd_mgr()->bddOne());
-        t->winningmoves.push_back(!instant_losing_);
+        
+        if (adv_mp_) {
+          t->winningmoves.push_back(state_space_);
+        } else {
+          t->winningmoves.push_back(!instant_losing_);
+        }
       } else {
         for (int i = 0; i < t->children.size(); i++) {
           //t->winningmoves[i] = var_mgr_->cudd_mgr()->bddOne();
           // t->winningmoves.push_back(var_mgr_->cudd_mgr()->bddOne());
-          t->winningmoves.push_back(!instant_losing_);
+          if (adv_mp_) {
+            t->winningmoves.push_back(state_space_);
+          } else {
+            t->winningmoves.push_back(!instant_losing_);
+          }
+          
         }
       }
     } else {
@@ -630,17 +660,28 @@ namespace Syft {
         }
       }
     }
+    // std::cout << "Node: " << t->order << "\n";
+    //   std::cout << X << "\n";
 
     // loop until fixpoint has stabilized
     while (true) {
-      // std::cout << "Node: " << t->order << "\n";
-      // std::cout << X << "\n";
+      std::cout << "Node: " << t->order << "\n";
+      std::cout << "X: " << X << "\n";
+      std::cout << "instant winning:" << instant_winning_ << "\n";
+      std::cout << "instant losing:" << instant_losing_ << "\n";
 
       // if t is a leaf
       if (t->children.empty()) {
-        // std::cout << "cpre:" << cpre(t, 0, X & (!instant_losing_)) << "\n";
+        
         // std::cout << "t->safenodes:" <<  t->safenodes << "\n";
-        XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
+        // XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
+        if (adv_mp_) {
+          XX = term | (t->safenodes & cpre(t, 0, X | instant_winning_));
+        } else {
+          XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
+        }
+        // std::cout << "cpre:" << cpre(t, 0, X & (!instant_losing_)) << "\n";
+        
       }
 
       // if t is not a leaf
@@ -657,7 +698,18 @@ namespace Syft {
         for (int i = 0; i < t->children.size(); i++) {
           // add new choice to term
           auto s = t->children[i];
-          CUDD::BDD current_term = term | (s->targetnodes & cpre(t, i, X & (!instant_losing_)));
+          CUDD::BDD current_term;
+
+          std::cout << "i: " << i << "\n";
+
+          if (adv_mp_){
+            current_term = term | (s->targetnodes & cpre(t, i, X | instant_winning_));
+          } else {
+            current_term = term | (s->targetnodes & cpre(t, i, X & (!instant_losing_)));
+          }
+          
+          // std::cout << "cpre:" << instant_winning_ << "\n";
+          
           if (t->winning) {
             // intersect with recursively computed solution for s and current term
             XX &= EmersonLeiSolve(s, current_term);
@@ -667,8 +719,9 @@ namespace Syft {
           }
         }
       }
-      // std::cout << "X: " << X << std::endl;
-      // std::cout << "XX: " << XX << std::endl;
+      std::cout << "X: " << X << std::endl;
+      std::cout << "XX: " << XX << std::endl;
+      var_mgr_->dump_dot(XX.Add(), "XX.dot");
 
       if (X == XX) {
         break;
@@ -681,17 +734,5 @@ namespace Syft {
     return X;
   }
 
-  // EmersonLei::OneStepSynReturn EmersonLei::synthesize(std::string X, ELSynthesisResult result) {
-  //   if (syn_flag_ == false) {
-  //     syn_flag_ = true;
-  //     curr_state_.emplace(spec_.initial_state_bdd());
-  //     curr_tree_node_.emplace(z_tree_->get_root());
-  //   } else {
-  //     CUDD::BDD X;
-  //     //TODO = ExtractStrategy_Explicit_OneStep(result.output_function, result.winning_states, curr_state_.value(), curr_tree_node_.value(), X);
-  //   }
-  //   OneStepSynReturn result;
-  //
-  // }
 
 }

@@ -96,7 +96,7 @@ namespace Syft {
           ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(dfa_input);
           
           // ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(explicit_dfa);
-          // explicit_dfa_remove_initial_loops.dfa_print();
+          explicit_dfa_remove_initial_loops.dfa_print();
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa_remove_initial_loops);
           // explicit_dfa_add.dump_dot("dfa_add.dot");
@@ -148,7 +148,7 @@ namespace Syft {
     // }
 
     SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
-    // arena.dump_dot("arena.dot");
+    arena.dump_dot("arena.dot");
     MannaPnueli solver(arena, ltlf_plus_formula_.color_formula_, F_colors_, G_colors_, starting_player_,
                        protagonist_player_,
                        goal_states, var_mgr_->cudd_mgr()->bddOne(), game_solver_);
