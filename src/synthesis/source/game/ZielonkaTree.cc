@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <vector>
 #include <queue>
+#include "debug.hpp"
 
 
 bool cmp_descending_count_true(const std::vector<bool>& a, const std::vector<bool>& b) {
@@ -16,7 +17,9 @@ bool cmp_descending_count_true(const std::vector<bool>& a, const std::vector<boo
 
 
 void ZielonkaTree::generate() {
-    std::cout << "generating... \n";
+    if (DEBUG_MODE) {
+        std::cout << "generating... \n";
+    }
     std::queue<ZielonkaNode*> q;
     q.push(root);
     std::vector<std::vector<bool>> ps = ELHelpers::powerset(root->label.size());
@@ -247,10 +250,14 @@ ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CU
     generate();
     //generate_parity();
     //graphZielonkaTree();
-    std::cout << "leaves: "<< leaves << '\n';
-    std::cout << "nodes: " << total_nodes  << '\n';
+    if (DEBUG_MODE) {
+        std::cout << "leaves: "<< leaves << '\n';
+        std::cout << "nodes: " << total_nodes  << '\n';
+    }
     //displayZielonkaTree();
-    graphZielonkaTree();
+    if (DEBUG_MODE) {
+        graphZielonkaTree();
+    }
 }
 
 ZielonkaNode* ZielonkaTree::get_root() { return root; }

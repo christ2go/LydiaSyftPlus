@@ -9,6 +9,7 @@
 #include "synthesizer/LTLfPlusSynthesizer.h"
 #include "synthesizer/LTLfPlusSynthesizerMP.h"
 #include <CLI/CLI.hpp>
+#include "debug.hpp"
 
 int main(int argc, char** argv) {
 
@@ -27,6 +28,9 @@ int main(int argc, char** argv) {
 
     std::string ltlf_plus_file, partition_file;
     int starting_player_id, game_solver;
+    bool verbose = false;
+    bool DEBUG_MODE = false;
+    bool STRATEGY = false;
 
     // CLI::Option* ltlf_plus_file_opt;
     app.add_option("-i,--input-file", ltlf_plus_file, "Path to LTLf+ formula file")->
@@ -43,6 +47,8 @@ int main(int argc, char** argv) {
     app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0.")->
             required();
 
+    app.add_flag("-v,--verbose", verbose, "Enable verbose mode");      
+
     CLI11_PARSE(app, argc, argv);
 
     // parse and process input LTLf+ formula
@@ -50,7 +56,9 @@ int main(int argc, char** argv) {
     std::string ltlf_plus_formula_str;
     std::ifstream ltlf_plus_formula_stream(ltlf_plus_file);
     getline(ltlf_plus_formula_stream, ltlf_plus_formula_str);
-    std::cout << "LTLf+ formula: " << ltlf_plus_formula_str << std::endl;
+    if (verbose) {
+        std::cout << "LTLf+ formula: " << ltlf_plus_formula_str << std::endl;
+    }
 
     // LTLf+ driver
     std::shared_ptr<whitemech::lydia::parsers::ltlfplus::LTLfPlusDriver> driver = 
@@ -114,15 +122,18 @@ int main(int argc, char** argv) {
 
         if (synthesis_result.realizability) {
             std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
-            for (auto item : synthesis_result.output_function) {
-                std::cout << "state: " << item.gameNode;
-                item.gameNode.PrintCover();
-
-                std::cout << "tree node: " << item.t->order << "\n";
-                std::cout << " -> \n";
-                std::cout << "Y: " << item.Y;
-                item.Y.PrintCover();
-                std::cout << "tree node: " << item.u->order << "\n\n";
+            if (verbose) {
+                std::cout << "Strategy:" << std::endl;
+                for (auto item : synthesis_result.output_function) {
+                    std::cout << "state: " << item.gameNode;
+                    item.gameNode.PrintCover();
+    
+                    std::cout << "tree node: " << item.t->order << "\n";
+                    std::cout << " -> \n";
+                    std::cout << "Y: " << item.Y;
+                    item.Y.PrintCover();
+                    std::cout << "tree node: " << item.u->order << "\n\n";
+                }
             }
         } else {
             std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
@@ -144,16 +155,19 @@ int main(int argc, char** argv) {
         auto synthesis_result_MP = synthesizerMP.run();
         if (synthesis_result_MP.realizability) {
             std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
-            for (auto item : synthesis_result_MP.output_function) {
-                std::cout << "state: " << item.gameNode;
-                item.gameNode.PrintCover();
-                std::cout << "dag node: " << item.currDagNodeId << "\n";
-                std::cout << "tree node: " << item.t->order << "\n";
-                std::cout << " -> \n";
-                std::cout << "Y: " << item.Y;
-                item.Y.PrintCover();
-                std::cout << "dag node: " << item.newDagNodeId << "\n";
-                std::cout << "tree node: " << item.u->order << "\n\n";
+            if (verbose) {
+                std::cout << "Strategy:" << std::endl;
+                for (auto item : synthesis_result_MP.output_function) {
+                    std::cout << "state: " << item.gameNode;
+                    item.gameNode.PrintCover();
+                    std::cout << "dag node: " << item.currDagNodeId << "\n";
+                    std::cout << "tree node: " << item.t->order << "\n";
+                    std::cout << " -> \n";
+                    std::cout << "Y: " << item.Y;
+                    item.Y.PrintCover();
+                    std::cout << "dag node: " << item.newDagNodeId << "\n";
+                    std::cout << "tree node: " << item.u->order << "\n\n";
+                }
             }
         } else {
             std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;

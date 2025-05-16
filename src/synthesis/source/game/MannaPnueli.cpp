@@ -4,6 +4,7 @@
 
 #include "game/MannaPnueli.hpp"
 #include "game/EmersonLei.hpp"
+#include "debug.hpp"
 #include <iostream>
 #include <cuddObj.hh>
 #include <stack>
@@ -34,7 +35,10 @@ namespace Syft {
     //   std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second << std::endl;
     // }
     tie(dag_, node_to_id_) = build_FG_dag();
-    print_FG_dag();
+
+    if (DEBUG_MODE) {
+      print_FG_dag();
+    }
   }
 
   void MannaPnueli::print_FG_dag() const {
@@ -74,51 +78,6 @@ namespace Syft {
     result.transducer = nullptr;
     return result;
   }
-
-  //   std::string simplifyFormula(std::vector<std::string> postfix, std::vector<bool> colors){
-  //
-  // // TODO update formula, check postfix format
-  //       std::reverse(postfix.begin(), postfix.end());
-  //       std::string resFormula;
-  //
-  //       while (!postfix.empty()){
-  //           std::string s = postfix.back();
-  //           postfix.pop_back();
-  //
-  //           if (isNumber(s)){
-  //               int tmp = stoi(s);
-  //               //std::cout << "var " << tmp << std::endl;
-  //               resStack.push_back(colors[tmp]);
-  //           }
-  //           else{
-  //               if (s == "!"){
-  //                   bool tmp = resStack.back();
-  //                   resStack.pop_back();
-  //                   //std::cout << "not " << tmp << std::endl;
-  //                   resStack.push_back(!tmp);
-  //               }
-  //               else if (s == "&"){
-  //                   bool tmp1 = resStack.back();
-  //                   resStack.pop_back();
-  //                   bool tmp2 = resStack.back();
-  //                   resStack.pop_back();
-  //                   //std::cout << tmp1 << " & " << tmp2 << std::endl;
-  //                   resStack.push_back(tmp1 && tmp2);
-  //               }
-  //               else{
-  //                   bool tmp1 = resStack.back();
-  //                   resStack.pop_back();
-  //                   bool tmp2 = resStack.back();
-  //                   resStack.pop_back();
-  //                   //std::cout << tmp1 << " & " << tmp2 << std::endl;
-  //                   resStack.push_back(tmp1 || tmp2);
-  //               }
-  //           }
-  //       }
-  //       if (resStack.size() != 1)
-  //           std::cout << "resStack wrong size" << std::endl;
-  //       return resStack.back();
-  //   }
 
   std::string MannaPnueli::remove_whitespace(const std::string &str) const {
     std::string result;
@@ -338,20 +297,26 @@ namespace Syft {
   MP_output_function MannaPnueli::ExtractStrategy_Explicit(MP_output_function op, int curr_node_id, CUDD::BDD gameNode,
                                                            ZielonkaNode *t,
                                                            std::vector<ELSynthesisResult> EL_results) const {
-    // std::cout << "-----------\ngameNode: " << gameNode;
-    // gameNode.PrintCover();
-    // std::cout << "dag node: " << curr_node_id << "\n";
-    // std::cout << "tree node: " << t->order << "\n";
+    if (DEBUG_MODE) {
+      std::cout << "-----------\ngameNode: " << gameNode;
+      gameNode.PrintCover();
+      std::cout << "dag node: " << curr_node_id << "\n";
+      std::cout << "tree node: " << t->order << "\n";
+    }
 
     for (auto item: op) {
-      // std::cout << item.gameNode << " " << item.t->order << "\n";
-      // std::cout << item.Y << " " << item.u->order << "\n";
+      if (DEBUG_MODE) {
+        std::cout << item.gameNode << " " << item.t->order << "\n";
+        std::cout << item.Y << " " << item.u->order << "\n";
+      }
       if (((item.gameNode | !gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order) && (
             item.currDagNodeId == curr_node_id)) {
-        // std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
-        // gameNode.PrintCover();
-        // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
-        // item.gameNode.PrintCover();
+        if (DEBUG_MODE) {
+          std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
+          gameNode.PrintCover();
+          std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
+          item.gameNode.PrintCover();
+        }
         return op;
       }
     }
@@ -422,10 +387,12 @@ namespace Syft {
 
 
     temp.push_back(move);
-    std::cout << " --> \n";
-    std::cout << "Y: " << move.Y << "\n";
-    std::cout << "dag node: " << move.newDagNodeId << "\n";
-    std::cout << "tree node: " << move.u->order << "\n\n";
+    if (DEBUG_MODE) {
+      std::cout << " --> \n";
+      std::cout << "Y: " << move.Y << "\n";
+      std::cout << "dag node: " << move.newDagNodeId << "\n";
+      std::cout << "tree node: " << move.u->order << "\n\n";
+    }
 
     // compute game nodes that can result by taking system choice from gameNode
     std::vector<CUDD::BDD> newGameNodes = getSuccsWithYZ(gameNode, move.Y);
@@ -497,11 +464,13 @@ namespace Syft {
       auto it = std::find(computed.begin(), computed.end(), false);
       int index = distance(computed.begin(), it);
       Node *node = dag_.at(index);
-      // std::cout << "Now process: Dag Node " << node->id << " (";
-      // for (int bit : node->F) std::cout << bit;
-      // std::cout << ", ";
-      // for (int bit : node->G) std::cout << bit;
-      // std::cout << ")\n";
+      if (DEBUG_MODE) {
+              std::cout << "Now process: Dag Node " << node->id << " (";
+              for (int bit : node->F) std::cout << bit;
+              std::cout << ", ";
+              for (int bit : node->G) std::cout << bit;
+              std::cout << ")\n";
+      }
 
       
 
@@ -531,8 +500,10 @@ namespace Syft {
           instant_winning = instant_winning | (child_winnning_states * !(Colors_[color_flipped]));
           instant_losing = instant_losing | (!child_winnning_states * !(Colors_[color_flipped]));
         }
-        // std::cout << "instant_winning: " << instant_winning << std::endl;
-        // std::cout << "instant_losing: " << instant_losing << std::endl;
+        if (DEBUG_MODE) {
+          std::cout << "instant_winning: " << instant_winning << std::endl;
+          std::cout << "instant_losing: " << instant_losing << std::endl;
+        }
       }
 
 
@@ -586,8 +557,10 @@ namespace Syft {
 
       // new MP: 
       adv_losing = adv_losing | (EL_state_space * !(result.winning_states));
-      std::cout << "adv_winning: " << adv_winning << std::endl;
-      var_mgr_->dump_dot(adv_winning.Add(), "adv_winning.dot");
+      if (DEBUG_MODE) {
+        std::cout << "adv_winning: " << adv_winning << std::endl;
+        var_mgr_->dump_dot(adv_winning.Add(), "adv_winning.dot");
+      }
     }
     // update result according to computed solution, TODO: store result for curcolors; also, winningmoves
     MPSynthesisResult result;
@@ -596,9 +569,12 @@ namespace Syft {
       result.realizability = true;
       result.winning_states = EL_results[dag_.size() - 1].winning_states;
       MP_output_function op;
-      std::cout << "Strategy: \n";
-      result.output_function = ExtractStrategy_Explicit(op, dag_.size() - 1, spec_.initial_state_bdd(),
-        EL_results[dag_.size() - 1].z_tree->get_root(), EL_results);
+      // std::cout << "Strategy: \n";
+
+      if (STRATEGY) {
+        result.output_function = ExtractStrategy_Explicit(op, dag_.size() - 1, spec_.initial_state_bdd(),
+          EL_results[dag_.size() - 1].z_tree->get_root(), EL_results);
+      }
       return result;
     } else {
       result.realizability = false;
