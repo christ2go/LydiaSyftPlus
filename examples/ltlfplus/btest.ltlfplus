@@ -1,0 +1,1 @@
+(AE(F(e1 && X(ff))) -> AE(F(a1 && X(ff)))) && (AE(F(e2 && X(ff))) -> AE(F(a2 && X(ff))))  && E(F(a1)) && E(F(a2)) && A(F(((a1 && X(ff)) -> (!a2 && X(ff))) && ((a2 && X(ff)) -> (!a1 && X(ff)))))
