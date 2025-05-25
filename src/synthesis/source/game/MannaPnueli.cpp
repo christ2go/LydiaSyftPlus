@@ -4,6 +4,7 @@
 
 #include "game/MannaPnueli.hpp"
 #include "game/EmersonLei.hpp"
+#include "debug.hpp"
 #include <iostream>
 #include <cuddObj.hh>
 #include <stack>
@@ -19,9 +20,9 @@ namespace Syft {
                            std::vector<int> G_colors, Player starting_player,
                            Player protagonist_player,
                            const std::vector<CUDD::BDD> &colorBDDs,
-                           const CUDD::BDD &state_space)
+                           const CUDD::BDD &state_space, int game_solver)
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula),
-      F_colors_(F_colors), G_colors_(G_colors), Colors_(colorBDDs), state_space_(state_space) {
+      F_colors_(F_colors), G_colors_(G_colors), Colors_(colorBDDs), state_space_(state_space), game_solver_(game_solver){
     color_mgr_ = CUDD::Cudd();
     color_formula_bdd_ = boolean_string_to_bdd(color_formula_);
     // std::cout << "Mapping of integer propositions to BDD variables:" << std::endl;
@@ -34,7 +35,10 @@ namespace Syft {
     //   std::cout << "Color " << pair.first << " -> BDD ID: " << pair.second << std::endl;
     // }
     tie(dag_, node_to_id_) = build_FG_dag();
-    print_FG_dag();
+
+    if (DEBUG_MODE) {
+      print_FG_dag();
+    }
   }
 
   void MannaPnueli::print_FG_dag() const {
@@ -74,51 +78,6 @@ namespace Syft {
     result.transducer = nullptr;
     return result;
   }
-
-  //   std::string simplifyFormula(std::vector<std::string> postfix, std::vector<bool> colors){
-  //
-  // // TODO update formula, check postfix format
-  //       std::reverse(postfix.begin(), postfix.end());
-  //       std::string resFormula;
-  //
-  //       while (!postfix.empty()){
-  //           std::string s = postfix.back();
-  //           postfix.pop_back();
-  //
-  //           if (isNumber(s)){
-  //               int tmp = stoi(s);
-  //               //std::cout << "var " << tmp << std::endl;
-  //               resStack.push_back(colors[tmp]);
-  //           }
-  //           else{
-  //               if (s == "!"){
-  //                   bool tmp = resStack.back();
-  //                   resStack.pop_back();
-  //                   //std::cout << "not " << tmp << std::endl;
-  //                   resStack.push_back(!tmp);
-  //               }
-  //               else if (s == "&"){
-  //                   bool tmp1 = resStack.back();
-  //                   resStack.pop_back();
-  //                   bool tmp2 = resStack.back();
-  //                   resStack.pop_back();
-  //                   //std::cout << tmp1 << " & " << tmp2 << std::endl;
-  //                   resStack.push_back(tmp1 && tmp2);
-  //               }
-  //               else{
-  //                   bool tmp1 = resStack.back();
-  //                   resStack.pop_back();
-  //                   bool tmp2 = resStack.back();
-  //                   resStack.pop_back();
-  //                   //std::cout << tmp1 << " & " << tmp2 << std::endl;
-  //                   resStack.push_back(tmp1 || tmp2);
-  //               }
-  //           }
-  //       }
-  //       if (resStack.size() != 1)
-  //           std::cout << "resStack wrong size" << std::endl;
-  //       return resStack.back();
-  //   }
 
   std::string MannaPnueli::remove_whitespace(const std::string &str) const {
     std::string result;
@@ -338,20 +297,26 @@ namespace Syft {
   MP_output_function MannaPnueli::ExtractStrategy_Explicit(MP_output_function op, int curr_node_id, CUDD::BDD gameNode,
                                                            ZielonkaNode *t,
                                                            std::vector<ELSynthesisResult> EL_results) const {
-    // std::cout << "-----------\ngameNode: " << gameNode;
-    // gameNode.PrintCover();
-    // std::cout << "dag node: " << curr_node_id << "\n";
-    // std::cout << "tree node: " << t->order << "\n";
+    if (DEBUG_MODE) {
+      std::cout << "-----------\ngameNode: " << gameNode;
+      gameNode.PrintCover();
+      std::cout << "dag node: " << curr_node_id << "\n";
+      std::cout << "tree node: " << t->order << "\n";
+    }
 
     for (auto item: op) {
-      // std::cout << item.gameNode << " " << item.t->order << "\n";
-      // std::cout << item.Y << " " << item.u->order << "\n";
+      if (DEBUG_MODE) {
+        std::cout << item.gameNode << " " << item.t->order << "\n";
+        std::cout << item.Y << " " << item.u->order << "\n";
+      }
       if (((item.gameNode | !gameNode) == var_mgr_->cudd_mgr()->bddOne()) && (item.t->order == t->order) && (
             item.currDagNodeId == curr_node_id)) {
-        // std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
-        // gameNode.PrintCover();
-        // std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
-        // item.gameNode.PrintCover();
+        if (DEBUG_MODE) {
+          std::cout << "defined! " << gameNode << " " << t->order << " " << curr_node_id << "\n";
+          gameNode.PrintCover();
+          std::cout << "stored " << item.gameNode << " " << item.t->order << "\n";
+          item.gameNode.PrintCover();
+        }
         return op;
       }
     }
@@ -422,10 +387,12 @@ namespace Syft {
 
 
     temp.push_back(move);
-    std::cout << " --> \n";
-    std::cout << "Y: " << move.Y << "\n";
-    std::cout << "dag node: " << move.newDagNodeId << "\n";
-    std::cout << "tree node: " << move.u->order << "\n\n";
+    if (DEBUG_MODE) {
+      std::cout << " --> \n";
+      std::cout << "Y: " << move.Y << "\n";
+      std::cout << "dag node: " << move.newDagNodeId << "\n";
+      std::cout << "tree node: " << move.u->order << "\n\n";
+    }
 
     // compute game nodes that can result by taking system choice from gameNode
     std::vector<CUDD::BDD> newGameNodes = getSuccsWithYZ(gameNode, move.Y);
@@ -472,20 +439,40 @@ namespace Syft {
     return succs;
   }
 
+  CUDD::BDD MannaPnueli::cpre(CUDD::BDD target) const {
+    CUDD::BDD result;
+    if (starting_player_ == Player::Agent) {
+      CUDD::BDD quantified_X_transitions_to_winning_states = preimage(target);
+      CUDD::BDD new_target_moves = state_space_ & quantified_X_transitions_to_winning_states;
+      result = project_into_states(new_target_moves);
+    } else {
+      CUDD::BDD transitions_to_target_states = preimage(target);
+      result = project_into_states(transitions_to_target_states);
+    }
+    return result;
+  }
+
 
   MPSynthesisResult MannaPnueli::run_MP() const {
     std::vector<ELSynthesisResult> EL_results(dag_.size()); //TODO here initialized as Zero just for testing
     std::vector<bool> computed(dag_.size(), false);
 
+    // new MP: 
+    CUDD::BDD adv_winning = var_mgr_->cudd_mgr()->bddZero();
+    CUDD::BDD adv_losing = var_mgr_->cudd_mgr()->bddZero();
     while (std::find(computed.begin(), computed.end(), false) != computed.end()) {
       auto it = std::find(computed.begin(), computed.end(), false);
       int index = distance(computed.begin(), it);
       Node *node = dag_.at(index);
-      // std::cout << "Now process: Dag Node " << node->id << " (";
-      // for (int bit : node->F) std::cout << bit;
-      // std::cout << ", ";
-      // for (int bit : node->G) std::cout << bit;
-      // std::cout << ")\n";
+      if (DEBUG_MODE) {
+              std::cout << "Now process: Dag Node " << node->id << " (";
+              for (int bit : node->F) std::cout << bit;
+              std::cout << ", ";
+              for (int bit : node->G) std::cout << bit;
+              std::cout << ")\n";
+      }
+
+      
 
 
       std::string curColor_formula = simplify_color_formula(node->F, node->G);
@@ -513,22 +500,67 @@ namespace Syft {
           instant_winning = instant_winning | (child_winnning_states * !(Colors_[color_flipped]));
           instant_losing = instant_losing | (!child_winnning_states * !(Colors_[color_flipped]));
         }
-        // std::cout << "instant_winning: " << instant_winning << std::endl;
-        // std::cout << "instant_losing: " << instant_losing << std::endl;
+        if (DEBUG_MODE) {
+          std::cout << "instant_winning: " << instant_winning << std::endl;
+          std::cout << "instant_losing: " << instant_losing << std::endl;
+        }
       }
 
 
       // TODO: loop over existing entries in the vector result.winning_states; each entry is a pair (colors,winningStates).
       // 		 Add nodes from winningStates for which curcolors&seencolors=colors to instantWinning
       //		 Add nodes from !winningStates for which curcolors&seencolors=colors to instantLosing
+
+      // new MP: state space is the conjunction of the acc states of colors appearing in {F, G}, and the non-acc of the colors not appearing
+      CUDD::BDD EL_state_space = var_mgr_->cudd_mgr()->bddOne();
+      
+      for (int i = 0; i < node->F.size(); i++) {
+        // retrive the i-th F color
+        int color = F_colors_[i];
+        if (node->F[i] == 1){
+          EL_state_space = EL_state_space * Colors_[color];
+        } else {
+          EL_state_space = EL_state_space * !Colors_[color];
+        }
+      }
+      // std::cout << new_color_formula_bdd.FactoredFormString()<< std::endl;
+      for (int i = 0; i < node->G.size(); i++) {
+        // retrive the i-th G color
+        int color = G_colors_[i];
+        if (node->G[i] == 1){
+          EL_state_space = EL_state_space * Colors_[color];
+        } else {
+          EL_state_space = EL_state_space * !Colors_[color];
+        }
+      }
+
+      // new MP: 
+      // CUDD::BDD adv_instant_winning = EL_state_space & cpre(adv_winning);
+      // CUDD::BDD adv_instant_losing = EL_state_space & !cpre(EL_state_space | adv_winning);
+
+      instant_winning = (game_solver_ == 1) ? instant_winning : adv_winning;
+      instant_losing = (game_solver_ == 1) ? instant_losing : adv_losing;
+
+      bool adv_mp = (game_solver_ == 2) ? true : false;
+      EL_state_space = (game_solver_ == 2) ? EL_state_space : var_mgr_->cudd_mgr()->bddOne();
+
       EmersonLei solver(spec_, curColor_formula, starting_player_, protagonist_player_,
-                        Colors_, var_mgr_->cudd_mgr()->bddOne(), instant_winning, instant_losing);
+                        Colors_, EL_state_space, instant_winning, instant_losing, adv_mp);
       ELSynthesisResult result = solver.run_EL();
       // solve EL game for curColor_formula
       //TODO change run_EL to take instantWinning, or change the constructor of EL
       // ELSynthesisResult el_synthesis_result = solver.run_EL(instantWinning, instantLosing);
       computed[index] = true;
       EL_results[index] = result;
+      // new MP: 
+      adv_winning = adv_winning | result.winning_states;
+
+      // new MP: 
+      adv_losing = adv_losing | (EL_state_space * !(result.winning_states));
+      if (DEBUG_MODE) {
+        std::cout << "adv_winning: " << adv_winning << std::endl;
+        var_mgr_->dump_dot(adv_winning.Add(), "adv_winning.dot");
+      }
     }
     // update result according to computed solution, TODO: store result for curcolors; also, winningmoves
     MPSynthesisResult result;
@@ -537,9 +569,12 @@ namespace Syft {
       result.realizability = true;
       result.winning_states = EL_results[dag_.size() - 1].winning_states;
       MP_output_function op;
-      std::cout << "Strategy: \n";
-      result.output_function = ExtractStrategy_Explicit(op, dag_.size() - 1, spec_.initial_state_bdd(),
-        EL_results[dag_.size() - 1].z_tree->get_root(), EL_results);
+      // std::cout << "Strategy: \n";
+
+      if (STRATEGY) {
+        result.output_function = ExtractStrategy_Explicit(op, dag_.size() - 1, spec_.initial_state_bdd(),
+          EL_results[dag_.size() - 1].z_tree->get_root(), EL_results);
+      }
       return result;
     } else {
       result.realizability = false;

@@ -40,7 +40,8 @@ namespace Syft {
 		/**
 		* \brief The Manna-Pnueli condition represented as a BDD
 		*/
-    CUDD::BDD color_formula_bdd_;
+    	CUDD::BDD color_formula_bdd_;
+		int game_solver_;
 		struct Node {
 			std::vector<int> F;
 			std::vector<int> G;
@@ -72,7 +73,7 @@ namespace Syft {
 		std::string infix_to_postfix(const std::string &infix) const;
 		Node* bottom_node_Dag() const;
 		std::vector<CUDD::BDD> getSuccsWithYZ(CUDD::BDD gameNode, CUDD::BDD Y) const;
-
+		CUDD::BDD cpre(CUDD::BDD target) const;
 		void MP_solve();
 
 		public:
@@ -88,7 +89,7 @@ namespace Syft {
 		*/
 		MannaPnueli(const SymbolicStateDfa &spec, std::string color_formula, std::vector<int> F_colors_,
 		std::vector<int> G_colors_, Player starting_player, Player protagonist_player,
-		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space);
+		const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, int game_solver);
 
 		CUDD::BDD boolean_string_to_bdd(const std::string &color_formula);
 

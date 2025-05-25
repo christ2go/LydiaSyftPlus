@@ -8,9 +8,9 @@
 namespace Syft {
   LTLfPlusSynthesizerMP::LTLfPlusSynthesizerMP(LTLfPlus ltlf_plus_formula,
                                                InputOutputPartition partition, Player starting_player,
-                                               Player protagonist_player)
+                                               Player protagonist_player, int game_solver)
     : ltlf_plus_formula_(ltlf_plus_formula), starting_player_(starting_player),
-      protagonist_player_(protagonist_player) {
+      protagonist_player_(protagonist_player), game_solver_(game_solver) {
     std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
     var_mgr->create_named_variables(partition.input_variables);
     var_mgr->create_named_variables(partition.output_variables);
@@ -92,7 +92,10 @@ namespace Syft {
           break;
         }
         case whitemech::lydia::PrefixQuantifier::Forall: {
-          ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(explicit_dfa);
+          ExplicitStateDfa dfa_input = (game_solver_ == 1) ? explicit_dfa : ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
+          ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(dfa_input);
+          
+          // ExplicitStateDfa explicit_dfa_remove_initial_loops = ExplicitStateDfa::dfa_remove_initial_self_loops(explicit_dfa);
           // explicit_dfa_remove_initial_loops.dfa_print();
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
             explicit_dfa_remove_initial_loops);
@@ -110,8 +113,10 @@ namespace Syft {
           break;
         }
         case whitemech::lydia::PrefixQuantifier::Exists: {
+          ExplicitStateDfa dfa_input = (game_solver_ == 1) ? explicit_dfa : ExplicitStateDfa::dfa_to_Fdfa(explicit_dfa);
+        
           ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_,
-            explicit_dfa);
+            dfa_input);
           SymbolicStateDfa symbolic_dfa = SymbolicStateDfa::from_explicit(
             std::move(explicit_dfa_add));
 
@@ -146,7 +151,7 @@ namespace Syft {
     // arena.dump_dot("arena.dot");
     MannaPnueli solver(arena, ltlf_plus_formula_.color_formula_, F_colors_, G_colors_, starting_player_,
                        protagonist_player_,
-                       goal_states, var_mgr_->cudd_mgr()->bddOne());
+                       goal_states, var_mgr_->cudd_mgr()->bddOne(), game_solver_);
     return solver.run_MP();
   }
 }

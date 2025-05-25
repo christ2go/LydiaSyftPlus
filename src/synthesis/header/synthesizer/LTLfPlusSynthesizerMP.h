@@ -25,13 +25,15 @@ namespace Syft {
     LTLfPlus ltlf_plus_formula_;
     std::vector<int> F_colors_;
     std::vector<int> G_colors_;
+    int game_solver_; // Manna-Pnueli-Adv=2; Manna-Pnueli=1 
 
   public:
     LTLfPlusSynthesizerMP(
       LTLfPlus ltlf_plus_formula,
       InputOutputPartition partition,
       Player starting_player,
-      Player protagonist_player
+      Player protagonist_player,
+      int game_solver
     );
 
 

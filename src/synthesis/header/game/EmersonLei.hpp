@@ -35,6 +35,7 @@ namespace Syft {
 		std::optional<ZielonkaNode*> curr_tree_node_;
 		ZielonkaTree* z_tree_;
 		bool syn_flag_ = false;
+		bool adv_mp_;
 
 		CUDD::BDD getOneUnprocessedState(CUDD::BDD state_state, CUDD::BDD processed) const;
 		
@@ -50,10 +51,10 @@ namespace Syft {
 		* \param state_space The state space.
 		*/
 		EmersonLei(const SymbolicStateDfa &spec, std::string color_formula, Player starting_player, Player protagonist_player,
-			const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, const CUDD::BDD &instant_winning, const CUDD::BDD &instant_losing);
+			const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, const CUDD::BDD &instant_winning, const CUDD::BDD &instant_losing, bool adv_mp);
 
 		CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
-    CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
+    	CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
 		EL_output_function ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD winning_states, CUDD::BDD gameNode, ZielonkaNode *t) const;
 		CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, CUDD::BDD winningmoves) const;
 		// CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, std::unique_ptr<Transducer> transducer) const;

@@ -65,9 +65,9 @@ namespace Syft::Test {
   bool get_realizability(const whitemech::lydia::ltlf_ptr & formula, const Syft::InputOutputPartition& partition);
 
   bool get_realizability_ltlfplus_from_input(const std::string& ltlfplus_formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables);
-  bool get_realizability_ltlfplusMP_from_input(const std::string& ltlfplus_formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables);
+  bool get_realizability_ltlfplusMP_from_input(const std::string& ltlfplus_formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables, int mp_solver);
   bool get_realizability_ppltlfplus_from_input(const std::string& ppltlfplus_formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables);
-  bool get_realizability_ppltlfplusMP_from_input(const std::string& ppltlfplus_formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables);
+  bool get_realizability_ppltlfplusMP_from_input(const std::string& ppltlfplus_formula, const std::vector<std::string>& input_variables, const std::vector<std::string>& output_variables, int mp_solver);
 }
 
 #endif //LYDIASYFT_TEST_UTILS_HPP
