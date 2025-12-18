@@ -8,6 +8,10 @@
 #include <lydia/logic/pnf.hpp>
 #include "synthesizer/LTLfPlusSynthesizer.h"
 #include "synthesizer/LTLfPlusSynthesizerMP.h"
+#include "synthesizer/ObligationLTLfPlusSynthesizer.h"
+#include "ObligationFragmentDetector.h"
+
+
 #include <CLI/CLI.hpp>
 #include "debug.hpp"
 
@@ -31,6 +35,7 @@ int main(int argc, char** argv) {
     bool verbose = false;
     bool DEBUG_MODE = false;
     bool STRATEGY = false;
+    bool obligation_simplification = false;
 
     // CLI::Option* ltlf_plus_file_opt;
     app.add_option("-i,--input-file", ltlf_plus_file, "Path to LTLf+ formula file")->
@@ -45,6 +50,9 @@ int main(int argc, char** argv) {
             required();
 
     app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0.")->
+            required();
+
+    app.add_option("--obligation-simplification", obligation_simplification, "should obligation properties be treated using simpler algorithm (boolean)")->
             required();
 
     app.add_flag("-v,--verbose", verbose, "Enable verbose mode");      
@@ -81,23 +89,24 @@ int main(int argc, char** argv) {
     ltlf_plus_formula.formula_to_quantification_= pnf.subformula_to_quantifier_;
 
     // debug
-    // for (const auto& [formula, color] : pnf.subformula_to_color_) {
-    //     std::cout << "LTLf+ Formula: " << whitemech::lydia::to_string(*formula) << ". Color: " << color << std::flush;
-    //     switch (pnf.subformula_to_quantifier_[formula]) {
-    //         case whitemech::lydia::PrefixQuantifier::ForallExists: {
-    //             std::cout << ". Prefix Quantifier: AE" << std::endl;
-    //             break;}
-    //         case whitemech::lydia::PrefixQuantifier::ExistsForall: {
-    //             std::cout << ". Prefix Quantifier: EA" << std::endl;
-    //             break;}
-    //         case whitemech::lydia::PrefixQuantifier::Forall: {
-    //             std::cout << ". Prefix Quantifier: A" << std::endl;
-    //             break;}
-    //         case whitemech::lydia::PrefixQuantifier::Exists: {
-    //             std::cout << ". Prefix Quantifier: E" << std::endl;
-    //             break;}
-    //     }
-    // }
+    for (const auto& [formula, color] : pnf.subformula_to_color_) {
+         std::cout << "LTLf+ Formula: " << whitemech::lydia::to_string(*formula) << ". Color: " << color << std::flush;
+         switch (pnf.subformula_to_quantifier_[formula]) {
+             case whitemech::lydia::PrefixQuantifier::ForallExists: {
+                 std::cout << ". Prefix Quantifier: AE" << std::endl;
+                 break;}
+             case whitemech::lydia::PrefixQuantifier::ExistsForall: {
+                 std::cout << ". Prefix Quantifier: EA" << std::endl;
+                 break;}
+             case whitemech::lydia::PrefixQuantifier::Forall: {
+                 std::cout << ". Prefix Quantifier: A" << std::endl;
+                 break;}
+             case whitemech::lydia::PrefixQuantifier::Exists: {
+                 std::cout << ". Prefix Quantifier: E" << std::endl;
+                 break;}
+         }
+    }
+
     // std::cout << "Color formula: " << pnf.color_formula_ << std::endl;
 
     // construct LTLfPlusSynthesizer obj
@@ -110,6 +119,31 @@ int main(int argc, char** argv) {
 
     Syft::InputOutputPartition partition =
         Syft::InputOutputPartition::read_from_file(partition_file);
+
+    // Use obligation synthesizer if enabled
+    if (obligation_simplification) {
+        std::cout << "Using obligation fragment synthesizer" << std::endl;
+        try {
+            Syft::ObligationLTLfPlusSynthesizer obligation_synthesizer(
+                ltlf_plus_formula,
+                partition,
+                starting_player,
+                Syft::Player::Agent
+            );
+            auto synthesis_result = obligation_synthesizer.run();
+
+            if (synthesis_result.realizability) {
+                std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
+            } else {
+                std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
+            }
+        } catch (const std::runtime_error& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+            std::cerr << "The formula is not in the obligation fragment. Use a different synthesizer." << std::endl;
+            return 1;
+        }
+        return 0;
+    }
 
     if (game_solver == 0) {
         Syft::LTLfPlusSynthesizer synthesizer(

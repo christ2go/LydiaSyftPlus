@@ -14,7 +14,7 @@
 TEST_CASE("LTLf+ EL game test", "[test]")
 {
 
-    std::string boolean_formula = "(AE(F(e1 & X(ff))) -> AE(F(a1 & X(ff)))) & (EA(F(e2 & X(ff))) -> EA(F(a2 & X(ff)))) & (E(G(e3 -> F(a3))))";
+    std::string boolean_formula = "(AE(F(e1 & X(false))) -> AE(F(a1 & X(false)))) & (EA(F(e2 & X(false))) -> EA(F(a2 & X(false)))) & (E(G(e3 -> F(a3))))";
 
     bool expected = true;
     INFO("tested\n");
@@ -23,10 +23,10 @@ TEST_CASE("LTLf+ EL game test", "[test]")
     REQUIRE(actual == expected);
 }
 
-TEST_CASE("LTLf+ EL game test1", "[test1]")
+TEST_CASE("LTLf+ EL game test1", "[test1a]")
 {
 
-    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(ff) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
+    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(false) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
 
     bool expected = true;
     INFO("tested\n");
@@ -74,7 +74,7 @@ TEST_CASE("LTLf+ EL game test4", "[test4]")
 TEST_CASE("LTLf+ MP game test", "[test]")
 {
 
-    std::string boolean_formula = "(AE(F(e1 & X(ff))) -> AE(F(a1 & X(ff)))) & (EA(F(e2 & X(ff))) -> EA(F(a2 & X(ff)))) & (E(G(e3 -> F(a3))))";
+    std::string boolean_formula = "(AE(F(e1 & X(false))) -> AE(F(a1 & X(false)))) & (EA(F(e2 & X(false))) -> EA(F(a2 & X(false)))) & (E(G(e3 -> F(a3))))";
 
     bool expected = true;
     INFO("tested\n");
@@ -86,7 +86,7 @@ TEST_CASE("LTLf+ MP game test", "[test]")
 TEST_CASE("LTLf+ MP game test1", "[test1]")
 {
 
-    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(ff) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
+    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(false) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
 
     bool expected = true;
     INFO("tested\n");
@@ -134,7 +134,7 @@ TEST_CASE("LTLf+ MP game test4", "[test4]")
 TEST_CASE("LTLf+ MP Adv game test", "[test]")
 {
 
-    std::string boolean_formula = "(AE(F(e1 & X(ff))) -> AE(F(a1 & X(ff)))) & (EA(F(e2 & X(ff))) -> EA(F(a2 & X(ff)))) & (E(G(e3 -> F(a3))))";
+    std::string boolean_formula = "(AE(F(e1 & X(false))) -> AE(F(a1 & X(false)))) & (EA(F(e2 & X(false))) -> EA(F(a2 & X(false)))) & (E(G(e3 -> F(a3))))";
 
     bool expected = true;
     INFO("tested\n");
@@ -146,7 +146,7 @@ TEST_CASE("LTLf+ MP Adv game test", "[test]")
 TEST_CASE("LTLf+ MP Adv game test1", "[test1]")
 {
 
-    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(ff) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
+    std::string boolean_formula = "(AE(e1) -> AE(s1)) & (AE(e2) -> AE(s2)) & E(F(X(false) & s3)) & (AE(e4) -> AE(s4)) & (AE(e5) -> AE(s5))";
 
     bool expected = true;
     INFO("tested\n");

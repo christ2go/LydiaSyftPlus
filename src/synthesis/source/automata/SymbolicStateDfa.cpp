@@ -206,6 +206,35 @@ namespace Syft {
         return dfa;
     }
 
+    SymbolicStateDfa SymbolicStateDfa::clone_with_fresh_state_space() const {
+        std::size_t bit_count = var_mgr_->state_variable_count(automaton_id_);
+        auto old_vars = var_mgr_->get_state_variables(automaton_id_);
+
+        // Allocate fresh state variables for the clone
+        auto new_automaton_id = var_mgr_->create_state_variables(bit_count);
+        auto new_vars = var_mgr_->get_state_variables(new_automaton_id);
+
+        auto swap_vars = [&](const CUDD::BDD& bdd) {
+            return bdd.SwapVariables(old_vars, new_vars);
+        };
+
+        std::vector<CUDD::BDD> new_transition_function;
+        new_transition_function.reserve(transition_function_.size());
+        for (const auto& tf : transition_function_) {
+            new_transition_function.push_back(swap_vars(tf));
+        }
+
+        CUDD::BDD new_final_states = swap_vars(final_states_);
+
+        SymbolicStateDfa clone(var_mgr_);
+        clone.automaton_id_ = new_automaton_id;
+        clone.initial_state_ = initial_state_;
+        clone.transition_function_ = std::move(new_transition_function);
+        clone.final_states_ = std::move(new_final_states);
+
+        return clone;
+    }
+
     SymbolicStateDfa SymbolicStateDfa::product_AND(const std::vector<SymbolicStateDfa> &dfa_vector) {
         if (dfa_vector.size() < 1) {
             throw std::runtime_error("Incorrect usage of automata product");

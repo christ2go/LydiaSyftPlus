@@ -94,9 +94,9 @@ message(STATUS EXT_LIBRARIES_PATH ${EXT_LIBRARIES_PATH})
 add_subdirectory(src)
 
 # TODO. Fix tests and examples to be compliant with LydiaSyft-EL
-# if (LYDIASYFT_ENABLE_TESTS)
-  # add_subdirectory(test)
-# endif()
+if (LYDIASYFT_ENABLE_TESTS)
+  add_subdirectory(test)
+endif()
 
 # if (LYDIASYFT_ENABLE_EXAMPLES)
   # add_subdirectory(examples)

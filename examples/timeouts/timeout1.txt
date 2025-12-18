@@ -1,0 +1,6 @@
+Timeout occurred in benchmark run 1
+Formula: (((((E((((p U p) | !q) & ((q | t) -> (r & t)))) | E((t -> p))) & A(((G(t) U (q U p)) & r))) | (A(F(G(X(s)))) | (E(r) | E(X(((t | r) & r)))))) & (((E(!q) & A((r & t))) | (A(G((F(r) U q))) | E((((t -> !s) U X(!p)) | X(X(p)))))) | E(s))) & A(G(((p & s) | !p))))
+Inputs: r
+Outputs: s p q t
+Timeout in: new(simplification=on)
+Timeout value: 60s

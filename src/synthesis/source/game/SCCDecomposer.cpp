@@ -9,6 +9,8 @@ extern "C" {
 
 namespace Syft {
 
+static constexpr bool kVerboseSCC = false;
+
 namespace {
     // Helper function to compute forward reachability layer by layer
     // Returns (forward_set, latest_layer) where:
@@ -373,17 +375,95 @@ CUDD::BDD NaiveSCCDecomposer::BuildPathRelation(const CUDD::BDD& states,
                                                  std::size_t temp_automaton_id) const {
     auto var_mgr = arena_.var_mgr();
     auto automaton_id = arena_.automaton_id();
+    auto mgr = var_mgr->cudd_mgr();
     
     // Build one-step transition relation
     CUDD::BDD trans_relation = BuildTransitionRelation(primed_automaton_id);
     
-    // Compute transitive closure to get reachability relation
-    CUDD::BDD path_relation = TransitiveClosure(trans_relation, primed_automaton_id, temp_automaton_id);
+    // Existentially quantify out I/O variables FIRST to get state-to-state relation
+    // This is crucial: we want T(s, s') = "can s reach s' in one step for SOME I/O"
+    CUDD::BDD io_cube = var_mgr->input_cube() * var_mgr->output_cube();
+    trans_relation = trans_relation.ExistAbstract(io_cube);
     
-    // Restrict to states: States(s) & States(s')
+    // Restrict transitions to stay within states BEFORE computing closure
+    // This ensures paths only go through states in the current set
     CUDD::BDD primed_states = UnprimedToPrimed(var_mgr, automaton_id, primed_automaton_id, states);
-    path_relation &= states;
-    path_relation &= primed_states;
+    CUDD::BDD restricted_trans = trans_relation & states & primed_states;
+    
+    if (kVerboseSCC) {
+        std::cout << "[BuildPathRelation] Enumerating transitions within state set:" << std::endl;
+    }
+    auto state_vars = var_mgr->get_state_variables(automaton_id);
+    auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
+    size_t num_state_bits = state_vars.size();
+    size_t num_states = 1ULL << num_state_bits;
+    
+    int trans_count = 0;
+    if (kVerboseSCC) {
+        for (size_t s = 0; s < num_states && trans_count < 50; ++s) {
+            CUDD::BDD src_bdd = mgr->bddOne();
+            for (size_t i = 0; i < num_state_bits; ++i) {
+                if ((s >> i) & 1) src_bdd &= state_vars[i];
+                else src_bdd &= !state_vars[i];
+            }
+            if ((src_bdd & states).IsZero()) continue;  // Skip states not in set
+            
+            for (size_t t = 0; t < num_states; ++t) {
+                CUDD::BDD dst_bdd = mgr->bddOne();
+                for (size_t i = 0; i < num_state_bits; ++i) {
+                    if ((t >> i) & 1) dst_bdd &= primed_vars[i];
+                    else dst_bdd &= !primed_vars[i];
+                }
+                if ((dst_bdd & primed_states).IsZero()) continue;  // Skip states not in set
+                
+                if (!(src_bdd & dst_bdd & restricted_trans).IsZero()) {
+                    std::cout << "  " << s << " -> " << t << std::endl;
+                    trans_count++;
+                }
+            }
+        }
+        std::cout << "[BuildPathRelation] Found " << trans_count << " transitions" << std::endl;
+    }
+    
+    if (restricted_trans.IsZero()) {
+        if (kVerboseSCC) {
+            std::cout << "[BuildPathRelation] WARNING: Restricted transition relation is ZERO!" << std::endl;
+        }
+        return mgr->bddZero();
+    }
+    
+    // Compute transitive closure to get reachability relation
+    CUDD::BDD path_relation = TransitiveClosure(restricted_trans, primed_automaton_id, temp_automaton_id);
+    
+    if (kVerboseSCC) {
+        std::cout << "[BuildPathRelation] Path relation (reachability):" << std::endl;
+    }
+    int path_count = 0;
+    if (kVerboseSCC) {
+        for (size_t s = 0; s < num_states && path_count < 50; ++s) {
+            CUDD::BDD src_bdd = mgr->bddOne();
+            for (size_t i = 0; i < num_state_bits; ++i) {
+                if ((s >> i) & 1) src_bdd &= state_vars[i];
+                else src_bdd &= !state_vars[i];
+            }
+            if ((src_bdd & states).IsZero()) continue;
+            
+            for (size_t t = 0; t < num_states; ++t) {
+                CUDD::BDD dst_bdd = mgr->bddOne();
+                for (size_t i = 0; i < num_state_bits; ++i) {
+                    if ((t >> i) & 1) dst_bdd &= primed_vars[i];
+                    else dst_bdd &= !primed_vars[i];
+                }
+                if ((dst_bdd & primed_states).IsZero()) continue;
+                
+                if (!(src_bdd & dst_bdd & path_relation).IsZero()) {
+                    std::cout << "  Path(" << s << ", " << t << ")" << std::endl;
+                    path_count++;
+                }
+            }
+        }
+        std::cout << "[BuildPathRelation] Found " << path_count << " reachable pairs" << std::endl;
+    }
     
     return path_relation;
 }
@@ -439,20 +519,68 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
     //std::cout << "[PeelLayer] Path relation node count: " << path.nodeCount() << std::endl;
     
     if (path.IsZero()) {
-        //std::cout << "[PeelLayer] WARNING: Path relation is ZERO!" << std::endl;
+        std::cout << "[PeelLayer] WARNING: Path relation is ZERO! (no transitions within state set)" << std::endl;
         return mgr->bddZero();
     }
     
     // TopLayer(s) = States(s) & ForAll s' . (Path(s', s) -> Path(s, s'))
     // This means: for all s' that can reach s, s can also reach s'
-    // path = Path(s, s')
-    // swapped_path = Path(s', s) (swap s and s' in the relation)
-    CUDD::BDD swapped_path = SwapPrimedAndUnprimed(var_mgr, automaton_id, primed_automaton_id, path);
+    //
+    // path = Path(s, s') with s=unprimed, s'=primed
+    //
+    // To compute Path(s', s), we need to swap the arguments properly.
+    // We'll use temp variables to do this correctly:
+    // 1. path(s, s') with unprimed=s, primed=s'
+    // 2. To get Path(s', s) with unprimed=s, primed=s':
+    //    - First substitute unprimed -> temp: Path(t, s') with temp=t, primed=s'
+    //    - Then substitute primed -> unprimed: Path(t, s) with temp=t, unprimed=s
+    //    - Then substitute temp -> primed: Path(s', s) with primed=s', unprimed=s
     
-    // ForAll s' . (Path(s', s) -> Path(s, s'))
-    // = ForAll s' . (!Path(s', s) | Path(s, s'))
-    // = ForAll s' . (!swapped_path | path)
-    CUDD::BDD implication = !swapped_path | path;
+    auto state_vars = var_mgr->get_state_variables(automaton_id);
+    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id);
+    std::size_t total_vars = var_mgr->total_variable_count();
+    
+    // Step 1: unprimed -> temp
+    std::vector<CUDD::BDD> to_temp(total_vars);
+    for (std::size_t i = 0; i < total_vars; ++i) {
+        to_temp[i] = mgr->bddVar(static_cast<int>(i));
+    }
+    for (std::size_t i = 0; i < state_vars.size(); ++i) {
+        to_temp[state_vars[i].NodeReadIndex()] = temp_vars[i];
+    }
+    CUDD::BDD path_temp_primed = path.VectorCompose(to_temp);  // Path(t, s')
+    
+    // Step 2: primed -> unprimed
+    std::vector<CUDD::BDD> primed_to_unprimed(total_vars);
+    for (std::size_t i = 0; i < total_vars; ++i) {
+        primed_to_unprimed[i] = mgr->bddVar(static_cast<int>(i));
+    }
+    for (std::size_t i = 0; i < primed_vars.size(); ++i) {
+        primed_to_unprimed[primed_vars[i].NodeReadIndex()] = state_vars[i];
+    }
+    CUDD::BDD path_temp_unprimed = path_temp_primed.VectorCompose(primed_to_unprimed);  // Path(t, s)
+    
+    // Step 3: temp -> primed
+    std::vector<CUDD::BDD> temp_to_primed(total_vars);
+    for (std::size_t i = 0; i < total_vars; ++i) {
+        temp_to_primed[i] = mgr->bddVar(static_cast<int>(i));
+    }
+    for (std::size_t i = 0; i < temp_vars.size(); ++i) {
+        temp_to_primed[temp_vars[i].NodeReadIndex()] = primed_vars[i];
+    }
+    CUDD::BDD reverse_path_raw = path_temp_unprimed.VectorCompose(temp_to_primed);  // Path(s', s) with s'=primed, s=unprimed
+    
+    // Restrict reverse_path to valid state pairs (both s and s' must be in states)
+    CUDD::BDD primed_states = UnprimedToPrimed(var_mgr, automaton_id, primed_automaton_id, states);
+    CUDD::BDD reverse_path = reverse_path_raw;
+    
+    // Now both path and reverse_path use: unprimed=s, primed=s'
+    // path(s, s') = "s can reach s'"
+    // reverse_path(s, s') = "s' can reach s"
+    
+    // ForAll s' . (reverse_path(s, s') -> path(s, s'))
+    // = ForAll s' . (!reverse_path | path)
+    CUDD::BDD implication = !reverse_path | path;
     //std::cout << "[PeelLayer] Implication node count: " << implication.nodeCount() << std::endl;
     
     //std::cout << "[PeelLayer] Universal quantification over primed variables..." << std::endl;
@@ -464,6 +592,7 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
     } else if (forall_result.IsOne()) {
         std::cout << "[PeelLayer] Forall result is ONE (all states satisfy condition)" << std::endl;
     }
+    
     
     // TopLayer(s) = States(s) & ForAll result
     //std::cout << "[PeelLayer] Computing top layer: states & forall_result" << std::endl;
@@ -486,11 +615,12 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
     if (!non_state_cube.IsOne()) {
         top_layer = top_layer.ExistAbstract(non_state_cube);
     }
-    std::cout << "[PeelLayer] input: " << var_mgr->bdd_to_string(input_cube) << std::endl;
-    std::cout << "[PeelLayer] output: " << var_mgr->bdd_to_string(output_cube) << std::endl;
-    std::cout << "[PeelLayer] non_state_cube: " << var_mgr->bdd_to_string(non_state_cube) << std::endl;
-
-    std::cout << "[PeelLayer] Top layer after existential quantification: " << var_mgr->bdd_to_string(top_layer) << std::endl;
+    if (kVerboseSCC) {
+        std::cout << "[PeelLayer] input: " << var_mgr->bdd_to_string(input_cube) << std::endl;
+        std::cout << "[PeelLayer] output: " << var_mgr->bdd_to_string(output_cube) << std::endl;
+        std::cout << "[PeelLayer] non_state_cube: " << var_mgr->bdd_to_string(non_state_cube) << std::endl;
+        std::cout << "[PeelLayer] Top layer after existential quantification: " << var_mgr->bdd_to_string(top_layer) << std::endl;
+    }
     
     return top_layer;
 }

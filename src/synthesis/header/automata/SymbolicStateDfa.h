@@ -80,6 +80,14 @@ namespace Syft {
                                                 std::vector<CUDD::BDD> predicates);
 
         /**
+         * \brief Return a copy of this DFA using fresh state variables.
+         *
+         * Useful when the same automaton is used multiple times in products; avoids
+         * aliasing state bits across operands.
+         */
+        SymbolicStateDfa clone_with_fresh_state_space() const;
+
+        /**
          * \brief Returns the variable manager.
          */
         std::shared_ptr<VarMgr> var_mgr() const;

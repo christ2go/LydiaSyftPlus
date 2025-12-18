@@ -87,6 +87,12 @@ class NaiveSCCDecomposer : public SCCDecomposer {
 private:
     const SymbolicStateDfa& arena_;
 
+    // Cached transition relation and variable IDs
+    mutable CUDD::BDD transition_relation_;
+    mutable std::size_t primed_automaton_id_;
+    mutable std::size_t temp_automaton_id_;
+    mutable bool initialized_ = false;
+
     /**
      * \brief Builds the one-step transition relation.
      */
@@ -98,6 +104,11 @@ private:
     CUDD::BDD TransitiveClosure(const CUDD::BDD& relation, 
                                 std::size_t primed_automaton_id,
                                 std::size_t temp_automaton_id) const;
+
+    /**
+     * \brief Initializes the cached transition relation and variable IDs.
+     */
+    void Initialize() const;
 
     /**
      * \brief Builds the path relation (reachability) from the transition function.
