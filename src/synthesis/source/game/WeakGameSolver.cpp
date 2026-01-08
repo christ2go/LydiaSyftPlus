@@ -65,52 +65,24 @@ CUDD::BDD WeakGameSolver::CPreSystem(const CUDD::BDD& target, const CUDD::BDD& s
     
     auto automaton_id = arena_.automaton_id();
     auto mgr = var_mgr_->cudd_mgr();
-    
-    // Get transition function
+    // Use vector-compose approach: T(s,i,o) := next_state(s,i,o) ∈ target
+    // Then quantify: CPre_system(X) = state_space & ∀inputs. ∃outputs. T
     auto transition_func = arena_.transition_function();
-    auto primed_vars = var_mgr_->get_state_variables(primed_automaton_id_);
-    
-    // Build transition relation: T(s, x, y, s') = AND_i(s_i' <-> f_i(s, x, y))
-    CUDD::BDD trans_rel = mgr->bddOne();
-    for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        trans_rel &= primed_vars[i].Xnor(transition_func[i]);
-    }
-    
-    // Convert target to primed variables
-    auto unprimed_vars = var_mgr_->get_state_variables(automaton_id);
-    std::size_t total_vars = var_mgr_->total_variable_count();
-    std::vector<CUDD::BDD> compose_vector(total_vars);
-    for (std::size_t i = 0; i < total_vars; ++i) {
-        compose_vector[i] = mgr->bddVar(static_cast<int>(i));
-    }
-    for (std::size_t i = 0; i < unprimed_vars.size(); ++i) {
-        compose_vector[unprimed_vars[i].NodeReadIndex()] = primed_vars[i];
-    }
-    CUDD::BDD primed_target = target.VectorCompose(compose_vector);
-    
-    // CPre_s(X) = state_space & ∀x. ∃y. (T(s,x,y,s') & X(s'))
-    // For all inputs, there exists an output such that we reach target
-    
-    CUDD::BDD output_cube = var_mgr_->output_cube();
-    CUDD::BDD input_cube = var_mgr_->input_cube();
-    CUDD::BDD primed_cube = var_mgr_->state_variables_cube(primed_automaton_id_);
-    
-    // T & X' - transitions that lead to target
-    CUDD::BDD transitions_to_target = (trans_rel & primed_target).ExistAbstract(primed_cube);
-    // ∃y. (T & X') - there exists output reaching target
-    CUDD::BDD exists_output = transitions_to_target.ExistAbstract(output_cube);
-    // ∀x. ∃y. (T & X') - for all inputs, exists output reaching target
-    CUDD::BDD forall_input = exists_output.UnivAbstract(input_cube);
-    
+    auto transition_compose_vector = var_mgr_->make_compose_vector(automaton_id, transition_func);
+
+    // Ensure we only consider pure-state target
+    CUDD::BDD W = target & state_space;
+
+    // T(s,i,o) is true when the next state is in W
+    CUDD::BDD T = W.VectorCompose(transition_compose_vector);
+
+    CUDD::BDD exists_output = T.ExistAbstract(var_mgr_->output_cube());
+    CUDD::BDD forall_input = exists_output.UnivAbstract(var_mgr_->input_cube());
+
     if (debug_ && kVerboseSolver) {
         std::cout << "[DEBUG CPreSystem] target count: " << target.CountMinterm(var_mgr_->state_variable_count(automaton_id)) << std::endl;
-        std::cout << "[DEBUG CPreSystem] transitions_to_target (after exist primed): " << transitions_to_target.CountMinterm(var_mgr_->state_variable_count(automaton_id) + var_mgr_->input_variable_count() + var_mgr_->output_variable_count()) << std::endl;
-        std::cout << "[DEBUG CPreSystem] exists_output count: " << exists_output.CountMinterm(var_mgr_->state_variable_count(automaton_id) + var_mgr_->input_variable_count()) << std::endl;
-        std::cout << "[DEBUG CPreSystem] forall_input count: " << forall_input.CountMinterm(var_mgr_->state_variable_count(automaton_id)) << std::endl;
-        //PrintStateSet("CPreSystem exists_output states", state_space & exists_output);
-        //PrintStateSet("CPreSystem result", state_space & forall_input);
     }
-    
+
     return state_space & forall_input;
 }
 
@@ -119,41 +91,17 @@ CUDD::BDD WeakGameSolver::CPreEnvironment(const CUDD::BDD& target, const CUDD::B
     
     auto automaton_id = arena_.automaton_id();
     auto mgr = var_mgr_->cudd_mgr();
-    
-    // Get transition function
+    // Use vector-compose approach: T(s,i,o) := next_state(s,i,o) ∈ target
+    // Then quantify: CPre_env(X) = state_space & ∀outputs. ∃inputs. T
     auto transition_func = arena_.transition_function();
-    auto primed_vars = var_mgr_->get_state_variables(primed_automaton_id_);
-    
-    // Build transition relation
-    CUDD::BDD trans_rel = mgr->bddOne();
-    for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        trans_rel &= primed_vars[i].Xnor(transition_func[i]);
-    }
-    
-    // Convert target to primed variables
-    auto unprimed_vars = var_mgr_->get_state_variables(automaton_id);
-    std::size_t total_vars = var_mgr_->total_variable_count();
-    std::vector<CUDD::BDD> compose_vector(total_vars);
-    for (std::size_t i = 0; i < total_vars; ++i) {
-        compose_vector[i] = mgr->bddVar(static_cast<int>(i));
-    }
-    for (std::size_t i = 0; i < unprimed_vars.size(); ++i) {
-        compose_vector[unprimed_vars[i].NodeReadIndex()] = primed_vars[i];
-    }
-    CUDD::BDD primed_target = target.VectorCompose(compose_vector);
-    
-    // CPre_s(X) = state_space & ∀output. ∃input. (T & X')
-    // Protagonist controls outputs, environment controls inputs
-    
-    CUDD::BDD output_cube = var_mgr_->output_cube();
-    CUDD::BDD input_cube = var_mgr_->input_cube();
-    CUDD::BDD primed_cube = var_mgr_->state_variables_cube(primed_automaton_id_);
-    
-    // For all outputs, there exists an input such that we reach target
-    CUDD::BDD can_reach = (trans_rel & primed_target).ExistAbstract(primed_cube);
-    CUDD::BDD exists_input = can_reach.ExistAbstract(input_cube);
-    CUDD::BDD forall_output = exists_input.UnivAbstract(output_cube);
-    
+    auto transition_compose_vector = var_mgr_->make_compose_vector(automaton_id, transition_func);
+
+    CUDD::BDD W = target & state_space;
+    CUDD::BDD T = W.VectorCompose(transition_compose_vector);
+
+    CUDD::BDD exists_input = T.ExistAbstract(var_mgr_->input_cube());
+    CUDD::BDD forall_output = exists_input.UnivAbstract(var_mgr_->output_cube());
+
     return state_space & forall_output;
 }
 
