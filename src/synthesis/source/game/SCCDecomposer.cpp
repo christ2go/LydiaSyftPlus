@@ -324,7 +324,7 @@ CUDD::BDD NaiveSCCDecomposer::TransitiveClosure(const CUDD::BDD& relation,
     
     auto unprimed_vars = var_mgr->get_state_variables(automaton_id);
     auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
-    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id);
+    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id_);
     CUDD::BDD temp_cube = var_mgr->state_variables_cube(temp_automaton_id);
     
     // Helper lambdas for variable substitution
@@ -370,102 +370,44 @@ CUDD::BDD NaiveSCCDecomposer::TransitiveClosure(const CUDD::BDD& relation,
     }
 }
 
+void NaiveSCCDecomposer::Initialize() const {
+    if (initialized_) return;
+
+    auto var_mgr = arena_.var_mgr();
+    auto automaton_id = arena_.automaton_id();
+
+    size_t num_bits = var_mgr->state_variable_count(automaton_id);
+    primed_automaton_id_ = var_mgr->create_state_variables(num_bits);
+    temp_automaton_id_ = var_mgr->create_state_variables(num_bits);
+
+    // Build one-step transition relation (state->state), BuildTransitionRelation
+    // will existentially quantify IO as needed.
+    transition_relation_ = BuildTransitionRelation(primed_automaton_id_);
+
+    // Compute full transitive closure once for the whole arena
+    cached_path_relation_ = TransitiveClosure(transition_relation_, primed_automaton_id_, temp_automaton_id_);
+    has_cached_path_relation_ = true;
+    initialized_ = true;
+}
+
 CUDD::BDD NaiveSCCDecomposer::BuildPathRelation(const CUDD::BDD& states, 
                                                  std::size_t primed_automaton_id,
                                                  std::size_t temp_automaton_id) const {
     auto var_mgr = arena_.var_mgr();
     auto automaton_id = arena_.automaton_id();
     auto mgr = var_mgr->cudd_mgr();
-    
-    // Build one-step transition relation
-    CUDD::BDD trans_relation = BuildTransitionRelation(primed_automaton_id);
-    
-    // Existentially quantify out I/O variables FIRST to get state-to-state relation
-    // This is crucial: we want T(s, s') = "can s reach s' in one step for SOME I/O"
-    CUDD::BDD io_cube = var_mgr->input_cube() * var_mgr->output_cube();
-    trans_relation = trans_relation.ExistAbstract(io_cube);
-    
-    // Restrict transitions to stay within states BEFORE computing closure
-    // This ensures paths only go through states in the current set
-    CUDD::BDD primed_states = UnprimedToPrimed(var_mgr, automaton_id, primed_automaton_id, states);
-    CUDD::BDD restricted_trans = trans_relation & states & primed_states;
-    
+    // Ensure initialization has been done (creates cached relations and variable ids)
+    Initialize();
+
+    // Now restrict the cached path relation to the provided state set S x S'
+    CUDD::BDD primed_states = UnprimedToPrimed(var_mgr, automaton_id, primed_automaton_id_, states);
+    CUDD::BDD restricted_path = cached_path_relation_ & states & primed_states;
+
     if (kVerboseSCC) {
-        std::cout << "[BuildPathRelation] Enumerating transitions within state set:" << std::endl;
+        std::cout << "[BuildPathRelation] Using cached path relation and restricting to current state set" << std::endl;
     }
-    auto state_vars = var_mgr->get_state_variables(automaton_id);
-    auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
-    size_t num_state_bits = state_vars.size();
-    size_t num_states = 1ULL << num_state_bits;
-    
-    int trans_count = 0;
-    if (kVerboseSCC) {
-        for (size_t s = 0; s < num_states && trans_count < 50; ++s) {
-            CUDD::BDD src_bdd = mgr->bddOne();
-            for (size_t i = 0; i < num_state_bits; ++i) {
-                if ((s >> i) & 1) src_bdd &= state_vars[i];
-                else src_bdd &= !state_vars[i];
-            }
-            if ((src_bdd & states).IsZero()) continue;  // Skip states not in set
-            
-            for (size_t t = 0; t < num_states; ++t) {
-                CUDD::BDD dst_bdd = mgr->bddOne();
-                for (size_t i = 0; i < num_state_bits; ++i) {
-                    if ((t >> i) & 1) dst_bdd &= primed_vars[i];
-                    else dst_bdd &= !primed_vars[i];
-                }
-                if ((dst_bdd & primed_states).IsZero()) continue;  // Skip states not in set
-                
-                if (!(src_bdd & dst_bdd & restricted_trans).IsZero()) {
-                    std::cout << "  " << s << " -> " << t << std::endl;
-                    trans_count++;
-                }
-            }
-        }
-        std::cout << "[BuildPathRelation] Found " << trans_count << " transitions" << std::endl;
-    }
-    
-    if (restricted_trans.IsZero()) {
-        if (kVerboseSCC) {
-            std::cout << "[BuildPathRelation] WARNING: Restricted transition relation is ZERO!" << std::endl;
-        }
-        return mgr->bddZero();
-    }
-    
-    // Compute transitive closure to get reachability relation
-    CUDD::BDD path_relation = TransitiveClosure(restricted_trans, primed_automaton_id, temp_automaton_id);
-    
-    if (kVerboseSCC) {
-        std::cout << "[BuildPathRelation] Path relation (reachability):" << std::endl;
-    }
-    int path_count = 0;
-    if (kVerboseSCC) {
-        for (size_t s = 0; s < num_states && path_count < 50; ++s) {
-            CUDD::BDD src_bdd = mgr->bddOne();
-            for (size_t i = 0; i < num_state_bits; ++i) {
-                if ((s >> i) & 1) src_bdd &= state_vars[i];
-                else src_bdd &= !state_vars[i];
-            }
-            if ((src_bdd & states).IsZero()) continue;
-            
-            for (size_t t = 0; t < num_states; ++t) {
-                CUDD::BDD dst_bdd = mgr->bddOne();
-                for (size_t i = 0; i < num_state_bits; ++i) {
-                    if ((t >> i) & 1) dst_bdd &= primed_vars[i];
-                    else dst_bdd &= !primed_vars[i];
-                }
-                if ((dst_bdd & primed_states).IsZero()) continue;
-                
-                if (!(src_bdd & dst_bdd & path_relation).IsZero()) {
-                    std::cout << "  Path(" << s << ", " << t << ")" << std::endl;
-                    path_count++;
-                }
-            }
-        }
-        std::cout << "[BuildPathRelation] Found " << path_count << " reachable pairs" << std::endl;
-    }
-    
-    return path_relation;
+
+    return restricted_path;
 }
 
 TransitionRelationResult NaiveSCCDecomposer::BuildTransitionRelationWithPrimed() const {
@@ -483,15 +425,11 @@ TransitionRelationResult NaiveSCCDecomposer::BuildTransitionRelationWithPrimed()
 PathRelationResult NaiveSCCDecomposer::BuildPathRelationWithPrimed(const CUDD::BDD& states) const {
     auto var_mgr = arena_.var_mgr();
     auto automaton_id = arena_.automaton_id();
-    
-    // Create primed and temp state variables
-    size_t num_bits = var_mgr->state_variable_count(automaton_id);
-    std::size_t primed_automaton_id = var_mgr->create_state_variables(num_bits);
-    std::size_t temp_automaton_id = var_mgr->create_state_variables(num_bits);
-    
-    CUDD::BDD relation = BuildPathRelation(states, primed_automaton_id, temp_automaton_id);
-    
-    return PathRelationResult{relation, primed_automaton_id};
+    // Ensure cached initialization (primes/temp and cached closure)
+    Initialize();
+
+    CUDD::BDD relation = BuildPathRelation(states, primed_automaton_id_, temp_automaton_id_);
+    return PathRelationResult{relation, primed_automaton_id_};
 }
 
 CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
@@ -507,15 +445,12 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
         return mgr->bddZero();
     }
     
-    // Create primed and temp state variables for path relation computation
-    size_t num_bits_peel = var_mgr->state_variable_count(automaton_id);
-    std::size_t primed_automaton_id = var_mgr->create_state_variables(num_bits_peel);
-    std::size_t temp_automaton_id = var_mgr->create_state_variables(num_bits_peel);
+    // Use cached path relation (initialize on demand) and get primed vars
+    PathRelationResult path_res = BuildPathRelationWithPrimed(states);
+    CUDD::BDD path = path_res.relation;
+    std::size_t primed_automaton_id = path_res.primed_automaton_id;
     auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
     CUDD::BDD primed_cube = var_mgr->state_variables_cube(primed_automaton_id);
-    
-    // Path(s, s') = transitive closure of transition relation, restricted to states
-    CUDD::BDD path = BuildPathRelation(states, primed_automaton_id, temp_automaton_id);
     //std::cout << "[PeelLayer] Path relation node count: " << path.nodeCount() << std::endl;
     
     if (path.IsZero()) {
@@ -537,7 +472,7 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
     //    - Then substitute temp -> primed: Path(s', s) with primed=s', unprimed=s
     
     auto state_vars = var_mgr->get_state_variables(automaton_id);
-    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id);
+    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id_);
     std::size_t total_vars = var_mgr->total_variable_count();
     
     // Step 1: unprimed -> temp

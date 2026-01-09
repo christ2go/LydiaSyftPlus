@@ -92,6 +92,9 @@ private:
     mutable std::size_t primed_automaton_id_;
     mutable std::size_t temp_automaton_id_;
     mutable bool initialized_ = false;
+    // Cached full path (transitive closure) relation over (s,s') for the whole arena
+    mutable CUDD::BDD cached_path_relation_;
+    mutable bool has_cached_path_relation_ = false;
 
     /**
      * \brief Builds the one-step transition relation.

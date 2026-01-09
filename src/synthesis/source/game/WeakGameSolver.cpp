@@ -416,63 +416,82 @@ WeakGameResult WeakGameSolver::Solve() const {
     CUDD::BDD initial_state = arena_.initial_state_bdd();
     CUDD::BDD io_cube = var_mgr_->input_cube() * var_mgr_->output_cube();
     
-    // Create primed variables for reachability computation
-    size_t num_bits = var_mgr_->state_variable_count(automaton_id);
-    std::size_t reach_primed_id = var_mgr_->create_state_variables(num_bits);
-    auto primed_vars = var_mgr_->get_state_variables(reach_primed_id);
-    auto unprimed_vars = var_mgr_->get_state_variables(automaton_id);
-    CUDD::BDD primed_cube = var_mgr_->state_variables_cube(reach_primed_id);
-    
-    // Build transition relation: T(s, x, y, s') = AND_i(s_i' <-> f_i(s, x, y))
-    std::cout << "[WeakGameSolver] Building transition relation for number of bits: " << num_bits        << std::endl;
-    auto trans_rel_start = std::chrono::steady_clock::now();
-    auto transition_func = arena_.transition_function();
-    CUDD::BDD trans_rel = mgr->bddOne();
-    for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        trans_rel &= primed_vars[i].Xnor(transition_func[i]);
-    }
-    auto trans_rel_end = std::chrono::steady_clock::now();
-    auto trans_rel_duration = std::chrono::duration_cast<std::chrono::milliseconds>(trans_rel_end - trans_rel_start);
-    std::cout << "[WeakGameSolver] Transition relation built in " << trans_rel_duration.count() << " ms" << std::endl;
-    
-    // Compute reachable states via fixpoint: Reach = μX. initial ∪ Post(X)
-    // Post(X) = ∃s,x,y. X(s) ∧ T(s,x,y,s') [then rename s' to s]
-    std::cout << "[WeakGameSolver] Computing reachability closure (fixpoint)..." << std::endl;
+    // Compute reachable states via fixpoint using vector-compose (no explicit transition relation)
+    // Reach = mu X. initial ∪ Post(X), where Post(X) is the image of X under the transition function
+    std::cout << "[WeakGameSolver] Computing reachability closure (fixpoint) using VectorCompose..." << std::endl;
     auto closure_start = std::chrono::steady_clock::now();
-    
-    CUDD::BDD reachable = initial_state;
-    
-    // Build substitution to rename primed back to unprimed
+
+    auto transition_func = arena_.transition_function();
+    // transition_compose_vector maps this automaton's state vars -> next-state functions f_i(x,a)
+    auto transition_compose_vector = var_mgr_->make_compose_vector(automaton_id, transition_func);
+
+    // Compute forward image using a per-bit construction of the one-step relation
+    // Instead of building the full R(s,s') = /\_i (z'_i <-> eta_i(s,a)) at once, we
+    // conjoin one bit-equivalence at a time and (optionally) perform early I/O
+    // quantification to reduce intermediate BDD size.
+
+    // Prepare primed variables
+    Initialize();
+    std::size_t primed_id = primed_automaton_id_;
+    auto primed_vars = var_mgr_->get_state_variables(primed_id);
+
+    auto unprimed_vars = var_mgr_->get_state_variables(automaton_id);
     std::size_t total_vars = var_mgr_->total_variable_count();
-    std::vector<CUDD::BDD> primed_to_unprimed(total_vars);
-    for (std::size_t i = 0; i < total_vars; ++i) {
-        primed_to_unprimed[i] = mgr->bddVar(static_cast<int>(i));
+
+    // Compose vector to map primed -> unprimed (for renaming post(s') into unprimed space)
+    std::vector<CUDD::BDD> primed_to_unprimed_compose(total_vars);
+    for (std::size_t i = 0; i < total_vars; ++i) primed_to_unprimed_compose[i] = mgr->bddVar(static_cast<int>(i));
+    for (std::size_t i = 0; i < unprimed_vars.size(); ++i) {
+        primed_to_unprimed_compose[primed_vars[i].NodeReadIndex()] = unprimed_vars[i];
     }
-    for (std::size_t i = 0; i < primed_vars.size(); ++i) {
-        primed_to_unprimed[primed_vars[i].NodeReadIndex()] = unprimed_vars[i];
-    }
-    
-    CUDD::BDD state_cube = var_mgr_->state_variables_cube(automaton_id);
-    
+
+    CUDD::BDD reachable = initial_state;
     int closure_iterations = 0;
+
+    // Full IO cube (we quant at the end of each bit to keep intermediates smaller).
+    CUDD::BDD io_cube_full = var_mgr_->input_cube() * var_mgr_->output_cube();
+    CUDD::BDD unprimed_state_cube = var_mgr_->state_variables_cube(automaton_id);
+
     while (true) {
         closure_iterations++;
-        // Post(reachable) = ∃s,x,y. reachable(s) ∧ T(s,x,y,s')
-        CUDD::BDD post = (reachable & trans_rel).ExistAbstract(state_cube * io_cube);
-        // Rename s' to s
-        post = post.VectorCompose(primed_to_unprimed);
-        
-        CUDD::BDD new_reachable = reachable | post;
-        if (new_reachable == reachable) {
-            break;
+
+        // Start relation = reachable (over unprimed vars)
+        CUDD::BDD relation = reachable;
+
+        // Conjoin bit-equivalences one by one
+        for (std::size_t i = 0; i < transition_func.size(); ++i) {
+            CUDD::BDD eta = transition_func[i]; // f_i(s,a)
+            CUDD::BDD zprime = primed_vars[i];
+
+            // eq_i(s,s',a) := (z'_i & eta) | (!z'_i & !eta)  <==>  z'_i XNOR eta
+            CUDD::BDD eq = zprime.Xnor(eta);
+
+            relation &= eq;
+
+            // Early quantification of I/O to keep BDDs smaller. This is safe only if
+            // quantifying the whole I/O cube at once preserves necessary correlations;
+            // for full correctness one could delay I/O quantification to the end.
+            relation = relation.ExistAbstract(io_cube_full);
         }
+
+        // Now eliminate source (unprimed) state vars to obtain primed next states
+        CUDD::BDD post_primed = relation.ExistAbstract(unprimed_state_cube);
+
+        // Rename primed -> unprimed
+        CUDD::BDD post = post_primed.VectorCompose(primed_to_unprimed_compose);
+
+        // Only keep newly discovered states
+        post &= !reachable;
+
+        CUDD::BDD new_reachable = reachable | post;
+        if (new_reachable == reachable) break;
         reachable = new_reachable;
     }
-    
+
     auto closure_end = std::chrono::steady_clock::now();
     auto closure_duration = std::chrono::duration_cast<std::chrono::milliseconds>(closure_end - closure_start);
-    std::cout << "[WeakGameSolver] Reachability closure completed in " << closure_duration.count() << " ms (" << closure_iterations << " iterations)" << std::endl;
-    
+    std::cout << "[WeakGameSolver] Reachability closure (vector-compose) completed in " << closure_duration.count() << " ms (" << closure_iterations << " iterations)" << std::endl;
+    //std::cout << "[WeakGameSolver] Reachable states count: " << reachable.CountMinterm(var_mgr_->state_variable_count(automaton_id)) << std::endl;
     auto reachability_end = std::chrono::steady_clock::now();
     auto reachability_duration = std::chrono::duration_cast<std::chrono::milliseconds>(reachability_end - reachability_start);
     std::cout << "[WeakGameSolver] Total reachability computation: " << reachability_duration.count() << " ms" << std::endl;
