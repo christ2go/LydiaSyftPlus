@@ -13,6 +13,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iostream>
+#include <chrono>
 
 namespace Syft {
 
@@ -20,10 +21,12 @@ namespace Syft {
         LTLfPlus ltlf_plus_formula,
         InputOutputPartition partition,
         Player starting_player,
-        Player protagonist_player)
+        Player protagonist_player,
+        Syft::BuchiSolver::BuchiMode buechi_mode)
         : ltlf_plus_formula_(ltlf_plus_formula),
           starting_player_(starting_player),
           protagonist_player_(protagonist_player) {
+        buechi_mode_ = buechi_mode;
         std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
         var_mgr->create_named_variables(partition.input_variables);
         var_mgr->create_named_variables(partition.output_variables);
@@ -158,6 +161,8 @@ namespace Syft {
 
     std::pair<SymbolicStateDfa, std::map<int, CUDD::BDD>> 
     ObligationLTLfPlusSynthesizer::convert_to_symbolic_dfa() const {
+        using clock = std::chrono::high_resolution_clock;
+        auto t0 = clock::now();
         std::map<int, SymbolicStateDfa> color_to_dfa;
         std::map<int, CUDD::BDD> color_to_final_states;
 
@@ -211,6 +216,9 @@ namespace Syft {
 
         // the arena already encodes the combined finals in arena.final_states()
         color_to_final_states[-1] = arena.final_states();
+        auto t1 = clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+        std::cout << "[ObligationFragment] DFA created in " << ms << " ms" << std::endl;
 
         return std::make_pair(arena, color_to_final_states);
     }
@@ -241,7 +249,7 @@ namespace Syft {
                 std::cout << state_space << std::endl;
 
         // Create and run the Büchi solver (arena already has final_states)
-        BuchiSolver solver(arena, starting_player_, protagonist_player_, var_mgr_->cudd_mgr()->bddOne());
+    BuchiSolver solver(arena, starting_player_, protagonist_player_, var_mgr_->cudd_mgr()->bddOne(), buechi_mode_);
         SynthesisResult game_result = solver.run();
         
         std::cout << "BuchiStandalone completed" << std::endl;

@@ -109,11 +109,13 @@ void BuchiSolver::print_automaton_summary() const {
         const SymbolicStateDfa& spec,
         Player starting_player,
         Player protagonist_player,
-        const CUDD::BDD &state_space
+        const CUDD::BDD &state_space,
+        BuchiSolver::BuchiMode mode
     ) : game_(spec),
         starting_player_(starting_player),
         protagonist_player_(protagonist_player),
-        state_space_(state_space) {
+        state_space_(state_space),
+        buechi_mode_(mode) {
 
         var_mgr_ = game_.var_mgr();
         initial_eval_vector_ = var_mgr_->make_eval_vector(game_.automaton_id(), game_.initial_state());
@@ -130,7 +132,11 @@ void BuchiSolver::print_automaton_summary() const {
                       << (starting_player_ == Player::Agent ? "Agent" : "Environment")
                       << " protagonist_player="
                       << (protagonist_player_ == Player::Agent ? "Agent" : "Environment")
-                      << "\n";
+                      ;
+
+            // print chosen Buchi mode
+            std::string mode_str = (buechi_mode_ == BuchiMode::PITERMAN) ? "PITERMAN" : "CLASSIC";
+            std::cout << " mode=" << mode_str << "\n";
         }
 
         std::tie(indep_quant_mode_, nonstate_quant_mode_) =
@@ -300,6 +306,123 @@ CUDD::BDD BuchiSolver::CPre_env(const CUDD::BDD& W_states) const {
         }
     }
 
+    // Alternating safety / reachability algorithm
+    // 1. W0 = empty
+    // 2. Safety step: W_{i+1} = GFP X. (F ∪ W_i) ∩ CPre(X)
+    // 3. Reachability step: W_{i+1} = LFP X. W_i ∪ CPre(X)
+    // 4. If W_i == W_{i-2} terminate else repeat
+    CUDD::BDD BuchiSolver::alternatingSafetyReachability() const {
+        auto mgr = var_mgr_->cudd_mgr();
+        CUDD::BDD F = game_.final_states() & state_space_;
+
+        // W = empty
+        CUDD::BDD W = mgr->bddZero();
+
+        int outer_iter = 0;
+        while (true) {
+            outer_iter++;
+
+            // Safety GFP: X, XX = BDD.one; iterate XX = (F || W) && Cpre(X)
+            CUDD::BDD X = mgr->bddOne();
+            CUDD::BDD XX = mgr->bddOne();
+            int safety_iters = 0;
+            while (true) {
+                safety_iters++;
+                XX = ((F | W) & computeCPreForPlayer(protagonist_player_, X)) & state_space_;
+                if (XX == X) break;
+                X = XX;
+            }
+
+            if (debug_enabled_) {
+                std::cout << "[BuchiSolver Alternating] outer=" << outer_iter
+                          << " safety_iters=" << safety_iters
+                          << " X_nodes=" << X.nodeCount() << "\n";
+                print_state_set(X, "X (after safety)");
+            }
+
+            if (W == X) {
+                if (debug_enabled_) std::cout << "[BuchiSolver Alternating] W==X, terminating at outer=" << outer_iter << "\n";
+                return W & state_space_;
+            } else {
+                W = X & state_space_;
+            }
+
+            // Reachability LFP: Y, YY = BDD.zero; iterate YY = W || Cpre(Y)
+            CUDD::BDD Y = mgr->bddZero();
+            CUDD::BDD YY = mgr->bddZero();
+            int reach_iters = 0;
+            while (true) {
+                reach_iters++;
+                YY = (W | computeCPreForPlayer(protagonist_player_, Y)) & state_space_;
+                if (YY == Y) break;
+                Y = YY;
+            }
+
+            if (debug_enabled_) {
+                std::cout << "[BuchiSolver Alternating] outer=" << outer_iter
+                          << " reach_iters=" << reach_iters
+                          << " Y_nodes=" << Y.nodeCount() << "\n";
+                print_state_set(Y, "Y (after reach)");
+            }
+
+            if (W == Y) {
+                if (debug_enabled_) std::cout << "[BuchiSolver Alternating] W==Y, terminating at outer=" << outer_iter << "\n";
+                return W & state_space_;
+            } else {
+                W = Y & state_space_;
+            }
+        }
+    }
+
+    bool BuchiSolver::DoubleFixpoint() {
+    // Compute nu X. mu Y. (F ∩ CPre_s(X)) ∪ CPre_s(Y)
+    auto mgr = var_mgr_->cudd_mgr();
+
+    // Initialize X to the whole state space (greatest fixpoint start)
+    CUDD::BDD X = mgr->bddOne();
+    CUDD::BDD prevX = mgr->bddZero();
+
+    int outer_iter = 0;
+    while (!(X == prevX)) {
+        prevX = X;
+        outer_iter++;
+
+        // Inner least fixpoint: Y_{k+1} = (F ∩ CPre_s(X)) ∪ CPre_s(Y_k)
+        CUDD::BDD Y = mgr->bddZero();
+        CUDD::BDD prevY; // assigned inside loop
+        int inner_iter = 0;
+
+        // Precompute the term F ∩ CPre_s(X) which is constant during inner loop
+        CUDD::BDD FcpreX = game_.final_states() & computeCPreForPlayer(protagonist_player_, X);
+
+        // Use a do/while so the inner least-fixpoint iterates at least once.
+        do {
+            prevY = Y;
+            inner_iter++;
+
+            CUDD::BDD newY = FcpreX | computeCPreForPlayer(protagonist_player_, Y);
+            // keep within state space
+            Y = newY & state_space_;
+        } while (!(Y == prevY));
+
+        // The phi(X) is the inner fixpoint Y
+        X = Y & state_space_;
+
+        if (debug_enabled_) {
+            std::cout << "[BuchiSolver DoubleFixpoint] outer_iter=" << outer_iter
+                      << " inner_iters=" << inner_iter << " X_nodes=" << X.nodeCount() << "\n";
+            print_state_set(X, "X (current)");
+        }
+    }
+
+    // Return whether initial state is contained in the outer fixpoint X
+    CUDD::BDD initial = game_.initial_state_bdd();
+    bool initial_in = (initial & !X).IsZero();
+    if (debug_enabled_) std::cout << "[BuchiSolver DoubleFixpoint] initial_in=" << initial_in << "\n";
+    return initial_in;
+
+    }
+
     // Main run
     SynthesisResult BuchiSolver::run() {
                 if (debug_enabled_) std::cout << "[BuchiSolver] run: starting solver\n";
@@ -308,13 +431,14 @@ CUDD::BDD BuchiSolver::CPre_env(const CUDD::BDD& W_states) const {
 print_automaton_summary();
 
 // If possible, print full set of all states in the state_space_ too
-print_state_set(state_space_, "STATE_SPACE");
-print_state_set(game_.final_states(), "INITIAL FINAL_STATES (game_.final_states())");
+//print_state_set(state_space_, "STATE_SPACE");
+//print_state_set(game_.final_states(), "INITIAL FINAL_STATES (game_.final_states())");
 
         // F 
         CUDD::BDD F = game_.final_states();
     if (debug_enabled_) std::cout << "[BuchiSolver] run: initial F = " << F << "\n";
 
+    /*
         // compute recurrence
         CUDD::BDD RecurF = computeRecurrence(F);
     if (debug_enabled_) std::cout << "[BuchiSolver] run: RecurF = " << RecurF << "\n";
@@ -322,27 +446,34 @@ print_state_set(game_.final_states(), "INITIAL FINAL_STATES (game_.final_states(
         // winning region = Attr0(Recur(F))
         auto [win_states, win_moves] = computeAttr(RecurF);
     if (debug_enabled_) std::cout << "[BuchiSolver] run: winning states = " << win_states << "\n";
-
+*/
         // normalize output states
-        CUDD::BDD norm_win_states = win_states;
+        CUDD::BDD norm_win_states;
+        CUDD::BDD win_moves;
+        bool wining = false;
 
-        if (includes_initial_state(norm_win_states)) {
-            result.realizability = true;
-            result.winning_states = norm_win_states;
-            result.winning_moves = win_moves;
-            result.transducer = nullptr;
-            return result;
+        if (buechi_mode_ == BuchiMode::PITERMAN) {
+            // Use Piterman's alternating safety/reachability construction
+            norm_win_states = alternatingSafetyReachability();
+            win_moves = CUDD::BDD();
+
+            // check if initial state is in the computed winning region
+            wining = includes_initial_state(norm_win_states);
         } else {
-            result.realizability = false;
-            result.winning_states = norm_win_states;
-            result.winning_moves = win_moves;
-            result.transducer = nullptr;
-            return result;
+            // Classic double-fixpoint mode (kept as before)
+            norm_win_states = CUDD::BDD();
+            win_moves = CUDD::BDD();
+            wining = DoubleFixpoint();
         }
+
+        result.realizability = wining;
+        result.winning_states = norm_win_states;
+        result.winning_moves = win_moves;
+        result.transducer = nullptr;
+        return result;
     }
 
 } // namespace Syft
-// ...existing code...
     // Dump the underlying DFA in the plain text format expected by the Python loader.
     // Format markers: ===PYDFA_BEGIN=== ... ===PYDFA_END===
     void Syft::BuchiSolver::DumpDFAForPython() const {
@@ -504,4 +635,3 @@ print_state_set(game_.final_states(), "INITIAL FINAL_STATES (game_.final_states(
 
         std::cout << "===PYDFA_END===" << std::endl;
     }
-// ...existing code...

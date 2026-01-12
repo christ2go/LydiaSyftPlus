@@ -13,10 +13,13 @@ namespace Syft {
     // It needs a SymbolicStateDfa (your semi-symbolic DFA) and uses VarMgr via it.
     class BuchiSolver {
     public:
-        BuchiSolver(const SymbolicStateDfa &spec,
-                        Player starting_player,
-                        Player protagonist_player,
-                        const CUDD::BDD &state_space);
+    enum class BuchiMode { CLASSIC, PITERMAN };
+
+    BuchiSolver(const SymbolicStateDfa &spec,
+            Player starting_player,
+            Player protagonist_player,
+            const CUDD::BDD &state_space,
+            BuchiMode mode = BuchiMode::CLASSIC);
 
         // run the nested fixed-point Büchi solver
         SynthesisResult run();
@@ -54,6 +57,10 @@ namespace Syft {
 
         bool includes_initial_state(const CUDD::BDD &winning_states) const;
         CUDD::BDD computeRecurrence(const CUDD::BDD &F) const;
+    // Alternate safety/reachability algorithm described by user:
+    // Repeatedly compute a GFP safety fixpoint then a LFP reachability fixpoint
+    // until W_i == W_{i-2}. Returns the stabilized winning state set.
+    CUDD::BDD alternatingSafetyReachability() const;
 
         CUDD::BDD normalize_state_set(const CUDD::BDD &bdd_maybe_with_io) const;
 
@@ -65,6 +72,8 @@ namespace Syft {
 
 
         CUDD::BDD computeCPre(const CUDD::BDD &states) const;
+
+        bool DoubleFixpoint();
 
         // internal bookkeeping
         SymbolicStateDfa game_;
@@ -83,6 +92,7 @@ namespace Syft {
         // Small enum to pick quantification behaviour without other classes
         IndepQuantMode indep_quant_mode_;
         NonStateQuantMode nonstate_quant_mode_;
+    BuchiMode buechi_mode_ = BuchiMode::CLASSIC;
         // enable verbose debug printing when true
         bool debug_enabled_ = false;
     public:

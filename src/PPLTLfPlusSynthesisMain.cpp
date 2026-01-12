@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
     // arguments
     std::string ppltl_plus_file, partition_file;
     int starting_player_id, game_solver;
+    std::string buechi_mode_str = "cl";
 
     CLI::Option* ppltl_plus_file_opt;
     app.add_option("-i,--input-file", ppltl_plus_file, "Path to PPLTL+ formula file")->
@@ -35,6 +36,9 @@ int main(int argc, char** argv) {
     CLI::Option* game_solver_opt =
         app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0.")->
             required();
+    
+        app.add_option("-b,--buechi-mode", buechi_mode_str, "Buechi solver mode: cl (classic) or pm (piterman)")
+            ->default_val("cl");
 
     CLI11_PARSE(app, argc, argv);
 

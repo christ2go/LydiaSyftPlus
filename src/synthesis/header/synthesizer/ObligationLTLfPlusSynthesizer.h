@@ -2,6 +2,7 @@
 #define OBLIGATION_LTLF_PLUS_SYNTHESIZER_H
 
 #include "automata/SymbolicStateDfa.h"
+#include "game/BuchiSolver.hpp"
 #include "game/InputOutputPartition.h"
 #include "lydia/logic/ltlfplus/base.hpp"
 #include "automata/SymbolicStateDfa.h"
@@ -54,7 +55,8 @@ namespace Syft {
             LTLfPlus ltlf_plus_formula,
             InputOutputPartition partition,
             Player starting_player,
-            Player protagonist_player
+            Player protagonist_player,
+            Syft::BuchiSolver::BuchiMode buechi_mode = Syft::BuchiSolver::BuchiMode::CLASSIC
         );
 
         /**
@@ -70,6 +72,7 @@ namespace Syft {
         LTLfPlus ltlf_plus_formula_;
         Player starting_player_;
         Player protagonist_player_;
+    Syft::BuchiSolver::BuchiMode buechi_mode_ = Syft::BuchiSolver::BuchiMode::CLASSIC;
 
         // --- core phases ---
         void validate_obligation_fragment() const;
