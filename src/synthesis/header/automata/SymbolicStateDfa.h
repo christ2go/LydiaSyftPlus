@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
 
 #include <cuddObj.hh>
 
@@ -150,6 +151,22 @@ namespace Syft {
          * \param filename The name of the file to save the symbolic DFA to.
          */
         void dump_dot(const std::string &filename) const;
+
+        /**
+         * \brief Dumps the DFA in JSON format for visualization.
+         *
+         * The JSON format contains all information needed to reconstruct the explicit DFA:
+         * - num_state_bits, num_inputs, num_outputs
+         * - input_labels, output_labels
+         * - trans_funcs: maps each state bit to its transition function as minterms
+         * - accepting_minterms: binary representations of accepting states
+         * - initial_minterm: binary representation of initial state
+         *
+         * \param filename The name of the JSON file to save.
+         * \param alt_final_states Optional alternative final states BDD to use instead of the DFA's final_states_.
+         */
+        void dump_json(const std::string &filename, 
+                      std::optional<CUDD::BDD> alt_final_states = std::nullopt) const;
 
         /**
          * \brief Returns a product AND of two symbolic DFAs.

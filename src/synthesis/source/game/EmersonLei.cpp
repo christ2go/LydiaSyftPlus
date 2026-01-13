@@ -16,6 +16,9 @@ namespace Syft {
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula), Colors_(colorBDDs),
       state_space_(state_space), instant_winning_(instant_winning), instant_losing_(instant_losing), adv_mp_(adv_mp) {
 
+        // Just for debugging, dump the DFA as json
+    //spec_.dump_json("EmersonLei_spec.json");
+
     // build Zielonka tree; parse formula from PHI_FILE, number of colors taken from Colors
     z_tree_ = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
   }
@@ -137,6 +140,7 @@ namespace Syft {
         return index_below(anchor_node, old_memory->parent);
       }
     }
+    return -1;
   }
 
   ZielonkaNode *EmersonLei::get_anchor(CUDD::BDD game_node, ZielonkaNode *t) const {

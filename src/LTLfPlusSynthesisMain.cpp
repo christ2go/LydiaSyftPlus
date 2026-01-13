@@ -133,6 +133,9 @@ int main(int argc, char** argv) {
             if (buechi_mode_str == "pm" || buechi_mode_str == "piterman") {
                 mode = Syft::BuchiSolver::BuchiMode::PITERMAN;
             }
+            if (buechi_mode_str == "cb" || buechi_mode_str == "cobuchi") {
+                mode = Syft::BuchiSolver::BuchiMode::COBUCHI;
+            }
 
             Syft::ObligationLTLfPlusSynthesizer obligation_synthesizer(
                 ltlf_plus_formula,

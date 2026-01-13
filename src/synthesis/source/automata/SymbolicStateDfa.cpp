@@ -1,4 +1,6 @@
 #include "automata/SymbolicStateDfa.h"
+#include <fstream>
+#include <sstream>
 
 namespace Syft {
 
@@ -187,6 +189,144 @@ namespace Syft {
         adds.push_back(final_states_.Add());
 
         var_mgr_->dump_dot(adds, function_labels, filename);
+    }
+
+    void SymbolicStateDfa::dump_json(const std::string &filename, 
+                                     std::optional<CUDD::BDD> alt_final_states) const {
+        std::ofstream out(filename);
+        if (!out.is_open()) {
+            throw std::runtime_error("Could not open file for writing: " + filename);
+        }
+
+        const CUDD::BDD& final_to_use = alt_final_states.has_value() ? alt_final_states.value() : final_states_;
+        
+        std::size_t num_state_bits = var_mgr_->state_variable_count(automaton_id_);
+        std::size_t num_inputs = var_mgr_->input_variable_count();
+        std::size_t num_outputs = var_mgr_->output_variable_count();
+        std::size_t num_states = 1 << num_state_bits;
+
+        // Get variable labels
+        auto input_labels = var_mgr_->input_variable_labels();
+        auto output_labels = var_mgr_->output_variable_labels();
+        auto state_labels = var_mgr_->state_variable_labels(automaton_id_);
+        auto state_vars = var_mgr_->get_state_variables(automaton_id_);
+
+        // Helper to convert vector to binary string (LSB first)
+        auto vec_to_binstr = [](const std::vector<int>& vec) {
+            std::string s;
+            for (int bit : vec) {
+                s += (bit ? '1' : '0');
+            }
+            return s;
+        };
+
+        // Helper to create BDD for integer value over input/output variables
+        // This assumes variables are ordered: input_0, input_1, ..., output_0, output_1, ...
+        auto value_to_io_bdd = [&](std::size_t inp, std::size_t outp) {
+            CUDD::BDD result = var_mgr_->cudd_mgr()->bddOne();
+            
+            // Encode inputs (assuming they start from index 0 in BDD order)
+            for (std::size_t i = 0; i < num_inputs; ++i) {
+                CUDD::BDD var = var_mgr_->cudd_mgr()->bddVar(static_cast<int>(i));
+                if ((inp >> i) & 1) {
+                    result &= var;
+                } else {
+                    result &= !var;
+                }
+            }
+            
+            // Encode outputs (assuming they follow inputs in BDD order)
+            for (std::size_t i = 0; i < num_outputs; ++i) {
+                CUDD::BDD var = var_mgr_->cudd_mgr()->bddVar(static_cast<int>(num_inputs + i));
+                if ((outp >> i) & 1) {
+                    result &= var;
+                } else {
+                    result &= !var;
+                }
+            }
+            
+            return result;
+        };
+
+        // Start JSON
+        out << "{\n";
+        out << "  \"num_state_bits\": " << num_state_bits << ",\n";
+        out << "  \"num_inputs\": " << num_inputs << ",\n";
+        out << "  \"num_outputs\": " << num_outputs << ",\n";
+
+        // State variable indices - get actual CUDD indices
+        out << "  \"state_var_indices\": [";
+        for (std::size_t i = 0; i < num_state_bits; ++i) {
+            if (i > 0) out << ", ";
+            out << state_vars[i].NodeReadIndex();
+        }
+        out << "],\n";
+
+        // Input labels
+        out << "  \"input_labels\": [";
+        for (std::size_t i = 0; i < input_labels.size(); ++i) {
+            if (i > 0) out << ", ";
+            out << "\"" << input_labels[i] << "\"";
+        }
+        out << "],\n";
+
+        // Output labels
+        out << "  \"output_labels\": [";
+        for (std::size_t i = 0; i < output_labels.size(); ++i) {
+            if (i > 0) out << ", ";
+            out << "\"" << output_labels[i] << "\"";
+        }
+        out << "],\n";
+
+        // Initial state minterm
+        out << "  \"initial_minterm\": \"" << vec_to_binstr(initial_state_) << "\",\n";
+
+        // Accepting states minterms
+        out << "  \"accepting_minterms\": [";
+        bool first_accept = true;
+        for (std::size_t state = 0; state < num_states; ++state) {
+            CUDD::BDD state_bdd = state_to_bdd(var_mgr_, automaton_id_, state);
+            if (!(state_bdd & final_to_use).IsZero()) {
+                if (!first_accept) out << ", ";
+                first_accept = false;
+                auto bin = state_to_binary(state, num_state_bits);
+                out << "\"" << vec_to_binstr(bin) << "\"";
+            }
+        }
+        out << "],\n";
+
+        // Transition functions
+        out << "  \"trans_funcs\": {\n";
+        for (std::size_t bit = 0; bit < transition_function_.size(); ++bit) {
+            if (bit > 0) out << ",\n";
+            out << "    \"" << bit << "\": [";
+            
+            const CUDD::BDD& trans_bdd = transition_function_[bit];
+            bool first_minterm = true;
+            
+            // Enumerate all (state, input, output) combinations where this bit is 1
+            for (std::size_t state = 0; state < num_states; ++state) {
+                CUDD::BDD state_bdd = state_to_bdd(var_mgr_, automaton_id_, state);
+                
+                for (std::size_t inp = 0; inp < (1u << num_inputs); ++inp) {
+                    for (std::size_t outp = 0; outp < (1u << num_outputs); ++outp) {
+                        CUDD::BDD io_bdd = value_to_io_bdd(inp, outp);
+                        CUDD::BDD combined = state_bdd & io_bdd;
+                        
+                        if (!(combined & trans_bdd).IsZero()) {
+                            if (!first_minterm) out << ", ";
+                            first_minterm = false;
+                            out << "[" << state << ", " << inp << ", " << outp << "]";
+                        }
+                    }
+                }
+            }
+            out << "]";
+        }
+        out << "\n  }\n";
+        out << "}\n";
+
+        out.close();
     }
 
     SymbolicStateDfa SymbolicStateDfa::from_predicates(

@@ -13,7 +13,7 @@ namespace Syft {
     // It needs a SymbolicStateDfa (your semi-symbolic DFA) and uses VarMgr via it.
     class BuchiSolver {
     public:
-    enum class BuchiMode { CLASSIC, PITERMAN };
+    enum class BuchiMode { CLASSIC, PITERMAN, COBUCHI };
 
     BuchiSolver(const SymbolicStateDfa &spec,
             Player starting_player,
@@ -35,7 +35,7 @@ namespace Syft {
     private:
     // Build a BDD representing a concrete state assignment (state vars only)
     CUDD::BDD state_index_to_bdd(std::size_t index) const;
-
+    std::unique_ptr<Syft::Quantification> quantify_independent_variables_, quantify_non_state_variables_;
     // Print a state-set BDD by enumerating concrete state indices (safe for small automata)
     void print_state_set(const CUDD::BDD &set_bdd,
                          const std::string &label,
@@ -61,6 +61,7 @@ namespace Syft {
     // Repeatedly compute a GFP safety fixpoint then a LFP reachability fixpoint
     // until W_i == W_{i-2}. Returns the stabilized winning state set.
     CUDD::BDD alternatingSafetyReachability() const;
+    CUDD::BDD CoBuchiFixpoint() const;
 
         CUDD::BDD normalize_state_set(const CUDD::BDD &bdd_maybe_with_io) const;
 
