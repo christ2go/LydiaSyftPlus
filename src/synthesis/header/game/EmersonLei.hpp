@@ -35,6 +35,9 @@ namespace Syft {
 		std::optional<ZielonkaNode*> curr_tree_node_;
 		ZielonkaTree* z_tree_;
 		bool syn_flag_ = false;
+		// When true, run the embedded Büchi-style double-fixpoint solver instead of the EL Zielonka solve.
+		// This is enabled by default "for lolz" and can be disabled later if desired.
+		bool use_embedded_buchi_ = false;
 		bool adv_mp_;
 
 		CUDD::BDD getOneUnprocessedState(CUDD::BDD state_state, CUDD::BDD processed) const;
@@ -54,6 +57,9 @@ namespace Syft {
 			const std::vector<CUDD::BDD> &colorBDDs, const CUDD::BDD &state_space, const CUDD::BDD &instant_winning, const CUDD::BDD &instant_losing, bool adv_mp);
 
 		CUDD::BDD EmersonLeiSolve(ZielonkaNode *t, CUDD::BDD term) const;
+		CUDD::BDD BuchiAlgorithm() const;
+		// Toggle the embedded Büchi algorithm at runtime
+		void set_use_embedded_buchi(bool use) { use_embedded_buchi_ = use; }
     	CUDD::BDD cpre(ZielonkaNode *t, int i, CUDD::BDD target) const;
 		EL_output_function ExtractStrategy_Explicit(EL_output_function op, CUDD::BDD winning_states, CUDD::BDD gameNode, ZielonkaNode *t) const;
 		CUDD::BDD getUniqueSystemChoice(CUDD::BDD gameNode, CUDD::BDD winningmoves) const;

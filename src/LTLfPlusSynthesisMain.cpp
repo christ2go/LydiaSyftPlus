@@ -14,6 +14,8 @@
 
 #include <CLI/CLI.hpp>
 #include "debug.hpp"
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char** argv) {
 
@@ -37,6 +39,10 @@ int main(int argc, char** argv) {
     bool STRATEGY = false;
     bool obligation_simplification = false;
     std::string buechi_mode_str = "cl";
+    auto console = spdlog::stdout_color_mt("console");
+    spdlog::set_default_logger(console);
+    spdlog::set_level(spdlog::level::trace); // or debug, trace, etc.
+    spdlog::set_pattern("[%H:%M:%S.%e] [%^%l%$] %v");
 
     // CLI::Option* ltlf_plus_file_opt;
     app.add_option("-i,--input-file", ltlf_plus_file, "Path to LTLf+ formula file")->
