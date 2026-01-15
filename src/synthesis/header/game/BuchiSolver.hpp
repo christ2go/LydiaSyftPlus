@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+<<<<<<< HEAD
 namespace Syft {
 
     // A standalone Büchi solver that does not inherit from DfaGameSynthesizer.
@@ -54,10 +55,59 @@ namespace Syft {
 
         bool includes_initial_state(const CUDD::BDD &winning_states) const;
         CUDD::BDD computeRecurrence(const CUDD::BDD &F) const;
+=======
+namespace Syft
+{
+
+    // A standalone solver for weak games that can use either Buchi, co-Buchi or a thrid algorithm.
+    class BuchiSolver
+    {
+    public:
+        enum class BuchiMode
+        {
+            CLASSIC,
+            PITERMAN,
+            COBUCHI
+        };
+
+        BuchiSolver(const SymbolicStateDfa &spec,
+                    Player starting_player,
+                    Player protagonist_player,
+                    const CUDD::BDD &state_space,
+                    BuchiMode mode = BuchiMode::CLASSIC);
+
+        // run the solver
+        SynthesisResult run();
+
+    private:
+        // Build a BDD representing a concrete state assignment (state vars only)
+        CUDD::BDD state_index_to_bdd(std::size_t index) const;
+        std::unique_ptr<Syft::Quantification> quantify_independent_variables_, quantify_non_state_variables_;
+        // Print a state-set BDD by enumerating concrete state indices (safe for small automata)
+        void print_state_set(const CUDD::BDD &set_bdd,
+                             const std::string &label,
+                             int max_enum_bits) const;
+
+        // Print a compact summary of the current automaton (state bits, finals, transitions)
+        void print_automaton_summary() const;
+
+
+        CUDD::BDD project_into_states(const CUDD::BDD &winning_moves) const;
+
+        bool includes_initial_state(const CUDD::BDD &winning_states) const;
+
+        // Alternate safety/reachability algorithm described by user:
+        // Repeatedly compute a GFP safety fixpoint then a LFP reachability fixpoint
+        // until W_i == W_{i-2}. Returns the stabilized winning state set.
+        CUDD::BDD alternatingSafetyReachability() const;
+        // Solves Co-Buchi Game
+        CUDD::BDD CoBuchiFixpoint() const;
+>>>>>>> buechi_solver
 
         CUDD::BDD normalize_state_set(const CUDD::BDD &bdd_maybe_with_io) const;
 
         // core algorithm pieces
+<<<<<<< HEAD
         std::pair<CUDD::BDD, CUDD::BDD> computeAttr(const CUDD::BDD &region) const;
                 CUDD::BDD computeCPreForPlayer(Player player, const CUDD::BDD &states) const;
             CUDD::BDD CPre_agent(const CUDD::BDD &W_states) const;
@@ -66,6 +116,16 @@ namespace Syft {
 
         CUDD::BDD computeCPre(const CUDD::BDD &states) const;
 
+=======
+        CUDD::BDD computeCPreForPlayer(Player player, const CUDD::BDD &states) const;
+        CUDD::BDD CPre_agent(const CUDD::BDD &W_states) const;
+        CUDD::BDD CPre_env(const CUDD::BDD &W_states) const;
+
+        CUDD::BDD computeCPre(const CUDD::BDD &states) const;
+
+        bool DoubleFixpoint();
+
+>>>>>>> buechi_solver
         // internal bookkeeping
         SymbolicStateDfa game_;
         Player starting_player_;
@@ -74,24 +134,16 @@ namespace Syft {
         CUDD::BDD state_space_;
 
         // precomputed helpers (like in DfaGameSynthesizer)
-        std::vector<int> initial_eval_vector_;                // for Eval
-        std::vector<CUDD::BDD> transition_compose_vector_;   // for VectorCompose
+        std::vector<int> initial_eval_vector_;             // for Eval
+        std::vector<CUDD::BDD> transition_compose_vector_; // for VectorCompose
         CUDD::BDD input_cube_;
         CUDD::BDD output_cube_;
         std::size_t output_count_;
 
-        // Small enum to pick quantification behaviour without other classes
-        IndepQuantMode indep_quant_mode_;
-        NonStateQuantMode nonstate_quant_mode_;
+        BuchiMode buechi_mode_ = BuchiMode::CLASSIC;
         // enable verbose debug printing when true
-        bool debug_enabled_ = false;
+        bool debug_enabled_ = true;
 
-        // cache last VectorCompose(W, transition_compose_vector_) result to avoid
-        // recomputing the transition relation when the same W is queried repeatedly.
-        // Mark mutable so const methods can update the cache.
-        mutable CUDD::BDD cached_vectorcompose_W_;
-        mutable CUDD::BDD cached_vectorcompose_T_;
-        mutable bool has_cached_vectorcompose_ = false;
     public:
         // enable/disable debug prints at runtime
         void set_debug(bool enabled) { debug_enabled_ = enabled; }

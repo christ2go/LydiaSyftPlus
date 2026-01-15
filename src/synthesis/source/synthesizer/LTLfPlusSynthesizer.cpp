@@ -132,9 +132,15 @@ namespace Syft {
 
     SymbolicStateDfa arena = SymbolicStateDfa::product_AND(vec_spec);
     // arena.dump_dot("arena.dot");
+    
+    // Add info log
+    spdlog::info("[LTLfPlusSynthesizer::run] created game arena ");
     std::shared_ptr<EmersonLei> emerson_lei = std::make_shared<EmersonLei>(arena, color_formula_, starting_player_, protagonist_player_,
                       goal_states, var_mgr_->cudd_mgr()->bddOne(), var_mgr_->cudd_mgr()->bddZero(), var_mgr_->cudd_mgr()->bddZero(), false);
+        spdlog::info("[LTLfPlusSynthesizer::run] created el solver ");
+
     emerson_lei_ = emerson_lei;
+            spdlog::info("[LTLfPlusSynthesizer::run] starting el solver ");
     return emerson_lei_->run_EL();
   }
 

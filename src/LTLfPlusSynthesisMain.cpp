@@ -14,6 +14,8 @@
 
 #include <CLI/CLI.hpp>
 #include "debug.hpp"
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char** argv) {
 
@@ -36,6 +38,11 @@ int main(int argc, char** argv) {
     bool DEBUG_MODE = false;
     bool STRATEGY = false;
     bool obligation_simplification = false;
+    std::string buechi_mode_str = "cl";
+    auto console = spdlog::stdout_color_mt("console");
+    spdlog::set_default_logger(console);
+    spdlog::set_level(spdlog::level::trace); // or debug, trace, etc.
+    spdlog::set_pattern("[%H:%M:%S.%e] [%^%l%$] %v");
 
     // CLI::Option* ltlf_plus_file_opt;
     app.add_option("-i,--input-file", ltlf_plus_file, "Path to LTLf+ formula file")->
@@ -52,8 +59,11 @@ int main(int argc, char** argv) {
     app.add_option("-g,--game-solver", game_solver, "Game:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0.")->
             required();
 
-    app.add_option("--obligation-simplification", obligation_simplification, "should obligation properties be treated using simpler algorithm (boolean)")->
-            required();
+    app.add_option("--obligation-simplification", obligation_simplification, "should obligation properties be treated using simpler algorithm (boolean)") ->
+        required();
+
+    app.add_option("-b,--buechi-mode", buechi_mode_str, "Buechi solver mode: cl (classic) or pm (piterman)")
+    ->default_val("cl");
 
     app.add_flag("-v,--verbose", verbose, "Enable verbose mode");      
 
@@ -124,11 +134,21 @@ int main(int argc, char** argv) {
     if (obligation_simplification) {
         std::cout << "Using obligation fragment synthesizer" << std::endl;
         try {
+            // Map CLI string to BuchiMode enum
+            Syft::BuchiSolver::BuchiMode mode = Syft::BuchiSolver::BuchiMode::CLASSIC;
+            if (buechi_mode_str == "pm" || buechi_mode_str == "piterman") {
+                mode = Syft::BuchiSolver::BuchiMode::PITERMAN;
+            }
+            if (buechi_mode_str == "cb" || buechi_mode_str == "cobuchi") {
+                mode = Syft::BuchiSolver::BuchiMode::COBUCHI;
+            }
+
             Syft::ObligationLTLfPlusSynthesizer obligation_synthesizer(
                 ltlf_plus_formula,
                 partition,
                 starting_player,
-                Syft::Player::Agent
+                Syft::Player::Agent,
+                mode
             );
             auto synthesis_result = obligation_synthesizer.run();
 

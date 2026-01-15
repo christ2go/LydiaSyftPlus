@@ -4,6 +4,7 @@
 
 #include "game/EmersonLei.hpp"
 #include "debug.hpp"
+#include <spdlog/spdlog.h>
 
 namespace Syft {
   EmersonLei::EmersonLei(const SymbolicStateDfa &spec, std::string color_formula, Player starting_player,
@@ -16,8 +17,13 @@ namespace Syft {
     : DfaGameSynthesizer(spec, starting_player, protagonist_player), color_formula_(color_formula), Colors_(colorBDDs),
       state_space_(state_space), instant_winning_(instant_winning), instant_losing_(instant_losing), adv_mp_(adv_mp) {
 
+        // Just for debugging, dump the DFA as json
+    //spec_.dump_json("EmersonLei_spec.json");
+
     // build Zielonka tree; parse formula from PHI_FILE, number of colors taken from Colors
+    spdlog::info("[EmersonLei::EmersonLei] building Zielonka tree");
     z_tree_ = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
+    spdlog::info("[EmersonLei::EmersonLei] built Zielonka tree");
   }
 
   CUDD::BDD EmersonLei::getOneUnprocessedState(CUDD::BDD states, CUDD::BDD processed) const {
@@ -60,6 +66,8 @@ namespace Syft {
     return Z;
   }
 
+// spdlog handles timestamps and formatting automatically
+
 
   SynthesisResult EmersonLei::run() const {
     SynthesisResult result;
@@ -77,9 +85,16 @@ namespace Syft {
         std::cout << Colors_[i] << '\n';
       }
     }
-
-    // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
-    CUDD::BDD winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
+    spdlog::info("[EmersonLei::run_EL] starting EmersonLeiSolve");
+    // Optionally run embedded Büchi-style double-fixpoint solver (often faster for some inputs)
+    CUDD::BDD winning_states;
+    if (use_embedded_buchi_) {
+      spdlog::info("[EmersonLei::run_EL] using embedded Büchi double-fixpoint algorithm");
+      winning_states = BuchiAlgorithm();
+    } else {
+      // solve EL game for root of Zielonka tree and BDD encoding emptyset as set of states currently assumed to be winning
+      winning_states = EmersonLeiSolve(z_tree_->get_root(), instant_winning_);
+    }
     // std::cout << "winning_states: " << winning_states << std::endl;
     // std::cout << "initial: " << spec_.initial_state_bdd() << "\n";
     // var_mgr_->dump_dot(winning_states.Add(), "winning_states.dot");
@@ -137,6 +152,7 @@ namespace Syft {
         return index_below(anchor_node, old_memory->parent);
       }
     }
+    return -1;
   }
 
   ZielonkaNode *EmersonLei::get_anchor(CUDD::BDD game_node, ZielonkaNode *t) const {
@@ -442,11 +458,14 @@ namespace Syft {
 
   CUDD::BDD EmersonLei::cpre(ZielonkaNode *t, int i, CUDD::BDD target) const {
     CUDD::BDD result;
+    if (DEBUG_MODE) {
+  spdlog::info("[cpre] entering cpre: node={} idx={} target_nodes={}", t->order, i, target.nodeCount());
+    }
 
     if (starting_player_ == Player::Agent) {
       CUDD::BDD quantified_X_transitions_to_winning_states = preimage(target);
       if (DEBUG_MODE) {
-        std::cout << "quantified_X_transitions_to_winning_states: " << quantified_X_transitions_to_winning_states << std::endl;
+  spdlog::info("[cpre] quantified_X_transitions_to_winning_states nodes={}", quantified_X_transitions_to_winning_states.nodeCount());
       }
       //             CUDD::BDD new_target_moves = target |
       //                                 (state_space_ & (!target) & quantified_X_transitions_to_winning_states);
@@ -462,10 +481,15 @@ namespace Syft {
         
         result = project_into_states(new_target_moves);
         if (DEBUG_MODE) {
-          std::cout << "project into states: " << project_into_states(new_target_moves) << std::endl;
+          spdlog::info("[cpre] project_into_states(new_target_moves) nodes={}", project_into_states(new_target_moves).nodeCount());
+          spdlog::info("[cpre] result nodes={}", result.nodeCount());
+          spdlog::info("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
         }
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
+        if (DEBUG_MODE) {
+          spdlog::info("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
+        }
       } else {
         CUDD::BDD new_target_moves_with_loops;
         if (adv_mp_) {
@@ -477,16 +501,29 @@ namespace Syft {
         CUDD::BDD new_target_moves = (!target) & new_target_moves_with_loops;
         result = project_into_states(new_target_moves_with_loops);
         if (DEBUG_MODE) {
-          std::cout << "project into states: " << project_into_states(new_target_moves) << std::endl;
+          spdlog::info("[cpre] project_into_states(new_target_moves_with_loops) nodes={}", project_into_states(new_target_moves_with_loops).nodeCount());
+          spdlog::info("[cpre] result nodes={}", result.nodeCount());
+          spdlog::info("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
         }
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
+        if (DEBUG_MODE) {
+          spdlog::info("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
+        }
       }
     } else {
       //TODO need to double-check
       CUDD::BDD transitions_to_target_states = preimage(target);
+      if (DEBUG_MODE) {
+  spdlog::info("[cpre] transitions_to_target_states nodes={}", transitions_to_target_states.nodeCount());
+      }
       if (t->winning) {
         result = state_space_ & project_into_states(transitions_to_target_states);
+        if (DEBUG_MODE) {
+          spdlog::info("[cpre] project_into_states(transitions_to_target_states) nodes={}", project_into_states(transitions_to_target_states).nodeCount());
+          spdlog::info("[cpre] result nodes={}", result.nodeCount());
+          spdlog::info("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
+        }
         // result = target | new_collected_target_states;
         CUDD::BDD new_target_moves;
         if (adv_mp_) {
@@ -496,8 +533,16 @@ namespace Syft {
         }
         // CUDD::BDD diffmoves = (!target) & transitions_to_target_states;
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
+        if (DEBUG_MODE) {
+          spdlog::info("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
+        }
       } else {
         result = state_space_ & project_into_states(transitions_to_target_states);
+        if (DEBUG_MODE) {
+          std::cout << "[cpre] project_into_states(transitions_to_target_states) nodes=" << project_into_states(transitions_to_target_states).nodeCount() << "\n";
+          std::cout << "[cpre] result nodes=" << result.nodeCount() << "\n";
+          std::cout << "[cpre] winningmoves_before nodes=" << t->winningmoves[i].nodeCount() << "\n";
+        }
         // result = target | new_collected_target_states;
         
         CUDD::BDD new_target_moves;
@@ -507,10 +552,13 @@ namespace Syft {
           new_target_moves = (!target) & result & transitions_to_target_states & (!instant_losing_);
         }
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
+        if (DEBUG_MODE) {
+          std::cout << "[cpre] winningmoves_after nodes=" << t->winningmoves[i].nodeCount() << "\n";
+        }
       }
     }
-    if (DEBUG_MODE) {
-      std::cout << "cpre: " << result << "\n";
+      if (DEBUG_MODE) {
+  spdlog::info("[cpre] exiting cpre: result nodes={}", result.nodeCount());
     }
     return result;
   }
@@ -521,6 +569,9 @@ namespace Syft {
       std::cout << "term: " << term << std::endl;
     }
     CUDD::BDD X, XX;
+
+    // lightweight entry log (info level)
+    spdlog::info("[EmersonLeiSolve] entering node={} initial_X_nodes={}", t->order, (var_mgr_->cudd_mgr()->bddOne()).nodeCount());
 
     // initialize variables for fixpoint computation (gfp for winning / lfp for losing)
     if (t->winning) {
@@ -564,22 +615,38 @@ namespace Syft {
     }
 
     // loop until fixpoint has stabilized
+    int outer_iter = 0;
     while (true) {
+      outer_iter++;
+      int inner_iter = 0;
       if (DEBUG_MODE) {
-        std::cout << "Node: " << t->order << "\n";
-        std::cout << "X: " << X << "\n";
-        std::cout << "instant winning:" << instant_winning_ << "\n";
-        std::cout << "instant losing:" << instant_losing_ << "\n";
+  spdlog::info("[EmersonLeiSolve] Node: {} outer_iter={}", t->order, outer_iter);
+  spdlog::info("[EmersonLeiSolve] X nodes={}", X.nodeCount());
+  spdlog::info("instant winning: {}", instant_winning_.nodeCount());
+  spdlog::info("instant losing: {}", instant_losing_.nodeCount());
       }
 
+      // lightweight per-outer-iteration info log; includes inner iteration count later
+      // we'll update this after computing XX to include inner_iter and XX.nodeCount()
+
       // if t is a leaf
-      if (t->children.empty()) {
+        if (t->children.empty()) {
         
         // std::cout << "t->safenodes:" <<  t->safenodes << "\n";
         // XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
         if (adv_mp_) {
-          XX = term | (t->safenodes & cpre(t, 0, X | instant_winning_));
+          inner_iter++;
+          {
+            auto t0 = std::chrono::steady_clock::now();
+            XX = term | (t->safenodes & cpre(t, 0, X | instant_winning_));
+            auto t1 = std::chrono::steady_clock::now();
+            //if (DEBUG_MODE) {
+              auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+              spdlog::info("[EmersonLeiSolve] cpre(child leaf) took={} ms", ms);
+            //}
+          }
         } else {
+          inner_iter++;
           XX = term | (t->safenodes & cpre(t, 0, X & (!instant_losing_)));
         }
         // std::cout << "cpre:" << cpre(t, 0, X & (!instant_losing_)) << "\n";
@@ -606,10 +673,24 @@ namespace Syft {
             std::cout << "i: " << i << "\n";
           }
 
-          if (adv_mp_){
+            if (adv_mp_){
+            inner_iter++;
+            auto t0 = std::chrono::steady_clock::now();
             current_term = term | (s->targetnodes & cpre(t, i, X | instant_winning_));
+            auto t1 = std::chrono::steady_clock::now();
+            if (DEBUG_MODE) {
+              auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+              spdlog::info("[EmersonLeiSolve] cpre(child non-leaf) idx={} took={} ms", i, ms);
+            }
           } else {
+            inner_iter++;
+            auto t0 = std::chrono::steady_clock::now();
             current_term = term | (s->targetnodes & cpre(t, i, X & (!instant_losing_)));
+            auto t1 = std::chrono::steady_clock::now();
+            //if (DEBUG_MODE) {
+              auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+              spdlog::info("[EmersonLeiSolve] cpre(child non-leaf) idx={} took={} ms", i, ms);
+            //}
           }
           
           // std::cout << "cpre:" << instant_winning_ << "\n";
@@ -623,11 +704,14 @@ namespace Syft {
           }
         }
       }
-      if (DEBUG_MODE) {
-        std::cout << "X: " << X << std::endl;
-        std::cout << "XX: " << XX << std::endl;
+     // if (DEBUG_MODE) {
+  spdlog::info("[EmersonLeiSolve] outer_iter={} inner_iter={} X_nodes={} XX_nodes={}", outer_iter, inner_iter, X.nodeCount(), XX.nodeCount());
         var_mgr_->dump_dot(XX.Add(), "XX.dot");
-      }
+      //}
+
+  // Info-level trace of the fixpoint progress for lightweight logging/monitoring
+  spdlog::info("[EmersonLeiSolve] node={} outer_iter={} inner_iter={} X_nodes={} XX_nodes={}",
+       t->order, outer_iter, inner_iter, X.nodeCount(), XX.nodeCount());
 
       if (X == XX) {
         break;
@@ -638,6 +722,82 @@ namespace Syft {
 
     // return stabilized fixpoint
     return X;
+  }
+
+
+  // A small, copy of the classic Büchi double-fixpoint (nu X. mu Y. (F ∩ CPre(X)) ∪ CPre(Y) ∪ Y)
+  // Implemented here inside EmersonLei so we can compare performance with the EL solver.
+  // Aligned to match EL solver's cpre pattern: restrict to state_space early, apply instant_winning/losing filters.
+  CUDD::BDD EmersonLei::BuchiAlgorithm() const {
+    auto mgr = var_mgr_->cudd_mgr();
+    CUDD::BDD F = spec_.final_states() & state_space_;
+
+    // Outer greatest fixpoint: X starts at true
+    CUDD::BDD X = mgr->bddOne();
+    CUDD::BDD prevX = mgr->bddZero();
+
+    int outer_iter = 0;
+    while (!(X == prevX)) {
+      prevX = X;
+      outer_iter++;
+
+      // Inner least fixpoint: Y starts at false
+      CUDD::BDD Y = mgr->bddZero();
+      CUDD::BDD prevY;
+      int inner_iter = 0;
+
+      // Precompute F ∩ CPre(X) using the same pattern as EL's cpre:
+      // 1. Restrict target to state_space (and optionally instant_winning if adv_mp)
+      // 2. Compute preimage
+      // 3. Restrict to state_space before projection
+      // 4. Project into states
+      CUDD::BDD X_target;
+      if (adv_mp_) {
+        X_target = (X | instant_winning_) & state_space_;
+      } else {
+        X_target = X & state_space_;
+      }
+      CUDD::BDD quantified_X = preimage(X_target);
+      CUDD::BDD new_target_moves;
+      if (adv_mp_) {
+        new_target_moves = (state_space_ & quantified_X);
+      } else {
+        new_target_moves = (state_space_ & quantified_X) & (!instant_losing_);
+      }
+      CUDD::BDD FcpreX = F & project_into_states(new_target_moves);
+
+      do {
+        prevY = Y;
+        inner_iter++;
+
+        // CPre(Y) using the same aligned pattern
+        CUDD::BDD Y_target;
+        if (adv_mp_) {
+          Y_target = (Y | instant_winning_) & state_space_;
+        } else {
+          Y_target = Y & state_space_;
+        }
+        CUDD::BDD quantified_Y = preimage(Y_target);
+        CUDD::BDD new_Y_moves;
+        if (adv_mp_) {
+          new_Y_moves = (state_space_ & quantified_Y);
+        } else {
+          new_Y_moves = (state_space_ & quantified_Y) & (!instant_losing_);
+        }
+        CUDD::BDD cpreY = project_into_states(new_Y_moves);
+
+        // newY = (F ∩ CPre(X)) ∪ CPre(Y) ∪ Y
+        CUDD::BDD newY = (FcpreX | cpreY) | Y;
+        Y = newY & state_space_;
+
+        spdlog::debug("[BuchiAlgorithm] outer={} inner={} Y_nodes={}", outer_iter, inner_iter, Y.nodeCount());
+      } while (!(Y == prevY));
+
+      X = Y & state_space_;
+      spdlog::info("[BuchiAlgorithm] finished outer={} inner_iters={} X_nodes={}", outer_iter, inner_iter, X.nodeCount());
+    }
+
+    return X & state_space_;
   }
 
 
