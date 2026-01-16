@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     bool DEBUG_MODE = false;
     bool STRATEGY = false;
     bool obligation_simplification = false;
-    std::string buechi_mode_str = "cl";
+    std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
     auto console = spdlog::stdout_color_mt("console");
     spdlog::set_default_logger(console);
     spdlog::set_level(spdlog::level::trace); // or debug, trace, etc.
@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
     app.add_option("--obligation-simplification", obligation_simplification, "should obligation properties be treated using simpler algorithm (boolean)") ->
         required();
 
-    app.add_option("-b,--buechi-mode", buechi_mode_str, "Buechi solver mode: cl (classic) or pm (piterman)")
-    ->default_val("cl");
+    app.add_option("-b,--buechi-mode", buechi_mode_str, "Solver mode: wg (weak-game / SCC), cl (Büchi classic), pm (Büchi Piterman), cb (CoBuchi)")
+    ->default_val("wg");
 
     app.add_flag("-v,--verbose", verbose, "Enable verbose mode");      
 
@@ -134,13 +134,22 @@ int main(int argc, char** argv) {
     if (obligation_simplification) {
         std::cout << "Using obligation fragment synthesizer" << std::endl;
         try {
-            // Map CLI string to BuchiMode enum
+            // Map CLI string to use_buchi flag and BuchiMode enum
+            bool use_buchi_flag = true;
             Syft::BuchiSolver::BuchiMode mode = Syft::BuchiSolver::BuchiMode::CLASSIC;
-            if (buechi_mode_str == "pm" || buechi_mode_str == "piterman") {
-                mode = Syft::BuchiSolver::BuchiMode::PITERMAN;
-            }
-            if (buechi_mode_str == "cb" || buechi_mode_str == "cobuchi") {
-                mode = Syft::BuchiSolver::BuchiMode::COBUCHI;
+
+            if (buechi_mode_str == "wg" || buechi_mode_str == "weak" || buechi_mode_str == "weak-game") {
+                use_buchi_flag = false; // use SCC-based weak-game solver
+            } else {
+                // When selecting a Büchi-based solver, set the enum appropriately
+                if (buechi_mode_str == "pm" || buechi_mode_str == "piterman") {
+                    mode = Syft::BuchiSolver::BuchiMode::PITERMAN;
+                } else if (buechi_mode_str == "cb" || buechi_mode_str == "cobuchi") {
+                    mode = Syft::BuchiSolver::BuchiMode::COBUCHI;
+                } else {
+                    // default to classic if unrecognised but not wg
+                    mode = Syft::BuchiSolver::BuchiMode::CLASSIC;
+                }
             }
 
             Syft::ObligationLTLfPlusSynthesizer obligation_synthesizer(
@@ -148,6 +157,7 @@ int main(int argc, char** argv) {
                 partition,
                 starting_player,
                 Syft::Player::Agent,
+                use_buchi_flag,
                 mode
             );
             auto synthesis_result = obligation_synthesizer.run();

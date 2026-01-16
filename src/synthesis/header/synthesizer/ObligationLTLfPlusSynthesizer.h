@@ -56,6 +56,9 @@ namespace Syft {
             InputOutputPartition partition,
             Player starting_player,
             Player protagonist_player,
+            // If use_buchi is false the solver will run the weak-game (SCC) algorithm.
+            // If true, the provided buechi_mode selects which Büchi-based algorithm to run.
+            bool use_buchi = false,
             Syft::BuchiSolver::BuchiMode buechi_mode = Syft::BuchiSolver::BuchiMode::CLASSIC
         );
 
@@ -72,6 +75,7 @@ namespace Syft {
         LTLfPlus ltlf_plus_formula_;
         Player starting_player_;
         Player protagonist_player_;
+    bool use_buchi_ = false;
     Syft::BuchiSolver::BuchiMode buechi_mode_ = Syft::BuchiSolver::BuchiMode::CLASSIC;
 
         // --- core phases ---
@@ -98,6 +102,15 @@ namespace Syft {
          */
         ELSynthesisResult solve_with_scc(const SymbolicStateDfa& arena,
                                          const std::map<int, CUDD::BDD>& color_to_final_states) const;
+
+    /**
+     * 
+     * Run the Büchi-based solver on the given arena. This is provided
+     * separately from the SCC-based weak-game solver so callers can
+     * choose the algorithm at runtime.
+     */
+    ELSynthesisResult solve_with_buchi(const SymbolicStateDfa& arena,
+                       const std::map<int, CUDD::BDD>& color_to_final_states) const;
 
         // --- helpers exposed because they're implemented in the .cpp ---
         /**

@@ -8,6 +8,7 @@
 #include "lydia/logic/pnf.hpp"
 #include "lydia/parser/ltlfplus/driver.hpp"
 #include "lydia/utils/print.hpp"
+#include "game/WeakGameSolver.h"
 
 namespace Syft {
   LTLfPlusSynthesizer::LTLfPlusSynthesizer(LTLfPlus ltlf_plus_formula,

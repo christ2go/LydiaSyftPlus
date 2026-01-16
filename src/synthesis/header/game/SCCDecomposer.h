@@ -95,6 +95,18 @@ private:
     // Cached full path (transitive closure) relation over (s,s') for the whole arena
     mutable CUDD::BDD cached_path_relation_;
     mutable bool has_cached_path_relation_ = false;
+    
+    // Cached variable composition vectors for ComposeRelations
+    // These map old variable to new variable BDD
+    mutable std::vector<CUDD::BDD> primed_to_temp_vector_;
+    mutable std::vector<CUDD::BDD> unprimed_to_temp_vector_;
+    mutable bool permutations_initialized_ = false;
+
+    /**
+     * \brief Initializes the permutation arrays for ComposeRelations.
+     * Must be called before Initialize() to avoid recursion.
+     */
+    void InitializePermutations() const;
 
     /**
      * \brief Builds the one-step transition relation.
@@ -107,6 +119,21 @@ private:
     CUDD::BDD TransitiveClosure(const CUDD::BDD& relation, 
                                 std::size_t primed_automaton_id,
                                 std::size_t temp_automaton_id) const;
+
+    /**
+     * \brief Composes two relations R1(s,s') and R2(s,s').
+     * 
+     * Computes R1 ∘ R2 = ∃t.(R1(s,t) ∧ R2(t,s'))
+     * 
+     * \param R1 The first relation over (s, s') pairs.
+     * \param R2 The second relation over (s, s') pairs.
+     * \param primed_automaton_id The automaton ID for the primed state variables.
+     * \param temp_automaton_id The automaton ID for temporary variables used in composition.
+     * \return A BDD representing the composition R1 ∘ R2.
+     */
+    CUDD::BDD ComposeRelations(const CUDD::BDD& R1, const CUDD::BDD& R2,
+                               std::size_t primed_automaton_id,
+                               std::size_t temp_automaton_id) const;
 
     /**
      * \brief Initializes the cached transition relation and variable IDs.

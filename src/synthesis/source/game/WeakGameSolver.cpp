@@ -3,6 +3,7 @@
 #include <iostream>
 #include <set>
 #include <chrono>
+#include <spdlog/spdlog.h>
 
 namespace Syft {
 
@@ -17,7 +18,6 @@ WeakGameSolver::WeakGameSolver(const SymbolicStateDfa& arena, const CUDD::BDD& a
 static constexpr bool kVerboseSolver = false;
 
 void WeakGameSolver::PrintStateSet(const std::string& name, const CUDD::BDD& states) const {
-    if (!(debug_ && kVerboseSolver)) return;
     
     auto mgr = var_mgr_->cudd_mgr();
     auto automaton_id = arena_.automaton_id();
@@ -40,12 +40,12 @@ void WeakGameSolver::PrintStateSet(const std::string& name, const CUDD::BDD& sta
         }
     }
     
-    std::cout << "[DEBUG] " << name << " (" << state_list.size() << " states) = {";
+    std::string state_list_str = "";
     for (size_t i = 0; i < state_list.size(); ++i) {
-        if (i > 0) std::cout << ", ";
-        std::cout << state_list[i];
+        if (i > 0) state_list_str += ", ";
+        state_list_str += std::to_string(state_list[i]);
     }
-    std::cout << "}" << std::endl;
+    spdlog::debug("[WeakGameSolver] {} ({} states) = {{{}}}", name, state_list.size(), state_list_str);
 }
 
 void WeakGameSolver::Initialize() const {
@@ -80,7 +80,7 @@ CUDD::BDD WeakGameSolver::CPreSystem(const CUDD::BDD& target, const CUDD::BDD& s
     CUDD::BDD forall_input = exists_output.UnivAbstract(var_mgr_->input_cube());
 
     if (debug_ && kVerboseSolver) {
-        std::cout << "[DEBUG CPreSystem] target count: " << target.CountMinterm(var_mgr_->state_variable_count(automaton_id)) << std::endl;
+        spdlog::debug("[WeakGameSolver] CPreSystem target count: {}", target.CountMinterm(var_mgr_->state_variable_count(automaton_id)));
     }
 
     return state_space & forall_input;
@@ -144,21 +144,21 @@ void WeakGameSolver::DumpDFA() const {
     auto state_vars = var_mgr_->get_state_variables(automaton_id);
     auto transition_func = arena_.transition_function();
     
-    std::cout << "[WeakGameSolver] ===== DFA DUMP =====" << std::endl;
-    std::cout << "[WeakGameSolver] State bits: " << num_state_bits << std::endl;
-    std::cout << "[WeakGameSolver] Input vars: " << var_mgr_->input_variable_count() << std::endl;
-    std::cout << "[WeakGameSolver] Output vars: " << var_mgr_->output_variable_count() << std::endl;
+    spdlog::debug("[WeakGameSolver] ===== DFA DUMP =====");
+    spdlog::debug("[WeakGameSolver] State bits: {}", num_state_bits);
+    spdlog::debug("[WeakGameSolver] Input vars: {}", var_mgr_->input_variable_count());
+    spdlog::debug("[WeakGameSolver] Output vars: {}", var_mgr_->output_variable_count());
     
     // Dump initial state
     CUDD::BDD initial = arena_.initial_state_bdd();
-    std::cout << "[WeakGameSolver] Initial state BDD node count: " << initial.nodeCount() << std::endl;
+    spdlog::debug("[WeakGameSolver] Initial state BDD node count: {}", initial.nodeCount());
     
     // Enumerate all states and transitions
     size_t num_states = 1 << num_state_bits;
-    std::cout << "[WeakGameSolver] Total possible states: " << num_states << std::endl;
+    spdlog::debug("[WeakGameSolver] Total possible states: {}", num_states);
     
     // Dump accepting states
-    std::cout << "[WeakGameSolver] Accepting states: {";
+    std::string accepting_states_str = "";
     bool first = true;
     for (size_t s = 0; s < num_states && s < 32; ++s) {
         // Build state BDD
@@ -171,12 +171,12 @@ void WeakGameSolver::DumpDFA() const {
             }
         }
         if (!(state_bdd & accepting_states_).IsZero()) {
-            if (!first) std::cout << ", ";
-            std::cout << s;
+            if (!first) accepting_states_str += ", ";
+            accepting_states_str += std::to_string(s);
             first = false;
         }
     }
-    std::cout << "}" << std::endl;
+    spdlog::debug("[WeakGameSolver] Accepting states: {{{}}}", accepting_states_str);
     
     // Get input/output variable counts
     size_t num_inputs = var_mgr_->input_variable_count();
@@ -185,12 +185,12 @@ void WeakGameSolver::DumpDFA() const {
     CUDD::BDD output_cube = var_mgr_->output_cube();
     size_t num_io = num_inputs + num_outputs;
     
-    std::cout << "[WeakGameSolver] Input variable count: " << num_inputs << std::endl;
-    std::cout << "[WeakGameSolver] Output variable count: " << num_outputs << std::endl;
+    spdlog::debug("[WeakGameSolver] Input variable count: {}", num_inputs);
+    spdlog::debug("[WeakGameSolver] Output variable count: {}", num_outputs);
     
     // Dump transitions (limit to small automata)
     if (num_states <= 16) {
-        std::cout << "[WeakGameSolver] Transitions (state -> possible next states):" << std::endl;
+        spdlog::debug("[WeakGameSolver] Transitions (state -> possible next states):");
         CUDD::BDD io_cube = input_cube * output_cube;
         
         for (size_t s = 0; s < num_states; ++s) {
@@ -222,20 +222,20 @@ void WeakGameSolver::DumpDFA() const {
                 }
             }
             
-            std::cout << "  " << s << " -> {";
-            first = true;
+            std::string next_states_str = "";
+            bool trans_first = true;
             for (size_t ns : next_states) {
-                if (!first) std::cout << ", ";
-                std::cout << ns;
-                first = false;
+                if (!trans_first) next_states_str += ", ";
+                next_states_str += std::to_string(ns);
+                trans_first = false;
             }
-            std::cout << "}" << std::endl;
+            spdlog::debug("[WeakGameSolver]   {} -> {{{}}}", s, next_states_str);
         }
     } else {
-        std::cout << "[WeakGameSolver] (Automaton too large to dump all transitions)" << std::endl;
+        spdlog::debug("[WeakGameSolver] (Automaton too large to dump all transitions)");
     }
     
-    std::cout << "[WeakGameSolver] ===== END DFA DUMP =====" << std::endl;
+    spdlog::debug("[WeakGameSolver] ===== END DFA DUMP =====");
     
     // Dump machine-readable format for Python reconstruction
     //DumpDFAForPython();
@@ -399,18 +399,18 @@ WeakGameResult WeakGameSolver::Solve() const {
     auto automaton_id = arena_.automaton_id();
     
     if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Starting Solve()" << std::endl;
+        spdlog::debug("[WeakGameSolver] Starting Solve()");
     }
     
     // Dump DFA info
     //DumpDFA();
     
     if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Accepting states count: " << accepting_states_.CountMinterm(var_mgr_->state_variable_count(automaton_id)) << std::endl;
+        spdlog::debug("[WeakGameSolver] Accepting states count: {}", accepting_states_.CountMinterm(var_mgr_->state_variable_count(automaton_id)));
     }
     
     // Compute reachable states from initial state
-    std::cout << "[WeakGameSolver] Starting reachability computation..." << std::endl;
+    spdlog::debug("[WeakGameSolver] Starting reachability computation...");
     auto reachability_start = std::chrono::steady_clock::now();
     
     CUDD::BDD initial_state = arena_.initial_state_bdd();
@@ -418,7 +418,7 @@ WeakGameResult WeakGameSolver::Solve() const {
     
     // Compute reachable states via fixpoint using vector-compose (no explicit transition relation)
     // Reach = mu X. initial ∪ Post(X), where Post(X) is the image of X under the transition function
-    std::cout << "[WeakGameSolver] Computing reachability closure (fixpoint) using VectorCompose..." << std::endl;
+    spdlog::debug("[WeakGameSolver] Computing reachability closure (fixpoint) using VectorCompose...");
     auto closure_start = std::chrono::steady_clock::now();
 
     auto transition_func = arena_.transition_function();
@@ -437,67 +437,60 @@ WeakGameResult WeakGameSolver::Solve() const {
 
     auto unprimed_vars = var_mgr_->get_state_variables(automaton_id);
     std::size_t total_vars = var_mgr_->total_variable_count();
-
+    /*≈
     // Compose vector to map primed -> unprimed (for renaming post(s') into unprimed space)
     std::vector<CUDD::BDD> primed_to_unprimed_compose(total_vars);
     for (std::size_t i = 0; i < total_vars; ++i) primed_to_unprimed_compose[i] = mgr->bddVar(static_cast<int>(i));
     for (std::size_t i = 0; i < unprimed_vars.size(); ++i) {
+        // Log coarse-grained progress (avoid printing individual variable indices).
+        spdlog::debug("[WeakGameSolver] Mapping primed vars progress: {} / {} bits", (i + 1), unprimed_vars.size());
         primed_to_unprimed_compose[primed_vars[i].NodeReadIndex()] = unprimed_vars[i];
     }
 
     CUDD::BDD reachable = initial_state;
-    int closure_iterations = 0;
-
-    // Full IO cube (we quant at the end of each bit to keep intermediates smaller).
-    CUDD::BDD io_cube_full = var_mgr_->input_cube() * var_mgr_->output_cube();
+    spdlog::debug("[WeakGameSolver] Building explicit transition relation for forward reachability...");
+    
+    // Build explicit transition relation: trans(s₁,...,sₙ, s₁',...,sₙ') 
+    // This means: ⋀ᵢ (sᵢ' ↔ transition_func[i](s,i,o))
+    CUDD::BDD transition_relation = mgr->bddOne();
+    for (std::size_t i = 0; i < transition_func.size(); ++i) {
+        CUDD::BDD eta = transition_func[i]; // f_i(s,i,o) - next state bit i
+        CUDD::BDD zprime = primed_vars[i];  // s'_i - primed state variable i
+        
+        // Build equivalence: s'_i ↔ f_i(s,i,o)
+        CUDD::BDD equivalence = zprime.Xnor(eta);
+        transition_relation &= equivalence;
+    }
+    spdlog::debug("[WeakGameSolver] Transition relation built, starting fixpoint...");
+    
     CUDD::BDD unprimed_state_cube = var_mgr_->state_variables_cube(automaton_id);
+    int closure_iterations = 0;
 
     while (true) {
         closure_iterations++;
-
-        // Start relation = reachable (over unprimed vars)
-        CUDD::BDD relation = reachable;
-
-        // Conjoin bit-equivalences one by one
-        for (std::size_t i = 0; i < transition_func.size(); ++i) {
-            CUDD::BDD eta = transition_func[i]; // f_i(s,a)
-            CUDD::BDD zprime = primed_vars[i];
-
-            // eq_i(s,s',a) := (z'_i & eta) | (!z'_i & !eta)  <==>  z'_i XNOR eta
-            CUDD::BDD eq = zprime.Xnor(eta);
-
-            relation &= eq;
-
-            // Early quantification of I/O to keep BDDs smaller. This is safe only if
-            // quantifying the whole I/O cube at once preserves necessary correlations;
-            // for full correctness one could delay I/O quantification to the end.
-            relation = relation.ExistAbstract(io_cube_full);
-        }
-
-        // Now eliminate source (unprimed) state vars to obtain primed next states
-        CUDD::BDD post_primed = relation.ExistAbstract(unprimed_state_cube);
-
-        // Rename primed -> unprimed
+        spdlog::debug("[WeakGameSolver] Forward reachability iteration {}", closure_iterations);
+        
+        // Forward Post(X) = ∃s₁,...,sₙ. ∃I,O. (X(s₁,...,sₙ) ∧ trans(s₁,...,sₙ, s₁',...,sₙ'))
+        CUDD::BDD post_primed = (reachable & transition_relation).ExistAbstract(unprimed_state_cube).ExistAbstract(io_cube);
+        
+        // Rename s₁',...,sₙ' back to s₁,...,sₙ  
         CUDD::BDD post = post_primed.VectorCompose(primed_to_unprimed_compose);
-
-        // Only keep newly discovered states
-        post &= !reachable;
-
+        
         CUDD::BDD new_reachable = reachable | post;
         if (new_reachable == reachable) break;
         reachable = new_reachable;
     }
-
+    
     auto closure_end = std::chrono::steady_clock::now();
     auto closure_duration = std::chrono::duration_cast<std::chrono::milliseconds>(closure_end - closure_start);
-    std::cout << "[WeakGameSolver] Reachability closure (vector-compose) completed in " << closure_duration.count() << " ms (" << closure_iterations << " iterations)" << std::endl;
-    //std::cout << "[WeakGameSolver] Reachable states count: " << reachable.CountMinterm(var_mgr_->state_variable_count(automaton_id)) << std::endl;
+    spdlog::debug("[WeakGameSolver] Reachability closure (explicit transition relation) completed in {} ms ({} iterations)", closure_duration.count(), closure_iterations);
+    spdlog::debug("[WeakGameSolver] Reachable states count: {}", reachable.CountMinterm(var_mgr_->state_variable_count(automaton_id)));
     auto reachability_end = std::chrono::steady_clock::now();
     auto reachability_duration = std::chrono::duration_cast<std::chrono::milliseconds>(reachability_end - reachability_start);
-    std::cout << "[WeakGameSolver] Total reachability computation: " << reachability_duration.count() << " ms" << std::endl;
+    spdlog::debug("[WeakGameSolver] Total reachability computation: {} ms", reachability_duration.count());
     
     //PrintStateSet("Reachable states from initial", reachable);
-    
+    */
     // Compute all layers and layers_below (like reference implementation)
     std::cout << "[WeakGameSolver] Starting SCC decomposition..." << std::endl;
     auto scc_start = std::chrono::steady_clock::now();
@@ -506,7 +499,7 @@ WeakGameResult WeakGameSolver::Solve() const {
     std::vector<CUDD::BDD> layers_below;
     
     // Start with reachable states only
-    CUDD::BDD remaining = reachable;
+    CUDD::BDD remaining = mgr->bddOne(); //reachable;
     
     int layer_idx = 0;
     while (!remaining.IsZero()) {

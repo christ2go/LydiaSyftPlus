@@ -3,6 +3,7 @@
 #include "automata/ExplicitStateDfa.h"
 #include "automata/ExplicitStateDfaAdd.h"
 #include "game/BuchiSolver.hpp"   // standalone Buchi solver (uses arena.final_states())
+#include "game/WeakGameSolver.h"
 #include "lydia/logic/ltlfplus/base.hpp"
 #include "lydia/logic/pnf.hpp"
 #include "lydia/utils/print.hpp"
@@ -22,10 +23,12 @@ namespace Syft {
         InputOutputPartition partition,
         Player starting_player,
         Player protagonist_player,
+        bool use_buchi,
         Syft::BuchiSolver::BuchiMode buechi_mode)
         : ltlf_plus_formula_(ltlf_plus_formula),
           starting_player_(starting_player),
-          protagonist_player_(protagonist_player) {
+          protagonist_player_(protagonist_player),
+          use_buchi_(use_buchi) {
         buechi_mode_ = buechi_mode;
         std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
         var_mgr->create_named_variables(partition.input_variables);
@@ -226,6 +229,41 @@ namespace Syft {
     ELSynthesisResult ObligationLTLfPlusSynthesizer::solve_with_scc(
         const SymbolicStateDfa& arena,
         const std::map<int, CUDD::BDD>& color_to_final_states) const {
+                    std::cout << "Solving with WeakGameSolver" << std::endl;
+        
+        // Use the arena's final states which already encode the correct AND/OR structure
+        CUDD::BDD accepting_states = arena.final_states();
+        
+        std::cout << "Starting WeakGameSolver" << std::endl;
+        
+        // Create and run the weak game solver (debug=true for detailed output)
+        WeakGameSolver solver(arena, accepting_states, true);
+        WeakGameResult game_result = solver.Solve();
+        
+        std::cout << "WeakGameSolver completed" << std::endl;
+        
+        // Check if initial state is winning
+        CUDD::BDD initial_state = arena.initial_state_bdd();
+        bool is_realizable = !(initial_state & !game_result.winning_states).IsZero() == false;
+        // Simplified: check if initial state is in winning states
+        is_realizable = !(initial_state & game_result.winning_states).IsZero();
+        
+        std::cout << "Realizability: " << (is_realizable ? "true" : "false") << std::endl;
+        
+        // Build result
+        ELSynthesisResult result;
+        result.realizability = is_realizable;
+        result.winning_states = game_result.winning_states;
+        result.output_function = {};  // TODO: Extract strategy from winning_moves
+        result.z_tree = nullptr;
+        
+        return result;
+
+        }        
+
+    ELSynthesisResult ObligationLTLfPlusSynthesizer::solve_with_buchi(
+        const SymbolicStateDfa& arena,
+        const std::map<int, CUDD::BDD>& color_to_final_states) const {
         
         std::cout << "Solving with BuchiStandalone solver" << std::endl;
         
@@ -273,7 +311,11 @@ namespace Syft {
         auto [arena, color_to_final_states] = convert_to_symbolic_dfa();
         
         // Step 3: Solve using Büchi solver (replaces SCC/WeakGame path)
-        return solve_with_scc(arena, color_to_final_states);
+        if (use_buchi_) {
+            return solve_with_buchi(arena, color_to_final_states);
+        } else {
+            return solve_with_scc(arena, color_to_final_states);
+        }
     }
 
 } // namespace Syft

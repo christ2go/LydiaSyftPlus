@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include <queue>
 extern "C" {
 #include "cudd.h"
 }
@@ -294,25 +295,133 @@ namespace {
 CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automaton_id) const {
     auto var_mgr = arena_.var_mgr();
     auto mgr = var_mgr->cudd_mgr();
-    
-    // Get transition functions f_i for each state variable
+
+    // transition functions f_i and primed variables s_i'
     auto transition_func = arena_.transition_function();
-    
-    // Get primed state variables s_i'
     auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
-    
-    // Build transition relation: AND_i(s_i' <-> f_i(s, x, y))
-    CUDD::BDD trans_relation = mgr->bddOne();
-    for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        CUDD::BDD equiv = primed_vars[i].Xnor(transition_func[i]);
-        trans_relation &= equiv;
-    }
-    
-    // Existentially quantify over input and output variables to get state-to-state relation
+
+    // IO cube we want to abstract during merges
     CUDD::BDD io_cube = var_mgr->input_cube() * var_mgr->output_cube();
-    trans_relation = trans_relation.ExistAbstract(io_cube);
-    
+
+    // fast-return for empty transition
+    if (transition_func.empty()) {
+        return mgr->bddOne();
+    }
+
+    const bool log_enabled = spdlog::default_logger()->should_log(spdlog::level::debug);
+
+    // Build per-bit equivalences (s_i' <-> f_i)
+    std::vector<CUDD::BDD> initial;
+    initial.reserve(transition_func.size());
+    for (std::size_t i = 0; i < transition_func.size(); ++i) {
+        if (log_enabled) spdlog::debug("[NaiveSCCDecomposer] Building per-bit equivalence: {} / {} bits",
+                                       (i + 1), transition_func.size());
+        initial.emplace_back(primed_vars[i].Xnor(transition_func[i]));
+        if (log_enabled) spdlog::debug("[NaiveSCCDecomposer]   BDD node count: {}", initial.back().nodeCount());
+    }
+
+    // If there's only one bit, just abstract IO from it and return
+    if (initial.size() == 1) {
+        CUDD::BDD single = initial.front().ExistAbstract(io_cube);
+        if (log_enabled) spdlog::debug("[NaiveSCCDecomposer] Single-bit relation node count after abstract: {}",
+                                       single.nodeCount());
+        return single;
+    }
+
+    // Min-heap (smallest nodeCount first) -> Huffman-like merging
+    struct Item { CUDD::BDD b; std::size_t sz; };
+    auto cmp = [](Item const& a, Item const& b) { return a.sz > b.sz; };
+    std::priority_queue<Item, std::vector<Item>, decltype(cmp)> pq(cmp);
+
+    for (auto &bb : initial) {
+        pq.push(Item{ std::move(bb), bb.nodeCount() });
+    }
+    initial.clear();
+
+    // limit for AndAbstract: tune this to abort overly large intermediate ops.
+    // UINT_MAX = no practical limit. Lower if you want fail-fast behavior.
+    const unsigned and_abstract_limit = std::numeric_limits<unsigned>::max();
+
+    std::size_t step = 0;
+    while (pq.size() >= 2) {
+        auto A = std::move(pq.top()); pq.pop();
+        auto B = std::move(pq.top()); pq.pop();
+
+        if (log_enabled) {
+            spdlog::debug("[NaiveSCCDecomposer] Merging step {}: sizes {} + {}", step++, A.sz, B.sz);
+        }
+
+        // Log a and b
+        if (log_enabled) {
+            spdlog::debug("[NaiveSCCDecomposer]   => A node count: {}", A.b.nodeCount());
+            spdlog::debug("[NaiveSCCDecomposer]   => B node count: {}", B.b.nodeCount());
+        }
+        // Use the provided member AndAbstract: (A.b & B.b) with IO variables abstracted in one go.
+        // Signature: BDD::AndAbstract(const BDD& g, const BDD& cube, unsigned int limit) const
+        // We call it on A.b: A.b.AndAbstract(B.b, io_cube, and_abstract_limit)
+        CUDD::BDD merged = A.b.AndAbstract(B.b, io_cube, 0);
+
+        if (log_enabled) {
+            spdlog::debug("[NaiveSCCDecomposer]   => merged node count: {}", merged.nodeCount());
+        }
+
+        pq.push(Item{ std::move(merged), merged.nodeCount() });
+
+        // Optional: if you see memory pressure, you can hint GC or reordering here (commented).
+        // mgr->garbageCollect(); // uncomment if you have a wrapper exposing this and it helps
+        // mgr->ReduceHeap(CUDD_REORDER_SIFT); // expensive: use sparingly
+    }
+
+    // The top now contains the fully-merged relation with IO already abstracted.
+    CUDD::BDD trans_relation = std::move(pq.top().b);
+    if (log_enabled) spdlog::debug("[NaiveSCCDecomposer] Built transition relation final node count: {}",
+                                   trans_relation.nodeCount());
+
     return trans_relation;
+}
+
+// Helper function: Compute relational composition R1 ∘ R2 = ∃t. (R1(s,t) ∧ R2(t,s'))
+CUDD::BDD NaiveSCCDecomposer::ComposeRelations(const CUDD::BDD& R1, const CUDD::BDD& R2,
+                                                 std::size_t primed_automaton_id,
+                                                 std::size_t temp_automaton_id) const {
+    auto var_mgr = arena_.var_mgr();
+    auto automaton_id = arena_.automaton_id();
+    auto mgr = var_mgr->cudd_mgr();
+    const bool log_enabled = spdlog::default_logger()->should_log(spdlog::level::debug);
+
+    auto unprimed_vars = var_mgr->get_state_variables(automaton_id);
+    auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
+    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id);
+    CUDD::BDD temp_cube = var_mgr->state_variables_cube(temp_automaton_id);
+
+    // Build canonical variable vectors using mgr->bddVar(index) to avoid complemented nodes
+    std::vector<CUDD::BDD> primed_swap;
+    std::vector<CUDD::BDD> temp_swap;
+    std::vector<CUDD::BDD> unprimed_swap;
+    primed_swap.reserve(primed_vars.size());
+    temp_swap.reserve(temp_vars.size());
+    unprimed_swap.reserve(unprimed_vars.size());
+
+    for (const auto& var : primed_vars) {
+        primed_swap.push_back(mgr->bddVar(var.NodeReadIndex()));
+    }
+    for (const auto& var : temp_vars) {
+        temp_swap.push_back(mgr->bddVar(var.NodeReadIndex()));
+    }
+    for (const auto& var : unprimed_vars) {
+        unprimed_swap.push_back(mgr->bddVar(var.NodeReadIndex()));
+    }
+
+    if (log_enabled) {
+        spdlog::debug("[ComposeRelations] swapping primed->temp and unprimed->temp variables");
+    }
+    CUDD::BDD R1_st = R1.SwapVariables(primed_swap, temp_swap);
+    CUDD::BDD R2_ts = R2.SwapVariables(unprimed_swap, temp_swap);
+
+    // Compute ∃t. (R1(s,t) ∧ R2(t,s')) via AndAbstract for efficiency
+    CUDD::BDD composition = (R1_st & R2_ts).ExistAbstract(temp_cube);
+    std::cout << "[ComposeRelations] Composition node count: " << composition.nodeCount() << std::endl;
+    return composition;
 }
 
 CUDD::BDD NaiveSCCDecomposer::TransitiveClosure(const CUDD::BDD& relation, 
@@ -322,52 +431,38 @@ CUDD::BDD NaiveSCCDecomposer::TransitiveClosure(const CUDD::BDD& relation,
     auto automaton_id = arena_.automaton_id();
     auto mgr = var_mgr->cudd_mgr();
     
-    auto unprimed_vars = var_mgr->get_state_variables(automaton_id);
-    auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
-    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id_);
-    CUDD::BDD temp_cube = var_mgr->state_variables_cube(temp_automaton_id);
+    // Use iterative composition with original relation to verify ComposeRelations is correct:
+    // R⁺ = R ∪ R² ∪ R³ ∪ ... where R^(i+1) = R^i ∘ R
     
-    // Helper lambdas for variable substitution
-    auto primedToTemp = [&](const CUDD::BDD& bdd) {
-        std::size_t total_vars = var_mgr->total_variable_count();
-        std::vector<CUDD::BDD> compose_vector(total_vars);
-        for (std::size_t i = 0; i < total_vars; ++i) {
-            compose_vector[i] = mgr->bddVar(static_cast<int>(i));
-        }
-        for (std::size_t i = 0; i < primed_vars.size(); ++i) {
-            compose_vector[primed_vars[i].NodeReadIndex()] = temp_vars[i];
-        }
-        return bdd.VectorCompose(compose_vector);
-    };
+    CUDD::BDD closure = relation;  // Accumulates R ∪ R² ∪ R³ ∪ ...
+    CUDD::BDD power = relation;    // Current power: R, R², R³, ...
     
-    auto unprimedToTemp = [&](const CUDD::BDD& bdd) {
-        std::size_t total_vars = var_mgr->total_variable_count();
-        std::vector<CUDD::BDD> compose_vector(total_vars);
-        for (std::size_t i = 0; i < total_vars; ++i) {
-            compose_vector[i] = mgr->bddVar(static_cast<int>(i));
-        }
-        for (std::size_t i = 0; i < unprimed_vars.size(); ++i) {
-            compose_vector[unprimed_vars[i].NodeReadIndex()] = temp_vars[i];
-        }
-        return bdd.VectorCompose(compose_vector);
-    };
-    
-    // Closure_0(s, s') = R(s, s')
-    CUDD::BDD closure = relation;
-    
+    int iteration = 0;
     while (true) {
-        // Transitive_i(s, t, s') = Closure_{i-1}(s, t) & Closure_{i-1}(t, s')
-        CUDD::BDD transitive = primedToTemp(closure) & unprimedToTemp(closure);
+        iteration++;
+        // Debug log clusre iteration
+            spdlog::debug("[TransitiveClosure] Iteration {}: ",
+                          iteration);
+        // Compute next power: R^(i+1) = R^i ∘ R (compose power with original relation)
+        CUDD::BDD next_power = ComposeRelations(power, relation, primed_automaton_id, temp_automaton_id);
         
-        // Closure_i(s, s') = Closure_{i-1}(s, s') | Exists t . Transitive_i(s, t, s')
-        CUDD::BDD new_closure = closure | transitive.ExistAbstract(temp_cube);
-        
+        // Check if we've reached fixpoint (no new paths added)
+        CUDD::BDD new_closure = closure | next_power;
         if (new_closure == closure) {
-            return closure;
+            break;
         }
         
+        // Update closure and power
         closure = new_closure;
+        power = next_power;
+        
+        // Safety check to prevent infinite loops
+        if (iteration > 3000) {
+            break;
+        }
     }
+    
+    return closure;
 }
 
 void NaiveSCCDecomposer::Initialize() const {
