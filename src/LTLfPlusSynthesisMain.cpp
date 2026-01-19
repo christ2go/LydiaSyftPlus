@@ -207,6 +207,7 @@ int main(int argc, char** argv) {
             std::cout << "Please specify a correct game solver. \nGame:\nManna-Pnueli-Adv=2;\nManna-Pnueli=1;\nEmerson-Lei=0" << std::endl;
             return 0;
         }
+            std::cout << "Using MP solvers" << std::endl;
 
         Syft::LTLfPlusSynthesizerMP synthesizerMP(
         ltlf_plus_formula,
@@ -215,6 +216,7 @@ int main(int argc, char** argv) {
         Syft::Player::Agent,
         game_solver
     );
+            std::cout << "Running MP solver" << std::endl;
 
         auto synthesis_result_MP = synthesizerMP.run();
         if (synthesis_result_MP.realizability) {

@@ -6,6 +6,7 @@ and compares results between normal solver and obligation simplification.
 
 import subprocess
 import random
+import sys
 import tempfile
 import os
 import argparse
@@ -317,6 +318,19 @@ def main():
         default=60,
         help='Timeout in seconds for each solver run (default: 60)'
     )
+    parser.add_argument(
+        '--check-mismatches',
+        dest='check_mismatches',
+        action='store_true',
+        help='Check existing mismatches before running random tests (default: enabled)'
+    )
+    parser.add_argument(
+        '--no-check-mismatches',
+        dest='check_mismatches',
+        action='store_false',
+        help='Skip the existing mismatch check'
+    )
+    parser.set_defaults(check_mismatches=True)
     
     args = parser.parse_args()
     
@@ -324,6 +338,92 @@ def main():
         random.seed(args.seed)
     
     atoms = ATOMS[:args.num_atoms]
+    mismatch_dir = Path(args.binary).parent.parent.parent / 'examples' / 'mismatches'
+    mismatch_dir.mkdir(parents=True, exist_ok=True)
+
+    def parse_partition_file(path):
+        inputs = []
+        outputs = []
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('.inputs:'):
+                    inputs = line.split(':', 1)[1].split()
+                elif line.startswith('.outputs:'):
+                    outputs = line.split(':', 1)[1].split()
+        return inputs, outputs
+
+    def mismatch_index_from_path(path):
+        stem = path.stem
+        prefix = 'mismatch'
+        if stem.startswith(prefix):
+            suffix = stem[len(prefix):]
+            try:
+                return int(suffix)
+            except ValueError:
+                return None
+        return None
+
+    def check_existing_mismatches():
+        mismatch_files = sorted(
+            mismatch_dir.glob('mismatch*.ltlfplus'),
+            key=lambda p: (mismatch_index_from_path(p) is None, mismatch_index_from_path(p) or 0, p.name)
+        )
+        if not mismatch_files:
+            return True
+
+        print('Checking existing mismatches...')
+        still_disagree = []
+        resolved = []
+
+        for formula_path in mismatch_files:
+            idx = mismatch_index_from_path(formula_path)
+            part_path = formula_path.with_suffix('.part')
+            label = f" mismatch {idx}" if idx is not None else f" {formula_path.stem}"
+
+            if not part_path.exists():
+                print(f"  Missing partition for{label}; aborting")
+                return False
+
+            formula = formula_path.read_text().strip()
+            inputs, outputs = parse_partition_file(part_path)
+
+            result = test_single_formula(
+                args.binary,
+                formula,
+                inputs,
+                outputs,
+                args.verbose,
+                timeout=args.timeout
+            )
+
+            if result['error']:
+                print(f"  Existing mismatch{label} triggers an error")
+                return False
+            if result.get('timeout'):
+                timeouts = ', '.join(result.get('timeout_solvers', [])) or 'unknown solver'
+                print(f"  Existing mismatch{label} timed out ({timeouts})")
+                return False
+            if result['agree']:
+                resolved.append(label.strip())
+            else:
+                still_disagree.append(label.strip())
+
+        if still_disagree:
+            print('Existing mismatches still disagree: ' + ', '.join(still_disagree))
+            print('Resolve existing mismatches before generating new ones.')
+            return False
+
+        if resolved:
+            print(f"All existing mismatches resolved ({len(resolved)} cases).")
+        else:
+            print('No existing mismatches found.')
+        return True
+
+    if args.check_mismatches:
+        if not check_existing_mismatches():
+            print('Mismatch check failed; aborting new test run.')
+            return 1
     
     if not args.shallow:
         print(f"Testing obligation simplification")
@@ -431,16 +531,21 @@ def main():
             f.write("\n")
     
     # Dump to examples/mismatches folder
-    mismatch_dir = Path(args.binary).parent.parent.parent / 'examples' / 'mismatches'
-    mismatch_dir.mkdir(parents=True, exist_ok=True)
-    
     # Path to visualize_dfa.py script
     script_dir = Path(__file__).parent
     visualize_script = script_dir / 'visualize_dfa.py'
     
-    for i, r in enumerate(disagreements):
-        formula_file = mismatch_dir / f"mismatch{i}.ltlfplus"
-        part_file = mismatch_dir / f"mismatch{i}.part"
+    existing_indices = []
+    for existing_file in mismatch_dir.glob('mismatch*.ltlfplus'):
+        idx = mismatch_index_from_path(existing_file)
+        if idx is not None:
+            existing_indices.append(idx)
+    next_mismatch_index = max(existing_indices) + 1 if existing_indices else 0
+
+    for offset, r in enumerate(disagreements):
+        mismatch_idx = next_mismatch_index + offset
+        formula_file = mismatch_dir / f"mismatch{mismatch_idx}.ltlfplus"
+        part_file = mismatch_dir / f"mismatch{mismatch_idx}.part"
         with open(formula_file, 'w') as f:
             f.write(r['formula'] + "\n")
         with open(part_file, 'w') as f:
@@ -450,8 +555,8 @@ def main():
         # Extract DFA dump from obligation solver output and generate PNG
         oblig_output = r.get('output_oblig', '')
         if '===PYDFA_BEGIN===' in oblig_output and '===PYDFA_END===' in oblig_output:
-            dfa_dump_file = mismatch_dir / f"mismatch{i}_dfa.txt"
-            png_file = mismatch_dir / f"mismatch{i}_dfa.png"
+            dfa_dump_file = mismatch_dir / f"mismatch{mismatch_idx}_dfa.txt"
+            png_file = mismatch_dir / f"mismatch{mismatch_idx}_dfa.png"
             with open(dfa_dump_file, 'w') as f:
                 f.write(oblig_output)
             try:
@@ -464,9 +569,17 @@ def main():
                 # Check for weakness warning
                 if 'WARNING: DFA IS NOT WEAK' in result.stderr:
                     r['not_weak'] = True
-                    print(f"  WARNING: mismatch{i} has non-weak DFA!")
+                    print(f"  WARNING: mismatch{mismatch_idx} has non-weak DFA!")
             except Exception as e:
                 pass  # Ignore visualization errors
+        else:
+            print("Cannot produce DFA visualization: DFA dump not found in output.")
+            print(oblig_output)
+            
+            sys.exit(-1)
+
+    if disagreements:
+        print(f"New mismatches start at index {next_mismatch_index}.")
     
     # Count non-weak DFAs
     num_not_weak = sum(1 for r in disagreements if r.get('not_weak', False))
@@ -481,7 +594,7 @@ def main():
                 print(f"  {r['formula']}")
                 print(f"    .inputs: {' '.join(r['inputs'])}")
                 print(f"    .outputs: {' '.join(r['outputs'])}")
-                print(f"    normal={r['realizable_normal']}, oblig={r['realizable_oblig']}")
+                print(f"     oblig={r['realizable_oblig']}")
                 if r.get('not_weak'):
                     print(f"    WARNING: DFA IS NOT WEAK!")
         if args.num_tests > 0:
@@ -511,7 +624,7 @@ def main():
                 if not r['error'] and not r['agree']:
                     print(f"  Formula: {r['formula']}")
                     print(f"  Inputs: {r['inputs']}, Outputs: {r['outputs']}")
-                    print(f"  Normal: {r['realizable_normal']}, Oblig: {r['realizable_oblig']}")
+                    #print(f"  Normal: {r['realizable_normal']}, Oblig: {r['realizable_oblig']}")
                     print(f"  Normal output: {r.get('output_normal', 'N/A')}")
                     print(f"  Oblig output: {r.get('output_oblig', 'N/A')}")
                     print()

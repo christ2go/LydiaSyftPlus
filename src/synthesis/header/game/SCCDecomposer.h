@@ -95,18 +95,6 @@ private:
     // Cached full path (transitive closure) relation over (s,s') for the whole arena
     mutable CUDD::BDD cached_path_relation_;
     mutable bool has_cached_path_relation_ = false;
-    
-    // Cached variable composition vectors for ComposeRelations
-    // These map old variable to new variable BDD
-    mutable std::vector<CUDD::BDD> primed_to_temp_vector_;
-    mutable std::vector<CUDD::BDD> unprimed_to_temp_vector_;
-    mutable bool permutations_initialized_ = false;
-
-    /**
-     * \brief Initializes the permutation arrays for ComposeRelations.
-     * Must be called before Initialize() to avoid recursion.
-     */
-    void InitializePermutations() const;
 
     /**
      * \brief Builds the one-step transition relation.

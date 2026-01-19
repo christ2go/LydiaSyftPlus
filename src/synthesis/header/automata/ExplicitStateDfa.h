@@ -140,6 +140,9 @@ namespace Syft {
           * \brief
           */
         static ExplicitStateDfa dfa_to_Fdfa(ExplicitStateDfa &d);
+  // Obligation-fragment specific conversions that preserve original DFA untouched elsewhere.
+  static ExplicitStateDfa dfa_to_Gdfa_obligation(const ExplicitStateDfa &d);
+  static ExplicitStateDfa dfa_to_Fdfa_obligation(const ExplicitStateDfa &d);
 
         static ExplicitStateDfa dfa_remove_initial_self_loops(ExplicitStateDfa &d);
 

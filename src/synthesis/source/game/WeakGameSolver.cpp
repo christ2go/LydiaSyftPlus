@@ -13,6 +13,11 @@ WeakGameSolver::WeakGameSolver(const SymbolicStateDfa& arena, const CUDD::BDD& a
     , accepting_states_(accepting_states)
     , decomposer_(std::make_unique<NaiveSCCDecomposer>(arena))
     , debug_(debug) {
+
+    // Log the number of bits used for automaton
+    auto automaton_id = arena_.automaton_id();
+    size_t num_state_bits = var_mgr_->state_variable_count(automaton_id);
+    spdlog::info("[WeakGameSolver] Initialized for automaton ID {} with {} state bits.", automaton_id, num_state_bits);
 }
 
 static constexpr bool kVerboseSolver = false;
@@ -144,7 +149,7 @@ void WeakGameSolver::DumpDFA() const {
     auto state_vars = var_mgr_->get_state_variables(automaton_id);
     auto transition_func = arena_.transition_function();
     
-    spdlog::debug("[WeakGameSolver] ===== DFA DUMP =====");
+    spdlog::debug("===== DFA DUMP =====");
     spdlog::debug("[WeakGameSolver] State bits: {}", num_state_bits);
     spdlog::debug("[WeakGameSolver] Input vars: {}", var_mgr_->input_variable_count());
     spdlog::debug("[WeakGameSolver] Output vars: {}", var_mgr_->output_variable_count());
@@ -238,7 +243,7 @@ void WeakGameSolver::DumpDFA() const {
     spdlog::debug("[WeakGameSolver] ===== END DFA DUMP =====");
     
     // Dump machine-readable format for Python reconstruction
-    //DumpDFAForPython();
+    DumpDFAForPython();
 }
 
 void WeakGameSolver::DumpDFAForPython() const {
@@ -497,9 +502,7 @@ WeakGameResult WeakGameSolver::Solve() const {
     
     std::vector<CUDD::BDD> layers;
     std::vector<CUDD::BDD> layers_below;
-    
-    // Start with reachable states only
-    CUDD::BDD remaining = mgr->bddOne(); //reachable;
+    CUDD::BDD remaining = mgr->bddOne(); // Start with all states
     
     int layer_idx = 0;
     while (!remaining.IsZero()) {
@@ -517,6 +520,7 @@ WeakGameResult WeakGameSolver::Solve() const {
             if (!remaining.IsZero()) {
                 CUDD::BDD io_cube = var_mgr_->input_cube() * var_mgr_->output_cube();
                 CUDD::BDD remaining_states = remaining.ExistAbstract(io_cube);
+                spdlog::error("[WeakGameSolver] Orphan states (not in any SCC, will be handled via reachability), count: {}", remaining_states.CountMinterm(var_mgr_->state_variable_count(automaton_id)));
                 //PrintStateSet("Orphan states (not in any SCC, will be handled via reachability)", remaining_states);
             }
             layers_below.pop_back();
@@ -528,9 +532,6 @@ WeakGameResult WeakGameSolver::Solve() const {
         CUDD::BDD layer_states = layer.ExistAbstract(io_cube);
         
         double layer_count = layer_states.CountMinterm(var_mgr_->state_variable_count(automaton_id));
-        if (debug_ && kVerboseSolver) {
-            std::cout << "[WeakGameSolver] Peeled layer " << layer_idx << " with " << layer_count << " states" << std::endl;
-        }
         //PrintStateSet("Peeled layer " + std::to_string(layer_idx), layer_states);
         
         layers.push_back(layer_states);
@@ -553,92 +554,45 @@ WeakGameResult WeakGameSolver::Solve() const {
     if (debug_ && kVerboseSolver) {
         std::cout << "[WeakGameSolver] Reversed layers (now processing bottom-up)" << std::endl;
     }
-    
-    // Initialize good_states and bad_states (matching reference implementation)
+
     CUDD::BDD good_states = mgr->bddZero();
-    CUDD::BDD bad_states = mgr->bddZero();
-    
-    for (size_t i = 0; i < layers.size(); ++i) {
-        const CUDD::BDD& layer = layers[i];
-        const CUDD::BDD& state_space = layers_below[i];
+	CUDD::BDD bad_states = mgr->bddZero();
+    CUDD::BDD accepting_states = accepting_states_;
+    // Process each layer to compute winning states and moves
+    for(int i = 0; i < layers.size(); i++) {
 
-        double layer_count = layer.CountMinterm(var_mgr_->state_variable_count(automaton_id));
-        double space_count = state_space.CountMinterm(var_mgr_->state_variable_count(automaton_id));
-        if (debug_ && kVerboseSolver) {
-            std::cout << "[WeakGameSolver] Processing layer " << i << " (" << layer_count << " states, state_space=" << space_count << ")" << std::endl;
-        }
-        //PrintStateSet("layer", layer);
-        //PrintStateSet("state_space (layers_below)", state_space);
-        //PrintStateSet("good_states (before)", good_states);
-        //PrintStateSet("bad_states (before)", bad_states);
-
-        // Per-layer fixed point: accepting uses safety, rejecting uses reachability,
-        // both re-evaluated against freshly discovered bad states in this layer.
-        std::cout << "[WeakGameSolver] Starting fixed-point iteration for layer " << i << "..." << std::endl;
-        auto fixedpoint_start = std::chrono::steady_clock::now();
+        CUDD::BDD layer = layers[i];
+        // Print layer info
+        //PrintStateSet("Processing layer", layer);
+        CUDD::BDD layer_below = layers_below[i];
         
-        CUDD::BDD layer_good = mgr->bddZero();
-        CUDD::BDD layer_bad = mgr->bddZero();
-        
-        int fixedpoint_iterations = 0;
+        CUDD::BDD reach_good_states = SolveReachability(good_states, layer_below);
+        CUDD::BDD avoid_bad_states = SolveSafety(!bad_states, layer_below);
 
-        while (true) {
-            fixedpoint_iterations++;
-            CUDD::BDD local_bad = bad_states | layer_bad;
-            CUDD::BDD local_good = good_states | layer_good;
+        good_states |= layer & ((!accepting_states & reach_good_states) |
+		                             (accepting_states & avoid_bad_states));
+		bad_states |= layer & !good_states;
 
-            CUDD::BDD avoid_bad_states = SolveSafety(!local_bad, state_space);
-            CUDD::BDD accepting_winners = accepting_states_ & avoid_bad_states;
+        // Print good and bad states in this layer
+        //PrintStateSet("Good states in current layer", good_states & layer);
+        //PrintStateSet("Bad states in current layer", bad_states & layer);
 
-            CUDD::BDD reach_target = local_good | accepting_winners;
-            CUDD::BDD reach_good_states = SolveReachability(reach_target, state_space & !local_bad);
+                
 
-            CUDD::BDD new_layer_good = layer & (((!accepting_states_) & reach_good_states) |
-                                                (accepting_states_ & avoid_bad_states));
-            CUDD::BDD new_layer_bad = layer & !new_layer_good;
-
-            if (new_layer_good == layer_good && new_layer_bad == layer_bad) {
-                layer_good = new_layer_good;
-                layer_bad = new_layer_bad;
-                break;
-            }
-
-            layer_good = new_layer_good;
-            layer_bad = new_layer_bad;
-        }
-        
-        auto fixedpoint_end = std::chrono::steady_clock::now();
-        auto fixedpoint_duration = std::chrono::duration_cast<std::chrono::milliseconds>(fixedpoint_end - fixedpoint_start);
-        std::cout << "[WeakGameSolver] Fixed-point iteration for layer " << i << " completed in " << fixedpoint_duration.count() << " ms (" << fixedpoint_iterations << " iterations)" << std::endl;
-
-        //PrintStateSet("layer_good", layer_good);
-        //PrintStateSet("layer_bad (before update)", layer_bad);
-
-        good_states |= layer_good;
-        bad_states |= layer_bad;
-
-        double total_good = good_states.CountMinterm(var_mgr_->state_variable_count(automaton_id));
-        double total_bad = bad_states.CountMinterm(var_mgr_->state_variable_count(automaton_id));
-        if (debug_ && kVerboseSolver) {
-            std::cout << "[WeakGameSolver]   After layer " << i << ": good_states=" << total_good << ", bad_states=" << total_bad << std::endl;
-        }
-        //PrintStateSet("good_states (after)", good_states);
-        //PrintStateSet("bad_states (after)", bad_states);
     }
-    
-    double final_good = good_states.CountMinterm(var_mgr_->state_variable_count(automaton_id));
+
     if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Final winning states: " << final_good << std::endl;
+        double final_good = good_states.CountMinterm(var_mgr_->state_variable_count(automaton_id));
+        std::cout << "[WeakGameSolver] Final winning states: " << good_states << std::endl;
     }
-    //PrintStateSet("Final good_states", good_states);
-    
-    // Check initial state
+
     CUDD::BDD initial = arena_.initial_state_bdd();
-    bool initial_winning = !(initial & !good_states).IsZero() == false;  // initial ⊆ good_states
+    bool initial_winning = !(initial & !good_states).IsZero() == false;
     if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Initial state is " << (initial_winning ? "WINNING" : "LOSING") << std::endl;
+        std::cout << "[WeakGameSolver] Initial state is " << (initial_winning ? "WINNING" : "LOSING")
+                  << std::endl;
     }
-    
+
     return WeakGameResult{good_states, good_states};
 }
 

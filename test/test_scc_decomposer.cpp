@@ -10,6 +10,7 @@
 #include <sstream>
 #include <memory>
 #include <functional>
+#include <random>
 
 extern "C" {
 #include <mona/bdd.h>
@@ -131,6 +132,96 @@ TEST_CASE("Transition Relation Test", "[transition]")
             }
             
             INFO("Transition " << from << " -> " << to << ": exists=" << edge_exists << ", expected=" << should_exist);
+            REQUIRE(edge_exists == should_exist);
+        }
+    }
+}
+
+TEST_CASE("Transition Relation Random Graph Test", "[transitionrand]")
+{
+    const int num_states = 200;
+    const int max_transitions = 6;
+    const int num_vars = 3;  // 3 variables encode up to 8 guarded transitions
+
+    std::mt19937 gen(12345);
+    std::uniform_int_distribution<int> edge_count_dist(1, max_transitions);
+    std::uniform_int_distribution<int> target_dist(0, num_states - 1);
+
+    std::vector<std::vector<int>> transitions(num_states);
+    for (int state = 0; state < num_states; ++state) {
+        int num_trans = edge_count_dist(gen);
+        std::set<int> targets;
+        while (static_cast<int>(targets.size()) < num_trans) {
+            targets.insert(target_dist(gen));
+        }
+        transitions[state].assign(targets.begin(), targets.end());
+    }
+
+    int indices[3] = {0, 1, 2};
+    dfaSetup(num_states, num_vars, indices);
+
+    std::string statuses_str(num_states, '-');
+    for (int state = 0; state < num_states; ++state) {
+        int num_trans = transitions[state].size();
+        dfaAllocExceptions(num_trans);
+        int trans_idx = 0;
+        for (int target : transitions[state]) {
+            std::string guard_str;
+            guard_str += ((trans_idx & 4) ? '1' : '0');
+            guard_str += ((trans_idx & 2) ? '1' : '0');
+            guard_str += ((trans_idx & 1) ? '1' : '0');
+            std::vector<char> guard(guard_str.begin(), guard_str.end());
+            guard.push_back('\0');
+            dfaStoreException(target, guard.data());
+            trans_idx++;
+        }
+        int default_target = transitions[state].empty() ? state : transitions[state][0];
+        dfaStoreState(default_target);
+    }
+
+    std::vector<char> statuses(statuses_str.begin(), statuses_str.end());
+    statuses.push_back('\0');
+    DFA* mona_dfa = dfaBuild(statuses.data());
+
+    std::vector<std::string> dfa_var_names = {"v0", "v1", "v2"};
+    Syft::ExplicitStateDfa explicit_dfa(mona_dfa, dfa_var_names);
+
+    std::shared_ptr<Syft::VarMgr> var_mgr = std::make_shared<Syft::VarMgr>();
+    var_mgr->create_named_variables(dfa_var_names);
+    var_mgr->partition_variables(dfa_var_names, {});
+    Syft::ExplicitStateDfaAdd explicit_dfa_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr, explicit_dfa);
+    Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(std::move(explicit_dfa_add));
+
+    auto var_mgr_ptr = symbolic_dfa.var_mgr();
+    auto automaton_id = symbolic_dfa.automaton_id();
+    auto state_vars = var_mgr_ptr->get_state_variables(automaton_id);
+
+    Syft::NaiveSCCDecomposer decomposer(symbolic_dfa);
+    auto result = decomposer.BuildTransitionRelationWithPrimed();
+
+    CUDD::BDD trans_rel = result.relation;
+    std::size_t primed_id = result.primed_automaton_id;
+    auto primed_vars = var_mgr_ptr->get_state_variables(primed_id);
+
+    for (int from = 0; from < num_states; ++from) {
+        CUDD::BDD from_bdd = state_to_bdd(from, state_vars, var_mgr_ptr, automaton_id);
+
+        for (int to = 0; to < num_states; ++to) {
+            CUDD::BDD to_bdd = state_to_bdd(to, primed_vars, var_mgr_ptr, primed_id);
+
+            CUDD::BDD edge = trans_rel & from_bdd & to_bdd;
+            bool edge_exists = !edge.IsZero();
+
+            bool should_exist = false;
+            for (int target : transitions[from]) {
+                if (target == to) {
+                    should_exist = true;
+                    break;
+                }
+            }
+
+            INFO("Transition " << from << " -> " << to << ": exists=" << edge_exists
+                 << ", expected=" << should_exist);
             REQUIRE(edge_exists == should_exist);
         }
     }

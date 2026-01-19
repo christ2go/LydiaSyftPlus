@@ -176,7 +176,7 @@ namespace Syft {
             switch (prefix_quantifier) {
                 case whitemech::lydia::PrefixQuantifier::Forall: {
                     // Safety property: convert to G(phi) form
-                    ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa(explicit_dfa);
+                    ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa_obligation(explicit_dfa);
                     
                     ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(
                         var_mgr_, trimmed_explicit_dfa);
@@ -190,7 +190,7 @@ namespace Syft {
                 }
                 case whitemech::lydia::PrefixQuantifier::Exists: {
                     // Guarantee property: convert to F(phi) form
-                    ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa(explicit_dfa);
+                    ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
                     
                     ExplicitStateDfaAdd explicit_dfa_add = ExplicitStateDfaAdd::from_dfa_mona(
                         var_mgr_, trimmed_explicit_dfa);

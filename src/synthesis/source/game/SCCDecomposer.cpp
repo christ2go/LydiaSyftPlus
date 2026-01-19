@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 #include <queue>
+#include <cstdint>
 extern "C" {
 #include "cudd.h"
 }
@@ -292,90 +293,60 @@ namespace {
     }
 }
 
+// Compute & and existential quantification in one step, and merge from small to larger formulas
+
+
 CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automaton_id) const {
     auto var_mgr = arena_.var_mgr();
     auto mgr = var_mgr->cudd_mgr();
-
-    // transition functions f_i and primed variables s_i'
+    
+    // Get transition functions f_i for each state variable
     auto transition_func = arena_.transition_function();
+    
+    // Get primed state variables s_i'
     auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
-
-    // IO cube we want to abstract during merges
+    
+    // Build transition relation: AND_i(s_i' <-> f_i(s, x, y))
     CUDD::BDD io_cube = var_mgr->input_cube() * var_mgr->output_cube();
-
-    // fast-return for empty transition
-    if (transition_func.empty()) {
-        return mgr->bddOne();
-    }
-
-    const bool log_enabled = spdlog::default_logger()->should_log(spdlog::level::debug);
-
-    // Build per-bit equivalences (s_i' <-> f_i)
-    std::vector<CUDD::BDD> initial;
-    initial.reserve(transition_func.size());
+    CUDD::BDD trans_relation = mgr->bddOne();
+    // Collect equivalences first
+    std::vector<CUDD::BDD> terms;
+    terms.reserve(transition_func.size());
     for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        if (log_enabled) spdlog::debug("[NaiveSCCDecomposer] Building per-bit equivalence: {} / {} bits",
-                                       (i + 1), transition_func.size());
-        initial.emplace_back(primed_vars[i].Xnor(transition_func[i]));
-        if (log_enabled) spdlog::debug("[NaiveSCCDecomposer]   BDD node count: {}", initial.back().nodeCount());
+        std::cout << "[BuildTransitionRelation] Preparing equiv for state variable " << i << std::endl;
+        terms.push_back(primed_vars[i].Xnor(transition_func[i]));
     }
 
-    // If there's only one bit, just abstract IO from it and return
-    if (initial.size() == 1) {
-        CUDD::BDD single = initial.front().ExistAbstract(io_cube);
-        if (log_enabled) spdlog::debug("[NaiveSCCDecomposer] Single-bit relation node count after abstract: {}",
-                                       single.nodeCount());
-        return single;
-    }
-
-    // Min-heap (smallest nodeCount first) -> Huffman-like merging
-    struct Item { CUDD::BDD b; std::size_t sz; };
-    auto cmp = [](Item const& a, Item const& b) { return a.sz > b.sz; };
-    std::priority_queue<Item, std::vector<Item>, decltype(cmp)> pq(cmp);
-
-    for (auto &bb : initial) {
-        pq.push(Item{ std::move(bb), bb.nodeCount() });
-    }
-    initial.clear();
-
-    // limit for AndAbstract: tune this to abort overly large intermediate ops.
-    // UINT_MAX = no practical limit. Lower if you want fail-fast behavior.
-    const unsigned and_abstract_limit = std::numeric_limits<unsigned>::max();
-
-    std::size_t step = 0;
-    while (pq.size() >= 2) {
-        auto A = std::move(pq.top()); pq.pop();
-        auto B = std::move(pq.top()); pq.pop();
-
-        if (log_enabled) {
-            spdlog::debug("[NaiveSCCDecomposer] Merging step {}: sizes {} + {}", step++, A.sz, B.sz);
+    // Balanced pairwise conjunction: merge neighbors in rounds (like merge-sort)
+    // This is faster and more cache-friendly than Huffman-style merging
+    // Round 1: merge (0,1), (2,3), (4,5), ... 
+    // Round 2: merge results pairwise again, etc.
+    while (terms.size() > 1) {
+        std::cout << "[BuildTransitionRelation] Round with " << terms.size() << " terms" << std::endl;
+        
+        std::vector<CUDD::BDD> next_round;
+        next_round.reserve((terms.size() + 1) / 2);
+        
+        // Merge pairs
+        for (std::size_t i = 0; i + 1 < terms.size(); i += 2) {
+            next_round.push_back(terms[i] & terms[i + 1]);
         }
-
-        // Log a and b
-        if (log_enabled) {
-            spdlog::debug("[NaiveSCCDecomposer]   => A node count: {}", A.b.nodeCount());
-            spdlog::debug("[NaiveSCCDecomposer]   => B node count: {}", B.b.nodeCount());
+        
+        // If odd number of terms, carry the last one forward
+        if (terms.size() % 2 == 1) {
+            next_round.push_back(terms.back());
         }
-        // Use the provided member AndAbstract: (A.b & B.b) with IO variables abstracted in one go.
-        // Signature: BDD::AndAbstract(const BDD& g, const BDD& cube, unsigned int limit) const
-        // We call it on A.b: A.b.AndAbstract(B.b, io_cube, and_abstract_limit)
-        CUDD::BDD merged = A.b.AndAbstract(B.b, io_cube, 0);
-
-        if (log_enabled) {
-            spdlog::debug("[NaiveSCCDecomposer]   => merged node count: {}", merged.nodeCount());
-        }
-
-        pq.push(Item{ std::move(merged), merged.nodeCount() });
-
-        // Optional: if you see memory pressure, you can hint GC or reordering here (commented).
-        // mgr->garbageCollect(); // uncomment if you have a wrapper exposing this and it helps
-        // mgr->ReduceHeap(CUDD_REORDER_SIFT); // expensive: use sparingly
+        
+        terms = std::move(next_round);
     }
-
-    // The top now contains the fully-merged relation with IO already abstracted.
-    CUDD::BDD trans_relation = std::move(pq.top().b);
-    if (log_enabled) spdlog::debug("[NaiveSCCDecomposer] Built transition relation final node count: {}",
-                                   trans_relation.nodeCount());
+    
+    if (!terms.empty()) {
+        trans_relation = terms[0];
+    }
+    std::cout << "Beginnign existential abstraction" << std::endl;
+    // Existentially quantify over input and output variables to get state-to-state relation
+    trans_relation = trans_relation.ExistAbstract(io_cube);
+        std::cout << "Finished existential abstraction" << std::endl;
 
     return trans_relation;
 }
@@ -456,10 +427,6 @@ CUDD::BDD NaiveSCCDecomposer::TransitiveClosure(const CUDD::BDD& relation,
         closure = new_closure;
         power = next_power;
         
-        // Safety check to prevent infinite loops
-        if (iteration > 3000) {
-            break;
-        }
     }
     
     return closure;
@@ -531,127 +498,37 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
     auto var_mgr = arena_.var_mgr();
     auto automaton_id = arena_.automaton_id();
     auto mgr = var_mgr->cudd_mgr();
-    
-    //std::cout << "\n[PeelLayer] ========== Starting PeelLayer ==========" << std::endl;
-    //std::cout << "[PeelLayer] Input states node count: " << states.nodeCount() << std::endl;
-    
+
     if (states.IsZero()) {
-        //std::cout << "[PeelLayer] States is ZERO, returning ZERO" << std::endl;
         return mgr->bddZero();
     }
-    
-    // Use cached path relation (initialize on demand) and get primed vars
-    PathRelationResult path_res = BuildPathRelationWithPrimed(states);
-    CUDD::BDD path = path_res.relation;
-    std::size_t primed_automaton_id = path_res.primed_automaton_id;
-    auto primed_vars = var_mgr->get_state_variables(primed_automaton_id);
-    CUDD::BDD primed_cube = var_mgr->state_variables_cube(primed_automaton_id);
-    //std::cout << "[PeelLayer] Path relation node count: " << path.nodeCount() << std::endl;
-    
-    if (path.IsZero()) {
-        std::cout << "[PeelLayer] WARNING: Path relation is ZERO! (no transitions within state set)" << std::endl;
+
+    CUDD::BDD path_relation = BuildPathRelation(states, primed_automaton_id_, temp_automaton_id_);
+
+    if (path_relation.IsZero()) {
+        if (kVerboseSCC) {
+            std::cout << "[PeelLayer] Path relation is empty; returning zero layer" << std::endl;
+        }
         return mgr->bddZero();
     }
-    
-    // TopLayer(s) = States(s) & ForAll s' . (Path(s', s) -> Path(s, s'))
-    // This means: for all s' that can reach s, s can also reach s'
-    //
-    // path = Path(s, s') with s=unprimed, s'=primed
-    //
-    // To compute Path(s', s), we need to swap the arguments properly.
-    // We'll use temp variables to do this correctly:
-    // 1. path(s, s') with unprimed=s, primed=s'
-    // 2. To get Path(s', s) with unprimed=s, primed=s':
-    //    - First substitute unprimed -> temp: Path(t, s') with temp=t, primed=s'
-    //    - Then substitute primed -> unprimed: Path(t, s) with temp=t, unprimed=s
-    //    - Then substitute temp -> primed: Path(s', s) with primed=s', unprimed=s
-    
+
+    CUDD::BDD swapped_path = SwapPrimedAndUnprimed(var_mgr, automaton_id, primed_automaton_id_, path_relation);
+
+    CUDD::BDD primed_cube = var_mgr->state_variables_cube(primed_automaton_id_);
+    CUDD::BDD top_layer = states & (!swapped_path | path_relation).UnivAbstract(primed_cube);
+
+    std::cout << "[PeelLayer] Top layer (restricted) node count: " << top_layer.nodeCount() << std::endl;
+
     auto state_vars = var_mgr->get_state_variables(automaton_id);
-    auto temp_vars = var_mgr->get_state_variables(temp_automaton_id_);
-    std::size_t total_vars = var_mgr->total_variable_count();
-    
-    // Step 1: unprimed -> temp
-    std::vector<CUDD::BDD> to_temp(total_vars);
-    for (std::size_t i = 0; i < total_vars; ++i) {
-        to_temp[i] = mgr->bddVar(static_cast<int>(i));
-    }
-    for (std::size_t i = 0; i < state_vars.size(); ++i) {
-        to_temp[state_vars[i].NodeReadIndex()] = temp_vars[i];
-    }
-    CUDD::BDD path_temp_primed = path.VectorCompose(to_temp);  // Path(t, s')
-    
-    // Step 2: primed -> unprimed
-    std::vector<CUDD::BDD> primed_to_unprimed(total_vars);
-    for (std::size_t i = 0; i < total_vars; ++i) {
-        primed_to_unprimed[i] = mgr->bddVar(static_cast<int>(i));
-    }
-    for (std::size_t i = 0; i < primed_vars.size(); ++i) {
-        primed_to_unprimed[primed_vars[i].NodeReadIndex()] = state_vars[i];
-    }
-    CUDD::BDD path_temp_unprimed = path_temp_primed.VectorCompose(primed_to_unprimed);  // Path(t, s)
-    
-    // Step 3: temp -> primed
-    std::vector<CUDD::BDD> temp_to_primed(total_vars);
-    for (std::size_t i = 0; i < total_vars; ++i) {
-        temp_to_primed[i] = mgr->bddVar(static_cast<int>(i));
-    }
-    for (std::size_t i = 0; i < temp_vars.size(); ++i) {
-        temp_to_primed[temp_vars[i].NodeReadIndex()] = primed_vars[i];
-    }
-    CUDD::BDD reverse_path_raw = path_temp_unprimed.VectorCompose(temp_to_primed);  // Path(s', s) with s'=primed, s=unprimed
-    
-    // Restrict reverse_path to valid state pairs (both s and s' must be in states)
-    CUDD::BDD primed_states = UnprimedToPrimed(var_mgr, automaton_id, primed_automaton_id, states);
-    CUDD::BDD reverse_path = reverse_path_raw;
-    
-    // Now both path and reverse_path use: unprimed=s, primed=s'
-    // path(s, s') = "s can reach s'"
-    // reverse_path(s, s') = "s' can reach s"
-    
-    // ForAll s' . (reverse_path(s, s') -> path(s, s'))
-    // = ForAll s' . (!reverse_path | path)
-    CUDD::BDD implication = !reverse_path | path;
-    //std::cout << "[PeelLayer] Implication node count: " << implication.nodeCount() << std::endl;
-    
-    //std::cout << "[PeelLayer] Universal quantification over primed variables..." << std::endl;
-    CUDD::BDD forall_result = implication.UnivAbstract(primed_cube);
-    //std::cout << "[PeelLayer] Forall result node count: " << forall_result.nodeCount() << std::endl;
-    
-    if (forall_result.IsZero()) {
-        std::cout << "[PeelLayer] WARNING: Forall result is ZERO!" << std::endl;
-    } else if (forall_result.IsOne()) {
-        std::cout << "[PeelLayer] Forall result is ONE (all states satisfy condition)" << std::endl;
-    }
-    
-    
-    // TopLayer(s) = States(s) & ForAll result
-    //std::cout << "[PeelLayer] Computing top layer: states & forall_result" << std::endl;
-    CUDD::BDD top_layer = states & forall_result;
-    //std::cout << "[PeelLayer] Top layer node count: " << top_layer.nodeCount() << std::endl;
-    
-    if (top_layer.IsZero()) {
-        //std::cout << "[PeelLayer] Top layer is ZERO (no terminal SCCs found)" << std::endl;
-    } else if (top_layer == states) {
-        //std::cout << "[PeelLayer] Top layer equals all states (all states are in terminal SCCs)" << std::endl;
-    } else {
-        //std::cout << "[PeelLayer] Top layer is a subset of states" << std::endl;
-    }
-    
-    //std::cout << "[PeelLayer] ========== End PeelLayer ==========\n" << std::endl;
-    // TODO: Existentially quantify over input and output variables to get state-to-state relation
-    CUDD::BDD input_cube = var_mgr->input_cube();
-    CUDD::BDD output_cube = var_mgr->output_cube();
-    CUDD::BDD non_state_cube = input_cube * output_cube;
-    if (!non_state_cube.IsOne()) {
-        top_layer = top_layer.ExistAbstract(non_state_cube);
-    }
-    if (kVerboseSCC) {
-        std::cout << "[PeelLayer] input: " << var_mgr->bdd_to_string(input_cube) << std::endl;
-        std::cout << "[PeelLayer] output: " << var_mgr->bdd_to_string(output_cube) << std::endl;
-        std::cout << "[PeelLayer] non_state_cube: " << var_mgr->bdd_to_string(non_state_cube) << std::endl;
-        std::cout << "[PeelLayer] Top layer after existential quantification: " << var_mgr->bdd_to_string(top_layer) << std::endl;
-    }
-    
+
+    struct NodeInfo {
+        std::uint64_t id;
+        CUDD::BDD state;
+        CUDD::BDD primed;
+    };
+
+
+
     return top_layer;
 }
 
