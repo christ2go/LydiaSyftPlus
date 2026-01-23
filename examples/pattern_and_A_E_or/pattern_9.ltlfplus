@@ -1,0 +1,1 @@
+(A (F(a0 & X(true)))) | (E (F(e0 & X(true)))) & (A (F(a1 & X(true)))) | (E (F(e1 & X(true)))) & (A (F(a2 & X(true)))) | (E (F(e2 & X(true)))) & (A (F(a3 & X(true)))) | (E (F(e3 & X(true)))) & (A (F(a4 & X(true)))) | (E (F(e4 & X(true)))) & (A (F(a5 & X(true)))) | (E (F(e5 & X(true)))) & (A (F(a6 & X(true)))) | (E (F(e6 & X(true)))) & (A (F(a7 & X(true)))) | (E (F(e7 & X(true))))
