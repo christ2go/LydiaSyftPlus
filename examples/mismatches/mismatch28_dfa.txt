@@ -1,0 +1,52 @@
+LTLf+ Formula: A(G((q) U (!(p)))). Color: 0. Prefix Quantifier: A
+Using obligation fragment synthesizer
+Converted Forall formula to symbolic DFA for color 
+[ObligationFragment] DFA created in 0 ms
+Solving with WeakGameSolver
+Starting WeakGameSolver
+[04:59:21.708] [debug] ===== DFA DUMP =====
+[04:59:21.708] [debug] [WeakGameSolver] State bits: 2
+[04:59:21.708] [debug] [WeakGameSolver] Input vars: 1
+[04:59:21.708] [debug] [WeakGameSolver] Output vars: 2
+[04:59:21.708] [debug] [WeakGameSolver] Initial state BDD node count: 3
+[04:59:21.708] [debug] [WeakGameSolver] Total possible states: 4
+[04:59:21.708] [debug] [WeakGameSolver] Accepting states: {1}
+[04:59:21.708] [debug] [WeakGameSolver] Input variable count: 1
+[04:59:21.708] [debug] [WeakGameSolver] Output variable count: 2
+[04:59:21.708] [debug] [WeakGameSolver] Transitions (state -> possible next states):
+[04:59:21.708] [debug] [WeakGameSolver]   0 -> {0, 1, 2}
+[04:59:21.708] [debug] [WeakGameSolver]   1 -> {0, 1, 2}
+[04:59:21.708] [debug] [WeakGameSolver]   2 -> {2}
+[04:59:21.708] [debug] [WeakGameSolver]   3 -> {0}
+[04:59:21.708] [debug] [WeakGameSolver] ===== END DFA DUMP =====
+===PYDFA_BEGIN===
+num_state_bits=2
+num_inputs=1
+num_outputs=2
+state_var_indices=5,6
+input_labels=r
+output_labels=q,p
+trans_func_0=0,0,0;1,0,0;0,1,0;1,1,0;0,0,1;1,0,1;0,1,1;1,1,1
+trans_func_1=2,0,0;2,1,0;2,0,1;2,1,1;0,0,2;1,0,2;2,0,2;0,1,2;1,1,2;2,1,2;2,0,3;2,1,3
+accepting_minterms=10
+initial_minterm=00
+===PYDFA_END===
+[04:59:21.708] [debug] [WeakGameSolver] Starting reachability computation...
+[04:59:21.708] [debug] [WeakGameSolver] Computing reachability closure (fixpoint) using VectorCompose...
+[WeakGameSolver] Starting SCC decomposition...
+[04:59:21.708] [debug] [TransitiveClosure] Iteration 1: 
+[04:59:21.708] [debug] [ComposeRelations] swapping primed->temp and unprimed->temp variables
+[ComposeRelations] Composition node count: 5
+[04:59:21.708] [debug] [TransitiveClosure] Iteration 2: 
+[04:59:21.708] [debug] [ComposeRelations] swapping primed->temp and unprimed->temp variables
+[ComposeRelations] Composition node count: 5
+[PeelLayer] Top layer (restricted) node count: 3
+[WeakGameSolver] Peeled layer 0 with 1 states
+[PeelLayer] Top layer (restricted) node count: 2
+[WeakGameSolver] Peeled layer 1 with 2 states
+[PeelLayer] Top layer (restricted) node count: 3
+[WeakGameSolver] Peeled layer 2 with 1 states
+[WeakGameSolver] SCC decomposition completed in 0 ms (3 layers)
+WeakGameSolver completed
+Realizability: false
+LTLf+ synthesis is UNREALIZABLE

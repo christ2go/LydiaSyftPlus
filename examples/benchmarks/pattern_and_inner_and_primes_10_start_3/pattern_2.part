@@ -1,0 +1,4 @@
+.inputs: a1, a2
+.outputs: c1, c2
+# periods (primes) used: [7, 11]
+# lcm(periods) = 77, expanded_to = 76

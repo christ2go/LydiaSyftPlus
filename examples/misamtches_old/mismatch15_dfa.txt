@@ -1,0 +1,65 @@
+LTLf+ Formula: E((p | !(r))). Color: 0. Prefix Quantifier: E
+Using obligation fragment synthesizer
+Converted Exists formula to symbolic DFA for color 
+[ObligationFragment] DFA created in 0 ms
+Solving with WeakGameSolver
+Starting WeakGameSolver
+[01:31:53.893] [debug] ===== DFA DUMP =====
+[01:31:53.893] [debug] [WeakGameSolver] State bits: 2
+[01:31:53.893] [debug] [WeakGameSolver] Input vars: 1
+[01:31:53.893] [debug] [WeakGameSolver] Output vars: 2
+[01:31:53.893] [debug] [WeakGameSolver] Initial state BDD node count: 3
+[01:31:53.893] [debug] [WeakGameSolver] Total possible states: 4
+[01:31:53.893] [debug] [WeakGameSolver] Accepting states: {1}
+[01:31:53.893] [debug] [WeakGameSolver] Input variable count: 1
+[01:31:53.893] [debug] [WeakGameSolver] Output variable count: 2
+[01:31:53.893] [debug] [WeakGameSolver] Transitions (state -> possible next states):
+[01:31:53.893] [debug] [WeakGameSolver]   0 -> {1, 2}
+[01:31:53.893] [debug] [WeakGameSolver]   1 -> {1}
+[01:31:53.893] [debug] [WeakGameSolver]   2 -> {2}
+[01:31:53.893] [debug] [WeakGameSolver]   3 -> {0}
+[01:31:53.893] [debug] [WeakGameSolver] ===== END DFA DUMP =====
+===PYDFA_BEGIN===
+num_state_bits=2
+num_inputs=1
+num_outputs=2
+state_var_indices=5,6
+input_labels=p
+output_labels=r,q
+trans_func_0=0,0,0;1,0,0;0,1,0;1,1,0;1,0,1;0,1,1;1,1,1;0,0,2;1,0,2;0,1,2;1,1,2;1,0,3;0,1,3;1,1,3
+trans_func_1=2,0,0;2,1,0;0,0,1;2,0,1;2,1,1;2,0,2;2,1,2;0,0,3;2,0,3;2,1,3
+accepting_minterms=10
+initial_minterm=00
+===PYDFA_END===
+[01:31:53.893] [debug] [WeakGameSolver] Starting reachability computation...
+[01:31:53.893] [debug] [WeakGameSolver] Computing reachability closure (fixpoint) using VectorCompose...
+[WeakGameSolver] Starting SCC decomposition...
+[01:31:53.893] [debug] [NaiveSCCDecomposer] Building per-bit equivalence: 1 / 2 bits
+[01:31:53.893] [debug] [NaiveSCCDecomposer]   BDD node count: 6
+[01:31:53.893] [debug] [NaiveSCCDecomposer] Building per-bit equivalence: 2 / 2 bits
+[01:31:53.893] [debug] [NaiveSCCDecomposer]   BDD node count: 7
+[01:31:53.893] [debug] [NaiveSCCDecomposer] Merging step 0: sizes 6 + 7
+[01:31:53.893] [debug] [NaiveSCCDecomposer]   => A node count: 6
+[01:31:53.893] [debug] [NaiveSCCDecomposer]   => B node count: 7
+[01:31:53.893] [debug] [NaiveSCCDecomposer]   => merged node count: 7
+[01:31:53.893] [debug] [NaiveSCCDecomposer] Built transition relation final node count: 7
+[01:31:53.893] [debug] [TransitiveClosure] Iteration 1: 
+[01:31:53.893] [debug] [ComposeRelations] swapping primed->temp and unprimed->temp variables
+[ComposeRelations] Composition node count: 7
+[01:31:53.893] [debug] [TransitiveClosure] Iteration 2: 
+[01:31:53.893] [debug] [ComposeRelations] swapping primed->temp and unprimed->temp variables
+[ComposeRelations] Composition node count: 7
+[PeelLayer] Forall result is ONE (all states satisfy condition)
+[WeakGameSolver] SCC decomposition completed in 0 ms (3 layers)
+[01:31:53.893] [debug] [WeakGameSolver] Processing layer (1 states) = {3}
+[01:31:53.893] [debug] [WeakGameSolver] Good states in current layer (0 states) = {}
+[01:31:53.893] [debug] [WeakGameSolver] Bad states in current layer (1 states) = {3}
+[01:31:53.893] [debug] [WeakGameSolver] Processing layer (1 states) = {0}
+[01:31:53.893] [debug] [WeakGameSolver] Good states in current layer (0 states) = {}
+[01:31:53.893] [debug] [WeakGameSolver] Bad states in current layer (1 states) = {0}
+[01:31:53.893] [debug] [WeakGameSolver] Processing layer (2 states) = {1, 2}
+[01:31:53.893] [debug] [WeakGameSolver] Good states in current layer (1 states) = {1}
+[01:31:53.893] [debug] [WeakGameSolver] Bad states in current layer (1 states) = {2}
+WeakGameSolver completed
+Realizability: false
+LTLf+ synthesis is UNREALIZABLE
