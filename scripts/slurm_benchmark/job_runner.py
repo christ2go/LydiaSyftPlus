@@ -23,6 +23,9 @@ import signal
 import tempfile
 from pathlib import Path
 import shutil
+import traceback
+import sys
+from typing import Any
 
 
 def run_once(binary, binary_args, singularity, formula_file, partition_file, timeout_s, extra_env=None):
@@ -131,31 +134,75 @@ def main():
     START_TIME = time.monotonic()
 
     def write_atomic(report_obj, path):
+        def sanitize(o: Any):
+            # Convert bytes to str, recursively sanitize containers, and
+            # fall back to str() for other non-serializable objects.
+            if isinstance(o, bytes):
+                return o.decode('utf-8', errors='backslashreplace')
+            if isinstance(o, str) or o is None or isinstance(o, (int, float, bool)):
+                return o
+            if isinstance(o, dict):
+                return {str(k): sanitize(v) for k, v in o.items()}
+            if isinstance(o, (list, tuple)):
+                return [sanitize(v) for v in o]
+            # Path-like objects or other objects -> convert to str
+            try:
+                return str(o)
+            except Exception:
+                return repr(o)
+
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         tmp = str(path) + '.tmp'
-        with open(tmp, 'w') as f:
-            json.dump(report_obj, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
         try:
-            os.replace(tmp, path)
-        except Exception:
+            print(f"[job_runner] writing tmp file: {tmp}", file=sys.stderr, flush=True)
+            with open(tmp, 'w') as f:
+                json.dump(sanitize(report_obj), f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            print(f"[job_runner] tmp written, attempting atomic replace -> {path}", file=sys.stderr, flush=True)
+            try:
+                os.replace(tmp, path)
+                print(f"[job_runner] os.replace succeeded: {path}", file=sys.stderr, flush=True)
+                return
+            except Exception as e:
+                print(f"[job_runner] os.replace failed: {e!r}", file=sys.stderr, flush=True)
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
+
             # Try a more robust fallback that works across filesystems.
             try:
+                print(f"[job_runner] attempting shutil.move({tmp}, {path})", file=sys.stderr, flush=True)
                 shutil.move(tmp, path)
-            except Exception:
-                # As a last resort, write the file directly and remove the tmp file.
-                try:
-                    with open(path, 'w') as f:
-                        json.dump(report_obj, f, indent=2)
-                        f.flush()
-                        os.fsync(f.fileno())
-                    # remove tmp if it still exists
-                    if os.path.exists(tmp):
+                print(f"[job_runner] shutil.move succeeded: {path}", file=sys.stderr, flush=True)
+                return
+            except Exception as e:
+                print(f"[job_runner] shutil.move failed: {e!r}", file=sys.stderr, flush=True)
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
+
+            # As a last resort, write the file directly and remove the tmp file.
+            try:
+                print(f"[job_runner] writing final file directly: {path}", file=sys.stderr, flush=True)
+                with open(path, 'w') as f:
+                    json.dump(sanitize(report_obj), f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                # remove tmp if it still exists
+                if os.path.exists(tmp):
+                    try:
                         os.remove(tmp)
-                except Exception:
-                    # Give up; leave tmp if we can't write the final file
-                    pass
+                        print(f"[job_runner] removed tmp file: {tmp}", file=sys.stderr, flush=True)
+                    except Exception as e:
+                        print(f"[job_runner] failed to remove tmp file {tmp}: {e!r}", file=sys.stderr, flush=True)
+                        print(traceback.format_exc(), file=sys.stderr, flush=True)
+                return
+            except Exception as e:
+                print(f"[job_runner] final write failed: {e!r}", file=sys.stderr, flush=True)
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
+                # Give up; leave tmp if we can't write the final file
+                return
+        except Exception as e:
+            print(f"[job_runner] failed to create/write tmp file {tmp}: {e!r}", file=sys.stderr, flush=True)
+            print(traceback.format_exc(), file=sys.stderr, flush=True)
+            return
 
     def sigterm_handler(signum, frame):
         # Called when Slurm sends SIGTERM; write a partial report indicating termination
