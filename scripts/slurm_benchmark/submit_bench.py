@@ -246,7 +246,14 @@ def main():
     except Exception:
         user_provided_time = True
     if not user_provided_time:
-        margin = 10
+        # Use a larger margin for long-running per-run timeouts so the Slurm
+        # task has enough time to cleanup and write results. If timeout >= 1h,
+        # add 10 minutes; otherwise keep a small 10s margin.
+        try:
+            per_run = int(args.timeout)
+        except Exception:
+            per_run = 0
+        margin = 600 if per_run >= 3600 else 60
         total_seconds = int(args.timeout) + margin
         hh = total_seconds // 3600
         mm = (total_seconds % 3600) // 60

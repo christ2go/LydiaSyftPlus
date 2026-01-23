@@ -22,6 +22,7 @@ import socket
 import signal
 import tempfile
 from pathlib import Path
+import shutil
 
 
 def run_once(binary, binary_args, singularity, formula_file, partition_file, timeout_s, extra_env=None):
@@ -139,8 +140,22 @@ def main():
         try:
             os.replace(tmp, path)
         except Exception:
-            # best-effort replacement
-            pass
+            # Try a more robust fallback that works across filesystems.
+            try:
+                shutil.move(tmp, path)
+            except Exception:
+                # As a last resort, write the file directly and remove the tmp file.
+                try:
+                    with open(path, 'w') as f:
+                        json.dump(report_obj, f, indent=2)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    # remove tmp if it still exists
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
+                except Exception:
+                    # Give up; leave tmp if we can't write the final file
+                    pass
 
     def sigterm_handler(signum, frame):
         # Called when Slurm sends SIGTERM; write a partial report indicating termination
