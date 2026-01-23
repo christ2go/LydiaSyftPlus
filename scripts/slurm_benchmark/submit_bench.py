@@ -35,7 +35,7 @@ def find_examples(examples_dir, prefix='pattern'):
     return files
 
 
-def write_job_script(out_dir, pattern_file, partition_file, binary, singularity, binary_args, timeout, runs, sbatch_opts):
+def write_job_script(out_dir, pattern_file, partition_file, binary, singularity, binary_args, timeout, runs, sbatch_opts, mode, obligation_solver):
     # Create a job script under out_dir/jobs
     job_name = pattern_file.stem
     jobs_dir = out_dir / 'jobs'
@@ -53,12 +53,14 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         # If copy fails, we'll fallback to template's local lookup logic
         dst_runner = None
 
-    job_script = jobs_dir / f"job_{job_name}.sh"
+    # include mode and obligation solver in job name to distinguish jobs
+    job_script = jobs_dir / f"job_{job_name}_{mode}_os{obligation_solver}.sh"
     with open(TEMPLATE, 'r') as t, open(job_script, 'w') as out:
         # Write SBATCH header
         out.write('#!/usr/bin/env bash\n')
-        out.write(f"#SBATCH --job-name={job_name}\n")
-        out.write(f"#SBATCH --output={logs_dir}/{job_name}-%A_%a.out\n")
+        sjob = f"{job_name}_{mode}_os{obligation_solver}"
+        out.write(f"#SBATCH --job-name={sjob}\n")
+        out.write(f"#SBATCH --output={logs_dir}/{sjob}-%A_%a.out\n")
         # append other sbatch opts
         for k, v in sbatch_opts.items():
             out.write(f"#SBATCH {k}={v}\n")
@@ -95,7 +97,27 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
 
         out.write(f"BINARY=\"{binary}\"\n")
         out.write(f"SINGULARITY=\"{singularity or ''}\"\n")
-        out.write(f"BINARY_ARGS=\"{binary_args or ''}\"\n")
+        # Build binary args: always start with starting player -s 0
+        # Mode-specific args
+        mode_args = ''
+        if mode == 'el':
+            mode_args = '-s 0 -g 0'
+        else:
+            # optimized modes use -g 1, obligation simplification on, and -b <code>
+            mode_args = f'-s 0 -g 1 --obligation-simplification 1 -b {mode}'
+
+        # Append obligation-solver flag (if provided)
+        if obligation_solver is not None and str(obligation_solver) != '':
+            mode_args = mode_args + f' --obligation-solver {obligation_solver}'
+
+        # If caller provided extra binary_args, append them
+        combined_args = (binary_args or '').strip()
+        if combined_args:
+            combined = f"{mode_args} {combined_args}"
+        else:
+            combined = mode_args
+
+        out.write(f"BINARY_ARGS=\"{combined}\"\n")
         out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
         out.write(f"TIMEOUT=\"{timeout}\"\n")
         out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")
@@ -176,6 +198,10 @@ def main():
     parser.add_argument('--sbatch-cpus', default='1', help='Slurm cpus-per-task')
     parser.add_argument('--sbatch-partition', default='', help='Slurm partition (optional)')
     parser.add_argument('--max-examples', type=int, default=None, help='Limit to first N examples')
+    parser.add_argument('--modes', type=str, default='el,cl,pm,wg,cb',
+                        help='Comma-separated solver modes to run: el,cl,pm,wg,cb (default: all)')
+    parser.add_argument('--obligation-solvers', type=str, default='0,1',
+                        help='Comma-separated obligation-solver ids to iterate over (default: 0,1)')
     args = parser.parse_args()
 
     # Determine examples dir
@@ -207,6 +233,9 @@ def main():
     if args.sbatch_partition:
         sbatch_opts['--partition'] = args.sbatch_partition
 
+    modes = [m.strip() for m in args.modes.split(',') if m.strip()]
+    obligation_solvers = [s.strip() for s in args.obligation_solvers.split(',') if s.strip()]
+
     submitted = []
     expected_runs = 0
     for pattern in examples:
@@ -214,10 +243,19 @@ def main():
         if not partition_file.exists():
             print(f"Skipping {pattern.name}: partition file not found: {partition_file}")
             continue
-        job_script = write_job_script(out_dir, pattern, partition_file, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts)
-        jobid = submit_script(job_script)
-        submitted.append(jobid)
-        expected_runs += args.runs
+
+        for mode in modes:
+            # If mode is not 'el' (optimised modes), force obligation-solver to 1
+            if mode != 'el':
+                obs_list = ['1']
+            else:
+                obs_list = obligation_solvers
+
+            for obs in obs_list:
+                job_script = write_job_script(out_dir, pattern, partition_file, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts, mode, obs)
+                jobid = submit_script(job_script)
+                submitted.append(jobid)
+                expected_runs += args.runs
 
     print(f"Submitted {len(submitted)} jobs ({expected_runs} runs total)")
 

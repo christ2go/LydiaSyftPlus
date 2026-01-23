@@ -11,6 +11,7 @@ Files
 -----
 
 - `submit_bench.py` — discover examples and submit Slurm jobs. Creates `OUT_DIR/jobs`, `OUT_DIR/logs`, and `OUT_DIR/results`.
+ - `submit_bench.py` — discover examples and submit Slurm jobs. Creates `OUT_DIR/jobs`, `OUT_DIR/logs`, and `OUT_DIR/results`. Supports iterating solver modes and obligation-solver ids.
 - `job_slurm.sh.template` — a small job script template used by `submit_bench.py`.
 - `job_runner.py` — executes the binary (optionally inside a Singularity image), measures elapsed time and peak RSS and writes a per-run JSON.
 - `aggregate_results.py` — merge per-run JSON files into a single aggregated JSON.
@@ -29,6 +30,21 @@ python3 scripts/slurm_benchmark/submit_bench.py \
   --binary LydiaSyftEL \
   --singularity /path/to/lydiasyftplus.sif \
   --out-dir bench_out
+
+To iterate specific solver modes and obligation-solver values, use `--modes` and `--obligation-solvers`. Modes are: `el` (EL solver), `cl` (classic Buchi), `pm` (Piterman), `wg` (weak-game/SCC), `cb` (CoBuchi).
+
+Important: for optimised solver modes (any mode != `el`) the submitter forces `--obligation-solver 1`. The `--obligation-solvers` list only applies to the `el` mode. This matches the common benchmarking setup where optimised modes run with obligation-solver=1.
+
+Example: run only EL and classic modes and iterate obligation-solver 0 and 1 (classic will use obligation-solver=1 regardless):
+
+```bash
+python3 scripts/slurm_benchmark/submit_bench.py \
+  --modes el,cl \
+  --obligation-solvers 0,1 \
+  --runs 3 \
+  --singularity /path/to/lydiasyftplus.sif \
+  --out-dir bench_out
+```
 ```
 
 Notes
