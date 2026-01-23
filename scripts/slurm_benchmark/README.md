@@ -30,17 +30,15 @@ python3 scripts/slurm_benchmark/submit_bench.py \
   --binary LydiaSyftEL \
   --singularity /path/to/lydiasyftplus.sif \
   --out-dir bench_out
+```
 
-To iterate specific solver modes and obligation-solver values, use `--modes` and `--obligation-solvers`. Modes are: `el` (EL solver), `cl` (classic Buchi), `pm` (Piterman), `wg` (weak-game/SCC), `cb` (CoBuchi).
+To iterate specific solver modes, use `--modes`. Modes are: `el` (EL solver), `cl` (classic Buchi), `pm` (Piterman), `wg` (weak-game/SCC), `cb` (CoBuchi). Optimised modes automatically set `--obligation-simplification 1`.
 
-Important: for optimised solver modes (any mode != `el`) the submitter forces `--obligation-solver 1`. The `--obligation-solvers` list only applies to the `el` mode. This matches the common benchmarking setup where optimised modes run with obligation-solver=1.
-
-Example: run only EL and classic modes and iterate obligation-solver 0 and 1 (classic will use obligation-solver=1 regardless):
+Example: run only EL and classic modes:
 
 ```bash
 python3 scripts/slurm_benchmark/submit_bench.py \
   --modes el,cl \
-  --obligation-solvers 0,1 \
   --runs 3 \
   --singularity /path/to/lydiasyftplus.sif \
   --out-dir bench_out
