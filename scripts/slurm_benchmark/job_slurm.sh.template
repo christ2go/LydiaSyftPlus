@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# SBATCH directives will be injected by the submitter script when creating job files.
+# This template runs one array task that calls the Python job runner.
+
+set -euo pipefail
+
+# Parameters expected to be set by the generated job script:
+# - FORMULA_FILE
+# - PARTITION_FILE
+# - BINARY
+# - SINGULARITY (optional)
+# - BINARY_ARGS (optional)
+# - OUT_DIR
+# - TIMEOUT
+# - RUN_IDX  (if using arrays this will be $SLURM_ARRAY_TASK_ID)
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+JOB_RUNNER="${SCRIPT_DIR}/job_runner.py"
+
+if [ -z "${RUN_IDX-}" ]; then
+    if [ -n "${SLURM_ARRAY_TASK_ID-}" ]; then
+        RUN_IDX=${SLURM_ARRAY_TASK_ID}
+    else
+        RUN_IDX=1
+    fi
+fi
+
+echo "Starting benchmark run: formula=${FORMULA_FILE}, run=${RUN_IDX}, host=$(hostname)"
+
+# Call the Python runner
+python3 "$JOB_RUNNER" \
+  --binary "${BINARY}" \
+  --binary-args "${BINARY_ARGS-}" \
+  --singularity "${SINGULARITY-}" \
+  --formula "${FORMULA_FILE}" \
+  --partition "${PARTITION_FILE}" \
+  --run-idx "${RUN_IDX}" \
+  --out-dir "${OUT_DIR}" \
+  --timeout "${TIMEOUT}"
+
+echo "Job finished"
