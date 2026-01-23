@@ -19,6 +19,9 @@ import sys
 import time
 import resource
 import socket
+import signal
+import tempfile
+from pathlib import Path
 
 
 def run_once(binary, binary_args, singularity, formula_file, partition_file, timeout_s, extra_env=None):
@@ -104,48 +107,84 @@ def main():
 
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Determine pattern name from formula file
-    pattern = os.path.basename(args.formula)
-    # Determine mode: prefer CLI arg, then env var
-    mode = args.mode or os.environ.get('MODE')
+    # Determine pattern name and construct output filename early so a signal handler can write it
+    base = os.path.splitext(os.path.basename(args.formula))[0]
+    sjid = os.environ.get('SLURM_JOB_ID') or 'local'
+    sat = os.environ.get('SLURM_ARRAY_TASK_ID') or str(args.run_idx)
+    mode_tag = (args.mode or os.environ.get('MODE')) or 'nomode'
+    out_fname = f"{base}.{mode_tag}.job{sjid}_task{sat}.run{args.run_idx}.json"
+    out_file = os.path.join(args.out_dir, out_fname)
 
-    # Run
-    result = run_once(args.binary, args.binary_args, args.singularity or None, args.formula, args.partition, args.timeout)
-
-    # Augment result with metadata
+    # Build metadata early so signal handler can write a partial report
     metadata = {
         'pattern_file': args.formula,
         'partition_file': args.partition,
         'run_idx': args.run_idx,
-        'mode': mode,
+        'mode': mode_tag,
         'hostname': socket.gethostname(),
         'slurm_job_id': os.environ.get('SLURM_JOB_ID'),
         'slurm_array_task_id': os.environ.get('SLURM_ARRAY_TASK_ID'),
         'timestamp': time.time(),
     }
 
+    START_TIME = time.monotonic()
+
+    def write_atomic(report_obj, path):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        tmp = str(path) + '.tmp'
+        with open(tmp, 'w') as f:
+            json.dump(report_obj, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        try:
+            os.replace(tmp, path)
+        except Exception:
+            # best-effort replacement
+            pass
+
+    def sigterm_handler(signum, frame):
+        # Called when Slurm sends SIGTERM; write a partial report indicating termination
+        elapsed = time.monotonic() - START_TIME
+        partial = {
+            **metadata,
+            'cmd': None,
+            'returncode': None,
+            'timeout': True,
+            'killed_by_signal': int(signum),
+            'elapsed_s': elapsed,
+            'max_rss_kb': None,
+            'stdout': '',
+            'stderr': f'Terminated by signal {signum} before run completion.'
+        }
+        try:
+            write_atomic(partial, out_file)
+            print(f'Wrote partial result due to signal {signum}: {out_file}')
+        except Exception:
+            pass
+        # exit with code indicating signal
+        os._exit(128 + int(signum))
+
+    # Install signal handlers for graceful termination (best-effort)
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGINT, sigterm_handler)
+
+    # Run
+    result = run_once(args.binary, args.binary_args, args.singularity or None, args.formula, args.partition, args.timeout)
+
+    # Augment result with metadata
     report = {**metadata, **result}
 
     # Truncate very large outputs to keep JSON sane
     MAX_LOG = 200_000
-    if len(report['stdout']) > MAX_LOG:
+    if len(report.get('stdout') or '') > MAX_LOG:
         report['stdout_truncated'] = True
-        report['stdout'] = report['stdout'][:MAX_LOG]
-    if len(report['stderr']) > MAX_LOG:
+        report['stdout'] = (report.get('stdout') or '')[:MAX_LOG]
+    if len(report.get('stderr') or '') > MAX_LOG:
         report['stderr_truncated'] = True
-        report['stderr'] = report['stderr'][:MAX_LOG]
+        report['stderr'] = (report.get('stderr') or '')[:MAX_LOG]
 
-    # Write file
-    # Construct a readable, unique filename including mode and Slurm ids when available
-    base = os.path.splitext(os.path.basename(args.formula))[0]
-    sjid = metadata.get('slurm_job_id') or 'local'
-    sat = metadata.get('slurm_array_task_id') or str(args.run_idx)
-    mode_tag = mode or 'nomode'
-    out_fname = f"{base}.{mode_tag}.job{sjid}_task{sat}.run{args.run_idx}.json"
-    out_file = os.path.join(args.out_dir, out_fname)
-    with open(out_file + '.tmp', 'w') as f:
-        json.dump(report, f, indent=2)
-    os.replace(out_file + '.tmp', out_file)
+    # Write atomically
+    write_atomic(report, out_file)
 
     print(f"Wrote result: {out_file}")
     # Exit status: 0 if run completed (even if binary returned non-zero), 2 if timed out

@@ -229,6 +229,22 @@ def main():
     if args.sbatch_partition:
         sbatch_opts['--partition'] = args.sbatch_partition
 
+    # If user left --sbatch-time as the default, auto-adjust it to be a bit
+    # higher than per-run timeout so the runner can clean up and write results.
+    # Use a small margin (10 seconds) as a default.
+    default_sbatch_time = '00:10:00'
+    try:
+        user_provided_time = args.sbatch_time != default_sbatch_time
+    except Exception:
+        user_provided_time = True
+    if not user_provided_time:
+        margin = 10
+        total_seconds = int(args.timeout) + margin
+        hh = total_seconds // 3600
+        mm = (total_seconds % 3600) // 60
+        ss = total_seconds % 60
+        sbatch_opts['--time'] = f"{hh:02d}:{mm:02d}:{ss:02d}"
+
     modes = [m.strip() for m in args.modes.split(',') if m.strip()]
 
     submitted = []
