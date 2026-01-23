@@ -101,7 +101,8 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         # Mode-specific args
         mode_args = ''
         if mode == 'el':
-            mode_args = '-s 0 -g 0'
+            # explicit obligation-simplification=0 for the EL (explicit) mode
+            mode_args = '-s 0 -g 0 --obligation-simplification 0'
         else:
             # optimized modes use -g 1, obligation simplification on, and -b <code>
             mode_args = f'-s 0 -g 1 --obligation-simplification 1 -b {mode}'
@@ -192,7 +193,7 @@ def main():
     parser.add_argument('--wait', action='store_true', help='Wait for all runs to finish (polling)')
     parser.add_argument('--aggregate', action='store_true', help='Aggregate per-run JSONs into one file after completion')
     parser.add_argument('--sbatch-time', default='00:10:00', help='Slurm time limit (e.g. 00:10:00)')
-    parser.add_argument('--sbatch-mem', default='4G', help='Slurm memory per task')
+    parser.add_argument('--sbatch-mem', default='16G', help='Slurm memory per task')
     parser.add_argument('--sbatch-cpus', default='1', help='Slurm cpus-per-task')
     parser.add_argument('--sbatch-partition', default='', help='Slurm partition (optional)')
     parser.add_argument('--max-examples', type=int, default=None, help='Limit to first N examples')
