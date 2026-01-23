@@ -120,14 +120,7 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         # Export MODE so the job_runner can pick it up and include it in the result filename
         out.write(f"export MODE=\"{mode}\"\n")
         out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
-        # Give the runner a slightly smaller timeout than the requested per-run
-        # timeout so it has time to cleanup and write the result before Slurm
-        # enforces the job time limit. Subtract 10s but ensure at least 1s.
-        try:
-            runner_timeout = max(1, int(timeout) - 10)
-        except Exception:
-            runner_timeout = timeout
-        out.write(f"TIMEOUT=\"{runner_timeout}\"\n")
+        out.write(f"TIMEOUT=\"{timeout}\"\n")   
         out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")
 
         # Inject JOB_RUNNER absolute path (so template doesn't rely on $0-based lookup)
@@ -229,7 +222,8 @@ def main():
     out_dir = Path(args.out_dir).resolve()
     # Create a timestamped run subdirectory so separate invocations don't overwrite each other.
     # Format: YYYY-MM-DD-HHMM-<pattern>
-    timestamp = datetime.now().strftime('%Y-%m-%d-%H%M')
+    # include seconds to make the run directory unique even for rapid successive runs
+    timestamp = datetime.now().strftime('%Y-%m-%d-%H%M%S')
     run_subdir_name = f"{timestamp}-{args.pattern}"
     run_out_dir = out_dir / run_subdir_name
     (run_out_dir / 'results').mkdir(parents=True, exist_ok=True)
@@ -253,14 +247,13 @@ def main():
     except Exception:
         user_provided_time = True
     if not user_provided_time:
-        # Use a larger margin for long-running per-run timeouts so the Slurm
-        # task has enough time to cleanup and write results. If timeout >= 1h,
-        # add 10 minutes; otherwise keep a small 10s margin.
+        # Add a fixed 1 minute margin to the per-run timeout so Slurm gives
+        # the runner a small window to cleanup and write results.
         try:
             per_run = int(args.timeout)
         except Exception:
             per_run = 0
-        margin = 600 if per_run >= 3600 else 60
+        margin = 60
         total_seconds = int(args.timeout) + margin
         hh = total_seconds // 3600
         mm = (total_seconds % 3600) // 60
