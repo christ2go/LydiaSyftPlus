@@ -14,8 +14,12 @@ set -euo pipefail
 # - TIMEOUT
 # - RUN_IDX  (if using arrays this will be $SLURM_ARRAY_TASK_ID)
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-JOB_RUNNER="${SCRIPT_DIR}/job_runner.py"
+# JOB_RUNNER may be injected by the submitter as an absolute path.
+# If it's not provided, fall back to locating the runner next to this script.
+if [ -z "${JOB_RUNNER-}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    JOB_RUNNER="${SCRIPT_DIR}/job_runner.py"
+fi
 
 if [ -z "${RUN_IDX-}" ]; then
     if [ -n "${SLURM_ARRAY_TASK_ID-}" ]; then

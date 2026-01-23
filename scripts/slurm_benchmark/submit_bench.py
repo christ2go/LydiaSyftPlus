@@ -19,6 +19,7 @@ import subprocess
 import sys
 import time
 import json
+import shutil
 from pathlib import Path
 
 
@@ -42,6 +43,16 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
     logs_dir = out_dir / 'logs'
     logs_dir.mkdir(parents=True, exist_ok=True)
 
+    # Copy the job runner into jobs_dir so compute nodes can invoke it via an absolute path
+    src_runner = Path(__file__).parent / 'job_runner.py'
+    dst_runner = jobs_dir / 'job_runner.py'
+    try:
+        shutil.copy2(src_runner, dst_runner)
+        os.chmod(dst_runner, 0o755)
+    except Exception:
+        # If copy fails, we'll fallback to template's local lookup logic
+        dst_runner = None
+
     job_script = jobs_dir / f"job_{job_name}.sh"
     with open(TEMPLATE, 'r') as t, open(job_script, 'w') as out:
         # Write SBATCH header
@@ -56,14 +67,42 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         out.write('\n')
 
         # Export environment variables that template expects
-        out.write(f"FORMULA_FILE=\"{pattern_file}\"\n")
-        out.write(f"PARTITION_FILE=\"{partition_file}\"\n")
+        # If running inside a Singularity image that already contains examples at /opt/examples,
+        # rewrite the paths so they point to the image's copy (avoids host path not found inside image).
+        if singularity:
+            # compute path relative to the 'examples' folder so we can point to /opt/examples/<rel>
+            parts = pattern_file.parts
+            if 'examples' in parts:
+                idx = parts.index('examples')
+                rel = Path(*parts[idx+1:])
+                container_formula = Path('/opt/examples') / rel
+            else:
+                container_formula = pattern_file
+
+            parts_p = partition_file.parts
+            if 'examples' in parts_p:
+                idxp = parts_p.index('examples')
+                relp = Path(*parts_p[idxp+1:])
+                container_partition = Path('/opt/examples') / relp
+            else:
+                container_partition = partition_file
+
+            out.write(f"FORMULA_FILE=\"{container_formula}\"\n")
+            out.write(f"PARTITION_FILE=\"{container_partition}\"\n")
+        else:
+            out.write(f"FORMULA_FILE=\"{pattern_file}\"\n")
+            out.write(f"PARTITION_FILE=\"{partition_file}\"\n")
+
         out.write(f"BINARY=\"{binary}\"\n")
         out.write(f"SINGULARITY=\"{singularity or ''}\"\n")
         out.write(f"BINARY_ARGS=\"{binary_args or ''}\"\n")
         out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
         out.write(f"TIMEOUT=\"{timeout}\"\n")
         out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")
+
+        # Inject JOB_RUNNER absolute path (so template doesn't rely on $0-based lookup)
+        if dst_runner is not None:
+            out.write(f"JOB_RUNNER=\"{dst_runner}\"\n")
         out.write('\n')
 
         # Append the body of the template (skip its shebang)
