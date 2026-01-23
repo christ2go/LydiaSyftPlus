@@ -36,6 +36,7 @@ python3 "$JOB_RUNNER" \
   --binary "${BINARY}" \
   --binary-args "${BINARY_ARGS-}" \
   --singularity "${SINGULARITY-}" \
+  --mode "${MODE-}" \
   --formula "${FORMULA_FILE}" \
   --partition "${PARTITION_FILE}" \
   --run-idx "${RUN_IDX}" \
