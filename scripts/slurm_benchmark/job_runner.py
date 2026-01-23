@@ -183,6 +183,17 @@ def main():
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
 
+    # Write an initial 'started' JSON so that if the process is killed hard
+    # (SIGKILL) before the final report is written, there is still a valid
+    # JSON file present describing the run start. This is intentionally small
+    # and will be replaced by the full report at the end of the run.
+    try:
+        started = {**metadata, 'status': 'started', 'partial': True}
+        write_atomic(started, out_file)
+    except Exception:
+        # best-effort; continue even if we can't write the started file
+        pass
+
     # Run
     result = run_once(args.binary, args.binary_args, args.singularity or None, args.formula, args.partition, args.timeout)
 

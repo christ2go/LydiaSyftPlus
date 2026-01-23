@@ -120,7 +120,14 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         # Export MODE so the job_runner can pick it up and include it in the result filename
         out.write(f"export MODE=\"{mode}\"\n")
         out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
-        out.write(f"TIMEOUT=\"{timeout}\"\n")
+        # Give the runner a slightly smaller timeout than the requested per-run
+        # timeout so it has time to cleanup and write the result before Slurm
+        # enforces the job time limit. Subtract 10s but ensure at least 1s.
+        try:
+            runner_timeout = max(1, int(timeout) - 10)
+        except Exception:
+            runner_timeout = timeout
+        out.write(f"TIMEOUT=\"{runner_timeout}\"\n")
         out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")
 
         # Inject JOB_RUNNER absolute path (so template doesn't rely on $0-based lookup)
