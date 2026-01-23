@@ -114,6 +114,8 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
             combined = mode_args
 
         out.write(f"BINARY_ARGS=\"{combined}\"\n")
+        # Export MODE so the job_runner can pick it up and include it in the result filename
+        out.write(f"MODE=\"{mode}\"\n")
         out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
         out.write(f"TIMEOUT=\"{timeout}\"\n")
         out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")

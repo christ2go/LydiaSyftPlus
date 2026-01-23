@@ -93,6 +93,7 @@ def main():
     parser.add_argument('--binary', required=True, help='Path to LydiaSyftEL binary inside container or host')
     parser.add_argument('--binary-args', default='', help='Extra arguments to pass to the binary (quoted)')
     parser.add_argument('--singularity', default='', help='Path to singularity image (optional)')
+    parser.add_argument('--mode', default=None, help='Solver mode (el, cl, pm, wg, cb)')
     parser.add_argument('--formula', required=True, help='Path to .ltlfplus file')
     parser.add_argument('--partition', required=True, help='Path to .part file')
     parser.add_argument('--run-idx', type=int, required=True, help='Run index (1..N)')
@@ -105,6 +106,8 @@ def main():
 
     # Determine pattern name from formula file
     pattern = os.path.basename(args.formula)
+    # Determine mode: prefer CLI arg, then env var
+    mode = args.mode or os.environ.get('MODE')
 
     # Run
     result = run_once(args.binary, args.binary_args, args.singularity or None, args.formula, args.partition, args.timeout)
@@ -114,6 +117,7 @@ def main():
         'pattern_file': args.formula,
         'partition_file': args.partition,
         'run_idx': args.run_idx,
+        'mode': mode,
         'hostname': socket.gethostname(),
         'slurm_job_id': os.environ.get('SLURM_JOB_ID'),
         'slurm_array_task_id': os.environ.get('SLURM_ARRAY_TASK_ID'),
@@ -132,8 +136,13 @@ def main():
         report['stderr'] = report['stderr'][:MAX_LOG]
 
     # Write file
-    safe_name = os.path.basename(args.formula).replace('/', '_')
-    out_file = os.path.join(args.out_dir, f"{safe_name}.run{args.run_idx}.json")
+    # Construct a readable, unique filename including mode and Slurm ids when available
+    base = os.path.splitext(os.path.basename(args.formula))[0]
+    sjid = metadata.get('slurm_job_id') or 'local'
+    sat = metadata.get('slurm_array_task_id') or str(args.run_idx)
+    mode_tag = mode or 'nomode'
+    out_fname = f"{base}.{mode_tag}.job{sjid}_task{sat}.run{args.run_idx}.json"
+    out_file = os.path.join(args.out_dir, out_fname)
     with open(out_file + '.tmp', 'w') as f:
         json.dump(report, f, indent=2)
     os.replace(out_file + '.tmp', out_file)
