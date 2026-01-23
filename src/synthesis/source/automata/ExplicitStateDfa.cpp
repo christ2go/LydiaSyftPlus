@@ -22,7 +22,9 @@
 #include "lydia/to_dfa/strategies/compositional/base.hpp"
 #include "lydia/utils/print.hpp"
 
-
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/strong_components.hpp>
+#include <boost/graph/topological_sort.hpp>
 
 #include "cudd.h"
 
@@ -770,11 +772,12 @@ namespace Syft {
             DFA *rhs = queue.top();
             queue.pop();
             DFA *tmp = dfaProduct(lhs, rhs, dfaProductType::dfaAND);
+            std::cout << "Product DFA created with " << tmp->ns << " states." << std::endl;
             dfaFree(lhs);
             dfaFree(rhs);
             DFA *res = dfaMinimize(tmp);
             dfaFree(tmp);
-            queue.push(tmp);
+            queue.push(res);
         }
 
         ExplicitStateDfa res_dfa(queue.top(), ordered_name_vector);
@@ -871,6 +874,186 @@ namespace Syft {
         dfaNegation(arg);
         ExplicitStateDfa res_dfa(arg, d.names);
         return res_dfa;
+    }
+
+    /**
+     * Löding's O(n log n) minimization algorithm for deterministic weak automata.
+     * 
+     * Reference: Christof Löding, "Efficient minimization of deterministic weak ω-automata"
+     * Information Processing Letters 79 (2001) 105–109
+     * 
+     * Algorithm:
+     * 1. Compute SCCs and build SCC graph in O(n) time using Boost Graph Library
+     * 2. Compute maximal coloring on SCC graph in O(n) time via topological sort
+     * 3. Set final states based on coloring (even colors = final) to get normal form
+     * 4. Apply standard DFA minimization in O(n log n) time
+     * 
+     * The result is a minimal weak automaton for the given ω-language.
+     */
+    ExplicitStateDfa ExplicitStateDfa::dfa_minimize_weak(const ExplicitStateDfa &d) {
+        DFA* a = d.dfa_;
+        int ns = a->ns;
+        
+        // Build a Boost graph from the DFA
+        typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS> Graph;
+        Graph g(ns);
+        // Store if a vertex has a self-loop
+        std::vector<bool> has_self_loop(ns, false);
+
+        // Add edges to the graph
+        for (int v = 0; v < ns; v++) {
+            paths state_paths = make_paths(a->bddm, a->q[v]);
+            paths tp = state_paths;
+            std::set<int> successors;
+            while (tp) {
+                successors.insert(tp->to);
+                tp = tp->next;
+            }
+            kill_paths(state_paths);
+            
+            for (int succ : successors) {
+                boost::add_edge(v, succ, g);
+                if (succ == v) {
+                    has_self_loop[v] = true;
+                }
+            }
+        }
+        
+        // Step 1: Compute SCCs using Boost's strong_components
+        std::vector<int> scc_id(ns);
+        int num_sccs = boost::strong_components(g, &scc_id[0]);
+        
+        // Analyze SCCs - check if recurrent and accepting
+        std::vector<bool> is_recurrent(num_sccs, false);
+        std::vector<bool> scc_is_accepting(num_sccs, false);
+        std::vector<int> scc_size(num_sccs, 0);
+        
+        // Count SCC sizes and check if all states in SCC are final
+        std::vector<bool> all_final_in_scc(num_sccs, true);
+        for (int i = 0; i < ns; i++) {
+            scc_size[scc_id[i]]++;
+            if (a->f[i] != 1) {
+                all_final_in_scc[scc_id[i]] = false;
+            }
+        }
+        
+        // Determine which SCCs are recurrent
+        for (int scc = 0; scc < num_sccs; scc++) {
+            if (scc_size[scc] > 1) {
+                // Multi-state SCC is always recurrent
+                is_recurrent[scc] = true;
+            } else {
+                // Single-state SCC is recurrent only if it has a self-loop
+                for (int v = 0; v < ns; v++) {
+                    if (scc_id[v] == scc) {
+                        if (has_self_loop[v]) {
+                            is_recurrent[scc] = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (is_recurrent[scc]) {
+                scc_is_accepting[scc] = all_final_in_scc[scc];
+            }
+        }
+        
+        // Step 2: Build SCC graph and compute topological order
+        typedef boost::adjacency_list<boost::setS, boost::vecS, boost::directedS> SCCGraph;
+        SCCGraph scc_graph(num_sccs);
+        
+        // Build SCC graph by collapsing edges of g into edges between SCC ids.
+        typedef boost::graph_traits<Graph>::edge_iterator edge_iter;
+        edge_iter ei, ei_end;
+        for (boost::tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei) {
+            int u = boost::source(*ei, g);
+            int v = boost::target(*ei, g);
+            int su = scc_id[u];
+            int sv = scc_id[v];
+            if (su != sv) {
+            boost::add_edge(su, sv, scc_graph);
+            }
+        }
+        
+        // Compute topological sort
+        std::vector<int> topo_order;
+        topo_order.reserve(num_sccs);
+        try {
+            boost::topological_sort(scc_graph, std::back_inserter(topo_order));
+        } catch (boost::not_a_dag&) {
+            // This shouldn't happen with the SCC graph, but handle it gracefully
+            std::cerr << "Warning: SCC graph is not a DAG, using original automaton" << std::endl;
+            ExplicitStateDfa result(dfaCopy(a), d.names);
+            return result;
+        }
+            
+        // Step 3: Compute maximal coloring following Löding's algorithm (Fig. 1)
+        const int k = (num_sccs | 1) + 1;  // Large enough even number
+        std::vector<int> scc_color(num_sccs);
+        
+        for (int vi : topo_order) {
+            // Get successor SCCs
+            std::set<int> succ_sccs;
+            auto edge_range = boost::out_edges(vi, scc_graph);
+            for (auto it = edge_range.first; it != edge_range.second; ++it) {
+                succ_sccs.insert(boost::target(*it, scc_graph));
+            }
+            
+            if (succ_sccs.empty()) {
+                // No successors - terminal SCC
+                if (scc_is_accepting[vi]) {
+                    scc_color[vi] = k;  // even (accepting)
+                } else {
+                    scc_color[vi] = k + 1;  // odd (rejecting)
+                }
+            } else {
+                // Has successors - compute minimum successor color
+                int min_succ_color = k + 1;
+                for (int succ : succ_sccs) {
+                    min_succ_color = std::min(min_succ_color, scc_color[succ]);
+                }
+                
+                if (is_recurrent[vi]) {
+                    // Recurrent SCC - assign based on acceptance
+                    bool is_even = (min_succ_color % 2 == 0);
+                    if (is_even && scc_is_accepting[vi]) {
+                        scc_color[vi] = min_succ_color;
+                    } else if (!is_even && !scc_is_accepting[vi]) {
+                        scc_color[vi] = min_succ_color;
+                    } else {
+                        scc_color[vi] = min_succ_color - 1;
+                    }
+                } else {
+                    // Transient SCC - inherit color from successors
+                    scc_color[vi] = min_succ_color;
+                }
+            }
+        }
+        // Print out the colouring in SCC order
+        std::cout << "SCC Coloring Results:" << std::endl;
+        for (int scc = 0; scc < num_sccs; scc++) {
+            std::cout << "SCC " << scc << ": Color " << scc_color[scc]
+                      << ", Recurrent: " << is_recurrent[scc]
+                      << ", Accepting: " << scc_is_accepting[scc] << std::endl;
+        }
+        // Step 4: Set final states based on coloring (even = final, odd = non-final)
+        DFA* normalized = dfaCopy(a);
+        for (int i = 0; i < ns; i++) {
+            int color = scc_color[scc_id[i]];
+            std::cout << "State " << i << " in SCC " << scc_id[i] << " colored " << color << std::endl;
+            // Logif state wsa final before
+            std::cout << "State " << i << " was final before: " << normalized->f[i] << std::endl;
+            normalized->f[i] = (color % 2 == 0) ? 1 : -1;
+        }
+        
+        // Step 5: Apply standard DFA minimization
+        DFA* minimized = dfaMinimize(normalized);
+        dfaFree(normalized);
+        // Log number of states now and before
+        spdlog::info("[ExplicitStateDfa::dfa_to_Gdfa] Number of states before minimization: {}", ns);
+        spdlog::info("[ExplicitStateDfa::dfa_to_Gdfa] Number of states after minimization: {}", minimized->ns);
+        ExplicitStateDfa result(minimized, d.names);
+        return result;
     }
 
 

@@ -1,7 +1,7 @@
 FROM debian:bookworm
 LABEL version="0.1.0"
 LABEL authors="Shufang Zhu"
-LABEL description="A Docker image to build and run the LydiaSyftPlus project."
+LABEL description="A Docker image to build and run the LydiaSyftPlusEL project."
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LC_ALL=C.UTF-8

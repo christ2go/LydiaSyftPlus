@@ -2,6 +2,7 @@
 #define OBLIGATION_LTLF_PLUS_SYNTHESIZER_H
 
 #include "automata/SymbolicStateDfa.h"
+#include "automata/ExplicitStateDfa.h"
 #include "game/BuchiSolver.hpp"
 #include "game/InputOutputPartition.h"
 #include "lydia/logic/ltlfplus/base.hpp"
@@ -114,15 +115,28 @@ namespace Syft {
 
         // --- helpers exposed because they're implemented in the .cpp ---
         /**
-         * Parse a boolean color formula string like "(1 & 2) | 3" and build an arena
-         * DFA where numeric tokens reference DFAs provided in color_to_dfa.
+         * Parse a boolean color formula string like "(1 & 2) | 3" and build an explicit
+         * DFA product using MONA's dfaProduct where numeric tokens reference ExplicitStateDfa
+         * provided in color_to_dfa.
          *
-         * The parser clones referenced DFAs with fresh state-space for each occurrence,
-         * then composes them with product_AND / product_OR according to the formula.
+         * This computes the product at the MONA level before conversion to symbolic representation.
          */
-        SymbolicStateDfa build_arena_from_color_formula(
+        ExplicitStateDfa build_explicit_arena_from_color_formula(
             const std::string& color_formula,
-            const std::map<int, SymbolicStateDfa>& color_to_dfa) const;
+            const std::map<int, ExplicitStateDfa>& color_to_dfa) const;
+
+        /**
+         * Parse a boolean color formula and build the arena using a hybrid approach.
+         * Starts with explicit MONA DFAs for efficiency, but automatically switches
+         * to symbolic representation when the state space exceeds a threshold (256 states).
+         * This prevents memory blowup on large products while maintaining MONA efficiency
+         * for smaller intermediate results.
+         *
+         * Returns a SymbolicStateDfa representing the complete product arena.
+         */
+        SymbolicStateDfa build_arena_from_color_formula_hybrid(
+            const std::string& color_formula,
+            const std::map<int, ExplicitStateDfa>& color_to_dfa) const;
 
         /**
          * (Optional) Evaluate a boolean color formula by substituting color integers

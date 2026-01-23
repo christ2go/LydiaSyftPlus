@@ -317,33 +317,44 @@ CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automat
         terms.push_back(primed_vars[i].Xnor(transition_func[i]));
     }
 
-    // Balanced pairwise conjunction: merge neighbors in rounds (like merge-sort)
-    // This is faster and more cache-friendly than Huffman-style merging
-    // Round 1: merge (0,1), (2,3), (4,5), ... 
-    // Round 2: merge results pairwise again, etc.
-    while (terms.size() > 1) {
-        std::cout << "[BuildTransitionRelation] Round with " << terms.size() << " terms" << std::endl;
-        
-        std::vector<CUDD::BDD> next_round;
-        next_round.reserve((terms.size() + 1) / 2);
-        
-        // Merge pairs
-        for (std::size_t i = 0; i + 1 < terms.size(); i += 2) {
-            next_round.push_back(terms[i] & terms[i + 1]);
-        }
-        
-        // If odd number of terms, carry the last one forward
-        if (terms.size() % 2 == 1) {
-            next_round.push_back(terms.back());
-        }
-        
-        terms = std::move(next_round);
+    // Sort terms by BDD size (node count) before merging
+    // This implements Huffman-style merging: always merge the two smallest BDDs
+    // This minimizes intermediate BDD sizes during conjunction
+    std::cout << "[BuildTransitionRelation] Sorting " << terms.size() << " terms by size" << std::endl;
+    
+    // Calculate sizes and create priority queue (min-heap by node count)
+    auto cmp = [](const CUDD::BDD& a, const CUDD::BDD& b) {
+        return a.nodeCount() > b.nodeCount();  // Min-heap: smaller nodes first
+    };
+    std::priority_queue<CUDD::BDD, std::vector<CUDD::BDD>, decltype(cmp)> pq(cmp);
+    
+    // Add all terms to priority queue
+    for (const auto& term : terms) {
+        std::cout << "[BuildTransitionRelation]   Term size: " << term.nodeCount() << " nodes" << std::endl;
+        pq.push(term);
     }
     
-    if (!terms.empty()) {
-        trans_relation = terms[0];
+    // Merge two smallest BDDs at a time
+    while (pq.size() > 1) {
+        CUDD::BDD first = pq.top();
+        pq.pop();
+        CUDD::BDD second = pq.top();
+        pq.pop();
+        
+        std::cout << "[BuildTransitionRelation] Merging BDDs of size " 
+                  << first.nodeCount() << " and " << second.nodeCount() << std::endl;
+        
+        CUDD::BDD merged = first & second;
+        std::cout << "[BuildTransitionRelation]   Result size: " << merged.nodeCount() << " nodes" << std::endl;
+        
+        pq.push(merged);
     }
-    std::cout << "Beginnign existential abstraction" << std::endl;
+    
+    if (!pq.empty()) {
+        trans_relation = pq.top();
+    }
+    
+    std::cout << "[BuildTransitionRelation] Beginning existential abstraction" << std::endl;
     // Existentially quantify over input and output variables to get state-to-state relation
     trans_relation = trans_relation.ExistAbstract(io_cube);
         std::cout << "Finished existential abstraction" << std::endl;

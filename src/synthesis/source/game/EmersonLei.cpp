@@ -704,10 +704,10 @@ namespace Syft {
           }
         }
       }
-     // if (DEBUG_MODE) {
+     if (DEBUG_MODE) {
   spdlog::info("[EmersonLeiSolve] outer_iter={} inner_iter={} X_nodes={} XX_nodes={}", outer_iter, inner_iter, X.nodeCount(), XX.nodeCount());
-        var_mgr_->dump_dot(XX.Add(), "XX.dot");
-      //}
+        //var_mgr_->dump_dot(XX.Add(), "XX.dot");
+    }
 
   // Info-level trace of the fixpoint progress for lightweight logging/monitoring
   spdlog::info("[EmersonLeiSolve] node={} outer_iter={} inner_iter={} X_nodes={} XX_nodes={}",
