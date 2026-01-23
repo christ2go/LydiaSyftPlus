@@ -22,6 +22,8 @@ import json
 import shutil
 from pathlib import Path
 
+from datetime import datetime
+
 
 TEMPLATE = Path(__file__).parent / 'job_slurm.sh.template'
 
@@ -218,9 +220,14 @@ def main():
         sys.exit(1)
 
     out_dir = Path(args.out_dir).resolve()
-    (out_dir / 'results').mkdir(parents=True, exist_ok=True)
-    (out_dir / 'logs').mkdir(parents=True, exist_ok=True)
-    (out_dir / 'jobs').mkdir(parents=True, exist_ok=True)
+    # Create a timestamped run subdirectory so separate invocations don't overwrite each other.
+    # Format: YYYY-MM-DD-HHMM-<pattern>
+    timestamp = datetime.now().strftime('%Y-%m-%d-%H%M')
+    run_subdir_name = f"{timestamp}-{args.pattern}"
+    run_out_dir = out_dir / run_subdir_name
+    (run_out_dir / 'results').mkdir(parents=True, exist_ok=True)
+    (run_out_dir / 'logs').mkdir(parents=True, exist_ok=True)
+    (run_out_dir / 'jobs').mkdir(parents=True, exist_ok=True)
 
     sbatch_opts = {
         '--time': args.sbatch_time,
@@ -257,7 +264,7 @@ def main():
             continue
 
         for mode in modes:
-            job_script = write_job_script(out_dir, pattern, partition_file, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts, mode)
+            job_script = write_job_script(run_out_dir, pattern, partition_file, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts, mode)
             jobid = submit_script(job_script)
             submitted.append(jobid)
             expected_runs += args.runs
@@ -266,15 +273,15 @@ def main():
 
     if args.wait:
         print('Waiting for results to appear...')
-        ok = wait_for_results(out_dir, expected_runs, timeout_s=max(3600, args.runs * len(examples) * args.timeout * 2))
+        ok = wait_for_results(run_out_dir, expected_runs, timeout_s=max(3600, args.runs * len(examples) * args.timeout * 2))
         if not ok:
             print('Timeout while waiting for results. Some runs may be missing.')
         else:
             print('All expected result files are present.')
 
     if args.aggregate:
-        aggregated_file = out_dir / 'aggregated_results.json'
-        aggregate(out_dir, aggregated_file)
+        aggregated_file = run_out_dir / 'aggregated_results.json'
+        aggregate(run_out_dir, aggregated_file)
 
     print('Done.')
 
