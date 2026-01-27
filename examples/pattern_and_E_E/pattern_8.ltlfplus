@@ -1,0 +1,1 @@
+E(F((a1 | e1) & X(true))) & E(F((a2 | e2) & X(true))) & E(F((a3 | e3) & X(true))) & E(F((a4 | e4) & X(true))) & E(F((a5 | e5) & X(true))) & E(F((a6 | e6) & X(true))) & E(F((a7 | e7) & X(true))) & E(F((a8 | e8) & X(true)))
