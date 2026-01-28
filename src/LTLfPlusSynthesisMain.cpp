@@ -38,6 +38,8 @@ int main(int argc, char** argv) {
     bool DEBUG_MODE = false;
     bool STRATEGY = false;
     bool obligation_simplification = false;
+    bool disable_minimisation = false;
+    int minimisation_threshold = 12;
     std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
     auto console = spdlog::stdout_color_mt("console");
     spdlog::set_default_logger(console);
@@ -61,6 +63,12 @@ int main(int argc, char** argv) {
 
     app.add_option("--obligation-simplification", obligation_simplification, "should obligation properties be treated using simpler algorithm (boolean)") ->
         required();
+
+    app.add_flag("--disable-minimisation", disable_minimisation,
+                 "Disable DFA minimisation in obligation mode (default: enabled)");
+    app.add_option("--minimisation-threshold", minimisation_threshold,
+                   "State-count threshold below which DFA minimisation is attempted in obligation mode")
+        ->default_val(12);
 
     app.add_option("-b,--buechi-mode", buechi_mode_str, "Solver mode: wg (weak-game / SCC), cl (Büchi classic), pm (Büchi Piterman), cb (CoBuchi)")
     ->default_val("wg");
@@ -158,7 +166,8 @@ int main(int argc, char** argv) {
                 starting_player,
                 Syft::Player::Agent,
                 use_buchi_flag,
-                mode
+                mode,
+                MinimisationOptions{!disable_minimisation, minimisation_threshold}
             );
             auto synthesis_result = obligation_synthesizer.run();
 

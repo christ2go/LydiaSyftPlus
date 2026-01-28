@@ -16,6 +16,11 @@
 #include <string>
 #include <utility>
 
+struct MinimisationOptions {
+    bool allow_minimisation = true;
+    int threshold = 12;  // By default, only minimise small weak automata
+};
+
 namespace CUDD {
     // forward-declare minimal wrapper type used in signatures
     class BDD;
@@ -51,6 +56,9 @@ namespace Syft {
          * \param partition          input/output partition (variable names)
          * \param starting_player    who moves first each turn
          * \param protagonist_player the player we synthesise for (Agent/Environment)
+         * \param use_buchi         if true, use Büchi-based solver; if false, use SCC-based weak-game solver
+         * \param buechi_mode       which Büchi algorithm to use (if use_buchi is true)
+         * \param allow_minimisation if true, allows minimisation of intermediate DFAs to save memory
          */
         ObligationLTLfPlusSynthesizer(
             LTLfPlus ltlf_plus_formula,
@@ -60,7 +68,8 @@ namespace Syft {
             // If use_buchi is false the solver will run the weak-game (SCC) algorithm.
             // If true, the provided buechi_mode selects which Büchi-based algorithm to run.
             bool use_buchi = false,
-            Syft::BuchiSolver::BuchiMode buechi_mode = Syft::BuchiSolver::BuchiMode::CLASSIC
+            Syft::BuchiSolver::BuchiMode buechi_mode = Syft::BuchiSolver::BuchiMode::CLASSIC,
+            MinimisationOptions minimisation_options = MinimisationOptions()
         );
 
         /**
@@ -76,8 +85,9 @@ namespace Syft {
         LTLfPlus ltlf_plus_formula_;
         Player starting_player_;
         Player protagonist_player_;
-    bool use_buchi_ = false;
-    Syft::BuchiSolver::BuchiMode buechi_mode_ = Syft::BuchiSolver::BuchiMode::CLASSIC;
+        bool use_buchi_ = false;
+        Syft::BuchiSolver::BuchiMode buechi_mode_ = Syft::BuchiSolver::BuchiMode::CLASSIC;
+        MinimisationOptions minimisation_options_ = MinimisationOptions();
 
         // --- core phases ---
         void validate_obligation_fragment() const;

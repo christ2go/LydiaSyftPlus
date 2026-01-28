@@ -26,11 +26,13 @@ namespace Syft {
         Player starting_player,
         Player protagonist_player,
         bool use_buchi,
-        Syft::BuchiSolver::BuchiMode buechi_mode)
+        Syft::BuchiSolver::BuchiMode buechi_mode,
+        MinimisationOptions minimisation_options)
         : ltlf_plus_formula_(ltlf_plus_formula),
           starting_player_(starting_player),
           protagonist_player_(protagonist_player),
-          use_buchi_(use_buchi) {
+          use_buchi_(use_buchi), 
+          minimisation_options_(minimisation_options) {
         buechi_mode_ = buechi_mode;
         std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
         var_mgr->create_named_variables(partition.input_variables);
@@ -195,9 +197,9 @@ namespace Syft {
                         std::cout << "[ObligationFragment] Computing AND product using MONA" << std::endl;
                         ExplicitStateDfa product = ExplicitStateDfa::dfa_product_and({*left.explicit_dfa, *right.explicit_dfa});
                         std::cout << "[ObligationFragment] AND product has " << product.dfa_->ns << " states" << std::endl;
-                        if (product.dfa_->ns < MINIMISATION_THRESHOLD) {
+                        if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
                             std::cout << "[ObligationFragment] Minimizing AND product (states: " 
-                                      << product.dfa_->ns << " > " << MINIMISATION_THRESHOLD << ")" << std::endl;
+                                      << product.dfa_->ns << " > " << minimisation_options_.threshold << ")" << std::endl;
                                                               ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(product);
                         left = HybridDfa(minised, var_mgr_);
 
@@ -237,9 +239,9 @@ namespace Syft {
                         ExplicitStateDfa product = ExplicitStateDfa::dfa_product_or({*left.explicit_dfa, *right.explicit_dfa});
                         std::cout << "[ObligationFragment] OR product has " << product.dfa_->ns << " states" << std::endl;
                         // MINIMISE HERE IF NEEDED
-                        if (product.dfa_->ns < MINIMISATION_THRESHOLD) {
+                        if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
                             std::cout << "[ObligationFragment] Minimizing OR product (states: " 
-                                      << product.dfa_->ns << " > " << MINIMISATION_THRESHOLD << ")" << std::endl;
+                                      << product.dfa_->ns << " > " << minimisation_options_.threshold << ")" << std::endl;
 
                         ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(product);
                         left = HybridDfa(minised, var_mgr_);

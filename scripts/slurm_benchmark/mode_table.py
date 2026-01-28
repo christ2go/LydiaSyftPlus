@@ -22,6 +22,7 @@ import os
 import re
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any
+import math
 
 PATTERN_NUM_RE = re.compile(r"pattern[_\-](\d+)", re.IGNORECASE)
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
@@ -168,6 +169,113 @@ def build_cell(runs: List[Dict[str,Any]], use_color: bool) -> str:
 
     return " ".join(cell_parts)
 
+
+LATEX_MODE_ORDER = ["wg", "el", "pm", "cl", "sr", "cb", "ltlf"]
+LATEX_MODE_NAMES = {
+    "wg": "SCC",
+    "el": "EL",
+    "pm": "Buechi",
+    "cl": "Buechi",
+    "sr": "SafeReach",
+    "cb": "CoBuechi",
+    "ltlf": "LTLf",
+}
+
+
+def format_latex_cell(runs: List[Dict[str, Any]]) -> str:
+    # Error / OOM / non-zero return -> ddagger
+    rc_set = set()
+    for r in runs:
+        rc = r["rc"]
+        if isinstance(rc, str) and rc.isdigit():
+            rc = int(rc)
+        if rc is not None:
+            rc_set.add(rc)
+
+    timeout_any = any(r["timeout"] for r in runs)
+
+    nonzero_codes = [c for c in rc_set if isinstance(c, int) and c != 0] + [c for c in rc_set if not isinstance(c, int) and c not in (None, 0)]
+    if nonzero_codes:
+        # error
+        cell = r"\textsc{$\ddagger$}"
+        # mark timeout too if present
+        if timeout_any:
+            cell += r"\textsc{$\dagger$}"
+        return cell
+
+    elapsed_vals = [r["elapsed"] for r in runs if isinstance(r["elapsed"], (int, float))]
+    if not elapsed_vals:
+        # treat missing as timeout
+        return r"\textsc{$\dagger$}"
+
+    avg = sum(elapsed_vals) / len(elapsed_vals)
+    cell = f"\\textbf{{{avg:.3f}s}}"
+    if len(elapsed_vals) > 1:
+        # sample std dev
+        mean = avg
+        var = sum((x - mean) ** 2 for x in elapsed_vals) / len(elapsed_vals)
+        std = math.sqrt(var)
+        cell += f" \\scriptsize $\\pm${std:.3f}s"
+
+    if timeout_any:
+        cell += r" \textsc{$\dagger$}"
+    return cell
+
+
+def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_errors: List[Tuple[str, str]]):
+    pattern_nums = set()
+    modes = set()
+    for (pat, mode) in bucket.keys():
+        pattern_nums.add(pat)
+        modes.add(mode)
+
+    if not pattern_nums:
+        print("No JSON result files found.")
+        if parse_errors:
+            print("% Parse errors:")
+            for p, err in parse_errors:
+                print("% -", p, ":", err)
+        return
+
+    def pat_key(x):
+        try:
+            return (0, int(x))
+        except Exception:
+            return (1, x)
+
+    sorted_patterns = sorted(pattern_nums, key=pat_key)
+
+    # Determine mode order: use predefined order then append unknowns
+    ordered_modes = [m for m in LATEX_MODE_ORDER if m in modes]
+    unknown_modes = [m for m in sorted(modes) if m not in ordered_modes]
+    ordered_modes.extend(unknown_modes)
+
+    col_headers = [LATEX_MODE_NAMES.get(m, m) for m in ordered_modes]
+
+    # Begin LaTeX table
+    cols_spec = "r|" + "c" * len(ordered_modes)
+    print(f"\\begin{{tabular}}{{{cols_spec}}}")
+    print("\\hline")
+    header_line = "$n$" + " & " + " & ".join(col_headers) + r" \\""
+    print(header_line)
+    print("\\hline")
+
+    for pat in sorted_patterns:
+        cells = [pat]
+        for mode in ordered_modes:
+            runs = bucket.get((pat, mode), [])
+            cell = format_latex_cell(runs) if runs else r"\textsc{$\dagger$}"
+            cells.append(cell)
+        print(" ".join([str(cells[0])]) + " & " + " & ".join(cells[1:]) + r" \\")
+
+    print("\\hline")
+    print("\\end{tabular}")
+
+    if parse_errors:
+        print("% Parse errors:")
+        for p, err in parse_errors:
+            print(f"% - {p}: {err}")
+
 def make_table(bucket: Dict[Tuple[str,str], List[Dict[str,Any]]], parse_errors: List[Tuple[str,str]], use_color: bool):
     pattern_nums = set()
     modes = set()
@@ -230,10 +338,14 @@ def main():
     ap.add_argument("dir", help="Directory with JSON files")
     ap.add_argument("-r", "--recursive", action="store_true", help="Search directory recursively")
     ap.add_argument("--no-color", action="store_true", help="Disable color output")
+    ap.add_argument("--latex", action="store_true", help="Output LaTeX tabular instead of plain text")
     args = ap.parse_args()
 
     bucket, parse_errors = collect(args.dir, recursive=args.recursive)
-    make_table(bucket, parse_errors, use_color=not args.no_color)
+    if args.latex:
+        make_table_latex(bucket, parse_errors)
+    else:
+        make_table(bucket, parse_errors, use_color=not args.no_color)
 
 if __name__ == "__main__":
     main()
