@@ -256,7 +256,7 @@ def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_
     cols_spec = "r|" + "c" * len(ordered_modes)
     print(f"\\begin{{tabular}}{{{cols_spec}}}")
     print("\\hline")
-    header_line = "$n$" + " & " + " & ".join(col_headers) + r" \\""
+    header_line = "$n$" + " & " + " & ".join(col_headers) + " \\\\"
     print(header_line)
     print("\\hline")
 
