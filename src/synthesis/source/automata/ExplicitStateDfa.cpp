@@ -235,7 +235,7 @@ namespace Syft {
         }
 
         statuses.push_back('\0');
-        DFA *tmp = dfaMinimize(dfaBuild(statuses.data()));
+        DFA *tmp = dfaBuild(statuses.data());
         ExplicitStateDfa res(tmp, d.names);
         return res;
     }
