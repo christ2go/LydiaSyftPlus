@@ -174,9 +174,8 @@ LATEX_MODE_ORDER = ["wg", "el", "pm", "cl", "sr", "cb", "ltlf"]
 LATEX_MODE_NAMES = {
     "wg": "SCC",
     "el": "EL",
-    "pm": "Buechi",
+    "pm": "SafeReach",
     "cl": "Buechi",
-    "sr": "SafeReach",
     "cb": "CoBuechi",
     "ltlf": "LTLf",
 }
