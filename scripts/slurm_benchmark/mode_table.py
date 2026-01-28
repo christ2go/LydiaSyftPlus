@@ -182,8 +182,8 @@ LATEX_MODE_NAMES = {
 }
 
 
-def format_latex_cell(runs: List[Dict[str, Any]]) -> str:
-    # Error / OOM / non-zero return -> ddagger
+def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool) -> str:
+    # Error / OOM / non-zero return -> ddagger, but any timeout wins with dagger
     rc_set = set()
     for r in runs:
         rc = r["rc"]
@@ -194,14 +194,12 @@ def format_latex_cell(runs: List[Dict[str, Any]]) -> str:
 
     timeout_any = any(r["timeout"] for r in runs)
 
+    if timeout_any:
+        return r"\textsc{$\dagger$}"
+
     nonzero_codes = [c for c in rc_set if isinstance(c, int) and c != 0] + [c for c in rc_set if not isinstance(c, int) and c not in (None, 0)]
     if nonzero_codes:
-        # error
-        cell = r"\textsc{$\ddagger$}"
-        # mark timeout too if present
-        if timeout_any:
-            cell += r"\textsc{$\dagger$}"
-        return cell
+        return r"\textsc{$\ddagger$}"
 
     elapsed_vals = [r["elapsed"] for r in runs if isinstance(r["elapsed"], (int, float))]
     if not elapsed_vals:
@@ -210,19 +208,17 @@ def format_latex_cell(runs: List[Dict[str, Any]]) -> str:
 
     avg = sum(elapsed_vals) / len(elapsed_vals)
     cell = f"\\textbf{{{avg:.3f}s}}"
-    if len(elapsed_vals) > 1:
+    if show_ci and len(elapsed_vals) > 1:
         # sample std dev
         mean = avg
         var = sum((x - mean) ** 2 for x in elapsed_vals) / len(elapsed_vals)
         std = math.sqrt(var)
         cell += f" \\scriptsize $\\pm${std:.3f}s"
 
-    if timeout_any:
-        cell += r" \textsc{$\dagger$}"
     return cell
 
 
-def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_errors: List[Tuple[str, str]]):
+def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_errors: List[Tuple[str, str]], show_ci: bool):
     pattern_nums = set()
     modes = set()
     for (pat, mode) in bucket.keys():
@@ -264,7 +260,7 @@ def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_
         cells = [pat]
         for mode in ordered_modes:
             runs = bucket.get((pat, mode), [])
-            cell = format_latex_cell(runs) if runs else r"\textsc{$\dagger$}"
+            cell = format_latex_cell(runs, show_ci=show_ci) if runs else r"\textsc{$\dagger$}"
             cells.append(cell)
         print(" ".join([str(cells[0])]) + " & " + " & ".join(cells[1:]) + r" \\")
 
@@ -339,11 +335,12 @@ def main():
     ap.add_argument("-r", "--recursive", action="store_true", help="Search directory recursively")
     ap.add_argument("--no-color", action="store_true", help="Disable color output")
     ap.add_argument("--latex", action="store_true", help="Output LaTeX tabular instead of plain text")
+    ap.add_argument("--latex-ci", action="store_true", help="Show ±stddev in LaTeX output when multiple runs")
     args = ap.parse_args()
 
     bucket, parse_errors = collect(args.dir, recursive=args.recursive)
     if args.latex:
-        make_table_latex(bucket, parse_errors)
+        make_table_latex(bucket, parse_errors, show_ci=args.latex_ci)
     else:
         make_table(bucket, parse_errors, use_color=not args.no_color)
 
