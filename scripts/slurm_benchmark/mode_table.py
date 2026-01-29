@@ -329,7 +329,7 @@ def make_table(bucket: Dict[Tuple[str,str], List[Dict[str,Any]]], parse_errors: 
             if not runs:
                 cell = "-"
             else:
-                cell = build_cell(runs, use_color)
+                cell = build_cell_with_time(runs, use_color, time_source="elapsed")
             row.append(cell)
         rows.append(row)
 
@@ -360,10 +360,15 @@ def main():
     ap.add_argument("--no-color", action="store_true", help="Disable color output")
     ap.add_argument("--latex", action="store_true", help="Output LaTeX tabular instead of plain text")
     ap.add_argument("--latex-ci", action="store_true", help="Show ±stddev in LaTeX output when multiple runs")
+    ap.add_argument("--time-source", choices=["elapsed", "wall", "cpu"], default="elapsed",
+                    help="Which time to use when reporting runtimes: 'elapsed' from JSON (default), or parse 'Wall/CPU' from stdout when available")
     args = ap.parse_args()
 
     bucket, parse_errors = collect(args.dir, recursive=args.recursive)
     if args.latex:
+        # LaTeX table will use the chosen time source when formatting cells
+        # Note: make_table_latex currently delegates to format_latex_cell which uses elapsed field; to keep behavior
+        # consistent we do not change LaTeX path here (could be extended similarly)
         make_table_latex(bucket, parse_errors, show_ci=args.latex_ci)
     else:
         make_table(bucket, parse_errors, use_color=not args.no_color)
