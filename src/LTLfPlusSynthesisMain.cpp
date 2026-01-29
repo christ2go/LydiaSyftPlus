@@ -16,6 +16,8 @@
 #include "debug.hpp"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <ctime>
+#include <chrono>
 
 int main(int argc, char** argv) {
 
@@ -77,6 +79,19 @@ int main(int argc, char** argv) {
 
     CLI11_PARSE(app, argc, argv);
 
+    // Start stopwatch to measure execution time (wall and CPU)
+    auto start = std::chrono::high_resolution_clock::now();
+    const std::clock_t c_start = std::clock();
+
+    // Helper to print wall and CPU elapsed time
+    auto print_times = [&](const std::string &label = "") {
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> wall_elapsed = end - start;
+        const std::clock_t c_end = std::clock();
+        double cpu_elapsed = double(c_end - c_start) / double(CLOCKS_PER_SEC);
+        if (!label.empty()) std::cout << label << ": ";
+        std::cout << "Wall time: " << wall_elapsed.count() << " seconds; CPU time: " << cpu_elapsed << " seconds" << std::endl;
+    };
     // parse and process input LTLf+ formula
     // read formula
     std::string ltlf_plus_formula_str;
@@ -176,6 +191,7 @@ int main(int argc, char** argv) {
             } else {
                 std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
             }
+            print_times();
         } catch (const std::runtime_error& e) {
             std::cerr << "Error: " << e.what() << std::endl;
             std::cerr << "The formula is not in the obligation fragment. Use a different synthesizer." << std::endl;
@@ -193,8 +209,10 @@ int main(int argc, char** argv) {
         );
         auto synthesis_result = synthesizer.run();
 
-        if (synthesis_result.realizability) {
+            if (synthesis_result.realizability) {
             std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
+                        print_times();
+
             if (verbose) {
                 std::cout << "Strategy:" << std::endl;
                 for (auto item : synthesis_result.output_function) {
@@ -210,6 +228,8 @@ int main(int argc, char** argv) {
             }
         } else {
             std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
+                        print_times();
+
         }
     } else {
         if ((game_solver != 1) & (game_solver != 2)) {
@@ -228,8 +248,10 @@ int main(int argc, char** argv) {
             std::cout << "Running MP solver" << std::endl;
 
         auto synthesis_result_MP = synthesizerMP.run();
-        if (synthesis_result_MP.realizability) {
+            if (synthesis_result_MP.realizability) {
             std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
+                        print_times();
+
             if (verbose) {
                 std::cout << "Strategy:" << std::endl;
                 for (auto item : synthesis_result_MP.output_function) {
@@ -246,6 +268,8 @@ int main(int argc, char** argv) {
             }
         } else {
             std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;
+                        print_times();
+
         }
     }
 
