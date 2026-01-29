@@ -206,7 +206,7 @@ LATEX_MODE_NAMES = {
 }
 
 
-def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool) -> str:
+def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool, time_source: str = "elapsed") -> str:
     # Error / OOM / non-zero return -> ddagger, but any timeout wins with dagger
     rc_set = set()
     for r in runs:
@@ -225,15 +225,30 @@ def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool) -> str:
     if nonzero_codes:
         return r"\textsc{$\ddagger$}"
 
-    elapsed_vals = [r["elapsed"] for r in runs if isinstance(r["elapsed"], (int, float))]
+    def get_time(r: Dict[str, Any]) -> Any:
+        if time_source in ("wall", "cpu") and not r.get("timeout", False):
+            txt = r.get("stdout", "") or ""
+            wall_m = re.search(r"Wall time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
+            cpu_m = re.search(r"CPU time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
+            if time_source == "wall" and wall_m:
+                try:
+                    return float(wall_m.group(1))
+                except Exception:
+                    pass
+            if time_source == "cpu" and cpu_m:
+                try:
+                    return float(cpu_m.group(1))
+                except Exception:
+                    pass
+        return r.get("elapsed")
+
+    elapsed_vals = [get_time(r) for r in runs if isinstance(get_time(r), (int, float))]
     if not elapsed_vals:
-        # treat missing as timeout
         return r"\textsc{$\dagger$}"
 
     avg = sum(elapsed_vals) / len(elapsed_vals)
     cell = f"\\textbf{{{avg:.3f}s}}"
     if show_ci and len(elapsed_vals) > 1:
-        # sample std dev
         mean = avg
         var = sum((x - mean) ** 2 for x in elapsed_vals) / len(elapsed_vals)
         std = math.sqrt(var)
@@ -242,7 +257,7 @@ def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool) -> str:
     return cell
 
 
-def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_errors: List[Tuple[str, str]], show_ci: bool):
+def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_errors: List[Tuple[str, str]], show_ci: bool, time_source: str = "elapsed"):
     pattern_nums = set()
     modes = set()
     for (pat, mode) in bucket.keys():
@@ -284,7 +299,7 @@ def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_
         cells = [pat]
         for mode in ordered_modes:
             runs = bucket.get((pat, mode), [])
-            cell = format_latex_cell(runs, show_ci=show_ci) if runs else r"\textsc{$\dagger$}"
+            cell = format_latex_cell(runs, show_ci=show_ci, time_source=time_source) if runs else r"\textsc{$\dagger$}"
             cells.append(cell)
         print(" ".join([str(cells[0])]) + " & " + " & ".join(cells[1:]) + r" \\")
 
@@ -296,7 +311,7 @@ def make_table_latex(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_
         for p, err in parse_errors:
             print(f"% - {p}: {err}")
 
-def make_table(bucket: Dict[Tuple[str,str], List[Dict[str,Any]]], parse_errors: List[Tuple[str,str]], use_color: bool):
+def make_table(bucket: Dict[Tuple[str,str], List[Dict[str,Any]]], parse_errors: List[Tuple[str,str]], use_color: bool, time_source: str = "elapsed"):
     pattern_nums = set()
     modes = set()
     for (pat, mode) in bucket.keys():
@@ -329,7 +344,7 @@ def make_table(bucket: Dict[Tuple[str,str], List[Dict[str,Any]]], parse_errors: 
             if not runs:
                 cell = "-"
             else:
-                cell = build_cell_with_time(runs, use_color, time_source="elapsed")
+                cell = build_cell_with_time(runs, use_color, time_source=time_source)
             row.append(cell)
         rows.append(row)
 
@@ -367,11 +382,9 @@ def main():
     bucket, parse_errors = collect(args.dir, recursive=args.recursive)
     if args.latex:
         # LaTeX table will use the chosen time source when formatting cells
-        # Note: make_table_latex currently delegates to format_latex_cell which uses elapsed field; to keep behavior
-        # consistent we do not change LaTeX path here (could be extended similarly)
-        make_table_latex(bucket, parse_errors, show_ci=args.latex_ci)
+        make_table_latex(bucket, parse_errors, show_ci=args.latex_ci, time_source=args.time_source)
     else:
-        make_table(bucket, parse_errors, use_color=not args.no_color)
+        make_table(bucket, parse_errors, use_color=not args.no_color, time_source=args.time_source)
 
 if __name__ == "__main__":
     main()
