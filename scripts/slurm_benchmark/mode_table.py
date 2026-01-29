@@ -246,7 +246,12 @@ def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool, time_source: st
 
     def get_time(r: Dict[str, Any]) -> Any:
         if time_source in ("wall", "cpu") and not r.get("timeout", False):
-            txt = r.get("stdout", "") or ""
+            txt = ""
+            path = r.get("file")
+            if isinstance(path, str):
+                txt = _load_stdout_from_json(path)
+            if not txt:
+                txt = r.get("stdout", "") or ""
             wall_m = re.search(r"Wall time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
             cpu_m = re.search(r"CPU time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
             if time_source == "wall" and wall_m:
@@ -261,7 +266,11 @@ def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool, time_source: st
                     pass
         return r.get("elapsed")
 
-    elapsed_vals = [get_time(r) for r in runs if isinstance(get_time(r), (int, float))]
+    elapsed_vals: List[float] = []
+    for r in runs:
+        val = get_time(r)
+        if isinstance(val, (int, float)):
+            elapsed_vals.append(float(val))
     if not elapsed_vals:
         return r"\textsc{$\dagger$}"
 
