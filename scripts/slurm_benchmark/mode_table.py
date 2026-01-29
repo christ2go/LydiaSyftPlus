@@ -108,6 +108,11 @@ def collect(dirpath: str, recursive: bool=False) -> Tuple[Dict[Tuple[str,str], L
     return bucket, parse_errors
 
 def build_cell(runs: List[Dict[str,Any]], use_color: bool) -> str:
+    # Deprecated signature kept for backward-compat; delegate to new signature
+    return build_cell_with_time(runs, use_color, time_source="elapsed")
+
+
+def build_cell_with_time(runs: List[Dict[str,Any]], use_color: bool, time_source: str) -> str:
     # collect return codes (non-None)
     rc_set = set()
     for r in runs:
@@ -146,7 +151,27 @@ def build_cell(runs: List[Dict[str,Any]], use_color: bool) -> str:
         return cell
 
     # else all rc == 0 or missing
-    elapsed_vals = [r["elapsed"] for r in runs if r["elapsed"] is not None]
+    def get_time(r: Dict[str, Any]) -> Any:
+        # If user requested wall/cpu, prefer parsed stdout values unless the run timed out
+        if time_source in ("wall", "cpu") and not r.get("timeout", False):
+            # try parse from stdout
+            txt = r.get("stdout", "") or ""
+            wall_m = re.search(r"Wall time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
+            cpu_m = re.search(r"CPU time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
+            if time_source == "wall" and wall_m:
+                try:
+                    return float(wall_m.group(1))
+                except Exception:
+                    pass
+            if time_source == "cpu" and cpu_m:
+                try:
+                    return float(cpu_m.group(1))
+                except Exception:
+                    pass
+        # fallback to elapsed field
+        return r.get("elapsed")
+
+    elapsed_vals = [get_time(r) for r in runs if isinstance(get_time(r), (int, float))]
     cell_parts = []
     if elapsed_vals:
         avg = sum(elapsed_vals) / len(elapsed_vals)
