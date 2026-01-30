@@ -17,6 +17,22 @@
 #include <algorithm>
 #include <iostream>
 #include <chrono>
+#include <optional>
+#include <utility>
+#include <boost/multiprecision/cpp_int.hpp>
+
+namespace {
+    using BigInt = boost::multiprecision::cpp_int;
+
+    std::string bigint_to_string(const std::optional<BigInt>& value) {
+        if (!value.has_value()) {
+            return "unknown";
+        }
+        std::ostringstream oss;
+        oss << value.value();
+        return oss.str();
+    }
+}
 
 namespace Syft {
 
@@ -72,47 +88,70 @@ namespace Syft {
 
     // Threshold for switching from explicit to symbolic representation
     // 2^8 = 256 states is a reasonable threshold
-    static constexpr int EXPLICIT_TO_SYMBOLIC_THRESHOLD = 64;
+    static constexpr int EXPLICIT_TO_SYMBOLIC_THRESHOLD = 256;
     // Maxmimum number of states to start minimisation
     static constexpr int MINIMISATION_THRESHOLD = 0;  // Disabled for now
 
     // Helper struct to hold either explicit or symbolic DFA
     struct HybridDfa {
-        std::optional<ExplicitStateDfa> explicit_dfa;
-        std::optional<SymbolicStateDfa> symbolic_dfa;
+    std::optional<ExplicitStateDfa> explicit_dfa;
+    std::optional<SymbolicStateDfa> symbolic_dfa;
+    std::optional<BigInt> approx_state_count; // Optional approximation of number of states
         bool is_symbolic;
         std::shared_ptr<VarMgr> var_mgr;
         
         // Constructor from explicit DFA
-        HybridDfa(const ExplicitStateDfa& e, std::shared_ptr<VarMgr> vm) 
-            : explicit_dfa(e), symbolic_dfa(std::nullopt), 
-              is_symbolic(false), var_mgr(vm) {}
+                                HybridDfa(ExplicitStateDfa e, std::shared_ptr<VarMgr> vm) 
+                                        : explicit_dfa(std::move(e)), symbolic_dfa(std::nullopt), 
+                                            is_symbolic(false), var_mgr(vm) {
+                                                approx_state_count = BigInt(explicit_dfa->get_nb_states());
+              }
         
         // Constructor from symbolic DFA (already converted)
         HybridDfa(const SymbolicStateDfa& s, std::shared_ptr<VarMgr> vm)
             : explicit_dfa(std::nullopt), symbolic_dfa(s), 
-              is_symbolic(true), var_mgr(vm) {}
+              is_symbolic(true), var_mgr(vm) {
+              }
         
-        int state_count() const {
-            return is_symbolic ? -1 : explicit_dfa->dfa_->ns;
+        std::optional<BigInt> state_count() const {
+            if (!is_symbolic) {
+                return BigInt(explicit_dfa->dfa_->ns);
+            }
+            return approx_state_count;
+        }
+
+        std::string state_count_str() const {
+            return bigint_to_string(state_count());
+        }
+
+        void set_state_count(const BigInt& value) {
+            approx_state_count = value;
+        }
+
+        void clear_state_count() {
+            approx_state_count.reset();
         }
         
         void convert_to_symbolic_if_needed() {
             if (!is_symbolic && explicit_dfa->dfa_->ns > EXPLICIT_TO_SYMBOLIC_THRESHOLD) {
                 std::cout << "[ObligationFragment] Converting to symbolic (exceeded threshold: " 
                           << explicit_dfa->dfa_->ns << " > " << EXPLICIT_TO_SYMBOLIC_THRESHOLD << ")" << std::endl;
+                BigInt explicit_count = BigInt(explicit_dfa->get_nb_states());
                 symbolic_dfa = SymbolicStateDfa::from_explicit(
                     ExplicitStateDfaAdd::from_dfa_mona(var_mgr, *explicit_dfa));
                 is_symbolic = true;
+                approx_state_count = explicit_count;
                 explicit_dfa = std::nullopt;  // Free the explicit DFA
             }
         }
         
         SymbolicStateDfa to_symbolic() {
             if (!is_symbolic) {
+                BigInt explicit_count = BigInt(explicit_dfa->get_nb_states());
                 symbolic_dfa = SymbolicStateDfa::from_explicit(
                     ExplicitStateDfaAdd::from_dfa_mona(var_mgr, *explicit_dfa));
                 is_symbolic = true;
+                approx_state_count = explicit_count;
                 explicit_dfa = std::nullopt;  // Free the explicit DFA
             }
             return *symbolic_dfa;
@@ -187,10 +226,20 @@ namespace Syft {
                     if (left.is_symbolic || right.is_symbolic) {
                         // At least one is symbolic, use symbolic product
                         std::cout << "[ObligationFragment] Computing AND product using symbolic representation" << std::endl;
+                        auto left_count_before = left.state_count();
+                        auto right_count_before = right.state_count();
                         SymbolicStateDfa left_sym = left.to_symbolic();
                         SymbolicStateDfa right_sym = right.to_symbolic();
+                        // Try to compute n-state as product number, if possible 
+
                         SymbolicStateDfa product = SymbolicStateDfa::product_AND({left_sym, right_sym});
                         left = HybridDfa(product, var_mgr_);
+                        if (left_count_before && right_count_before) {
+                            left.set_state_count(left_count_before.value() * right_count_before.value());
+                        } else {
+                            left.clear_state_count();
+                        }
+
                         std::cout << "[ObligationFragment] Symbolic AND product computed" << std::endl;
                     } else {
                         // Both are explicit, use MONA product
@@ -201,10 +250,9 @@ namespace Syft {
                             std::cout << "[ObligationFragment] Minimizing AND product (states: " 
                                       << product.dfa_->ns << " > " << minimisation_options_.threshold << ")" << std::endl;
                                                               ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(product);
-                        left = HybridDfa(minised, var_mgr_);
-
+                        left = HybridDfa(std::move(minised), var_mgr_);
                         } else {
-                            left = HybridDfa(product, var_mgr_);
+                            left = HybridDfa(std::move(product), var_mgr_);
                         }
                         left.convert_to_symbolic_if_needed();
                     }
@@ -228,26 +276,43 @@ namespace Syft {
                     if (left.is_symbolic || right.is_symbolic) {
                         // At least one is symbolic, use symbolic product
                         std::cout << "[ObligationFragment] Computing OR product using symbolic representation" << std::endl;
+                        auto left_count_before = left.state_count();
+                        auto right_count_before = right.state_count();
                         SymbolicStateDfa left_sym = left.to_symbolic();
                         SymbolicStateDfa right_sym = right.to_symbolic();
                         SymbolicStateDfa product = SymbolicStateDfa::product_OR({left_sym, right_sym});
                         left = HybridDfa(product, var_mgr_);
+                        if (left_count_before && right_count_before) {
+                            left.set_state_count(left_count_before.value() * right_count_before.value());
+                        } else {
+                            left.clear_state_count();
+                        }
                         std::cout << "[ObligationFragment] Symbolic OR product computed" << std::endl;
+                        spdlog::info("[ObligationFragment] OR product computed from ~{} and ~{} states; approx result ~{}",
+                                     bigint_to_string(left_count_before),
+                                     bigint_to_string(right_count_before),
+                                     left.state_count_str());
+
                     } else {
                         // Both are explicit, use MONA product
                         std::cout << "[ObligationFragment] Computing OR product using MONA" << std::endl;
                         ExplicitStateDfa product = ExplicitStateDfa::dfa_product_or({*left.explicit_dfa, *right.explicit_dfa});
                         std::cout << "[ObligationFragment] OR product has " << product.dfa_->ns << " states" << std::endl;
                         // MINIMISE HERE IF NEEDED
+                            spdlog::info("[ObligationFragment] OR product computed from ~{} and ~{} states; approx result ~{}",
+                                     bigint_to_string(left.state_count()),
+                                     bigint_to_string(right.state_count()),
+                                     bigint_to_string(product.get_nb_states()));
+
                         if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
                             std::cout << "[ObligationFragment] Minimizing OR product (states: " 
                                       << product.dfa_->ns << " > " << minimisation_options_.threshold << ")" << std::endl;
 
                         ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(product);
-                        left = HybridDfa(minised, var_mgr_);
+                        left = HybridDfa(std::move(minised), var_mgr_);
 
                         } else {
-                            left = HybridDfa(product, var_mgr_);
+                            left = HybridDfa(std::move(product), var_mgr_);
                         }
                         left.convert_to_symbolic_if_needed();
                     }
@@ -263,9 +328,12 @@ namespace Syft {
         if (pos != formula.size()) {
             throw std::runtime_error("Trailing characters in color formula after parsing");
         }
-        
+        auto symbolic_arena = res.to_symbolic();
+        // info_log the number of states we approximated using spdlog
+    spdlog::info("[ObligationFragment] Final arena has approximately {} states, {} bits ", res.state_count_str(), symbolic_arena.transition_function().size());
+
         // Always return symbolic representation
-        return res.to_symbolic();
+        return symbolic_arena;
     }
 
     std::pair<SymbolicStateDfa, std::map<int, CUDD::BDD>> 

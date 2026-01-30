@@ -56,7 +56,7 @@ namespace Syft {
          * \param partition          input/output partition (variable names)
          * \param starting_player    who moves first each turn
          * \param protagonist_player the player we synthesise for (Agent/Environment)
-         * \param use_buchi         if true, use Büchi-based solver; if false, use SCC-based weak-game solver
+         * \param use_buchi         if true, use Büchi-based (mode controlling further) solver; if false, use SCC-based weak-game solver
          * \param buechi_mode       which Büchi algorithm to use (if use_buchi is true)
          * \param allow_minimisation if true, allows minimisation of intermediate DFAs to save memory
          */
@@ -65,8 +65,6 @@ namespace Syft {
             InputOutputPartition partition,
             Player starting_player,
             Player protagonist_player,
-            // If use_buchi is false the solver will run the weak-game (SCC) algorithm.
-            // If true, the provided buechi_mode selects which Büchi-based algorithm to run.
             bool use_buchi = false,
             Syft::BuchiSolver::BuchiMode buechi_mode = Syft::BuchiSolver::BuchiMode::CLASSIC,
             MinimisationOptions minimisation_options = MinimisationOptions()
