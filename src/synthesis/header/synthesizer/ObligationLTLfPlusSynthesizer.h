@@ -67,7 +67,8 @@ namespace Syft {
             Player protagonist_player,
             bool use_buchi = false,
             Syft::BuchiSolver::BuchiMode buechi_mode = Syft::BuchiSolver::BuchiMode::CLASSIC,
-            MinimisationOptions minimisation_options = MinimisationOptions()
+            MinimisationOptions minimisation_options = MinimisationOptions(),
+            bool use_balanced_boolean_product = true
         );
 
         /**
@@ -86,6 +87,7 @@ namespace Syft {
         bool use_buchi_ = false;
         Syft::BuchiSolver::BuchiMode buechi_mode_ = Syft::BuchiSolver::BuchiMode::CLASSIC;
         MinimisationOptions minimisation_options_ = MinimisationOptions();
+    bool use_balanced_boolean_product_ = true;
 
         // --- core phases ---
         void validate_obligation_fragment() const;

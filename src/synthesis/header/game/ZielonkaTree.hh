@@ -38,7 +38,6 @@ private:
     void generate_phi(const char*);
     void generate_phi_from_str(const std::string color_formula);
     bool evaluate_phi(std::vector<bool>);
-    void displayZielonkaTree();
     void graphZielonkaTree();
 
 public:
@@ -46,6 +45,8 @@ public:
     ~ZielonkaTree() {};
 
     ZielonkaNode* get_root();
+    void dump_dot(const std::string& path) const;
+        void displayZielonkaTree();
 
     inline void print_label(ZielonkaNode *z) {
         for (size_t i = 0; i < z->label.size(); ++i){

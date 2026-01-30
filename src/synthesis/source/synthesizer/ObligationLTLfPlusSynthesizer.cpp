@@ -19,6 +19,7 @@
 #include <chrono>
 #include <optional>
 #include <utility>
+#include <functional>
 #include <boost/multiprecision/cpp_int.hpp>
 
 namespace {
@@ -41,14 +42,16 @@ namespace Syft {
         InputOutputPartition partition,
         Player starting_player,
         Player protagonist_player,
-        bool use_buchi,
-        Syft::BuchiSolver::BuchiMode buechi_mode,
-        MinimisationOptions minimisation_options)
+                bool use_buchi,
+                Syft::BuchiSolver::BuchiMode buechi_mode,
+                MinimisationOptions minimisation_options,
+                bool use_balanced_boolean_product)
         : ltlf_plus_formula_(ltlf_plus_formula),
           starting_player_(starting_player),
           protagonist_player_(protagonist_player),
-          use_buchi_(use_buchi), 
-          minimisation_options_(minimisation_options) {
+                    use_buchi_(use_buchi),
+                    minimisation_options_(minimisation_options),
+                    use_balanced_boolean_product_(use_balanced_boolean_product) {
         buechi_mode_ = buechi_mode;
         std::shared_ptr<VarMgr> var_mgr = std::make_shared<VarMgr>();
         var_mgr->create_named_variables(partition.input_variables);
@@ -176,151 +179,187 @@ namespace Syft {
         std::function<HybridDfa()> parse_expr;
         std::function<HybridDfa()> parse_term;
         std::function<HybridDfa()> parse_factor;
-        
+
         auto skip_whitespace = [&]() {
-            while (pos < formula.size() && std::isspace(static_cast<unsigned char>(formula[pos]))) pos++;
+            while (pos < formula.size() && std::isspace(static_cast<unsigned char>(formula[pos]))) {
+                ++pos;
+            }
         };
-        
+
+        auto combine_pair = [&](HybridDfa left, HybridDfa right, bool is_or) -> HybridDfa {
+            auto left_est = left.state_count();
+            auto right_est = right.state_count();
+            // Also switch to symbolic if product estimate exceeds threshold
+            auto estimated_product = std::optional<BigInt>(1);
+            if (left_est.has_value()) {
+                estimated_product.value() *= left_est.value();
+            } else {
+                estimated_product = std::nullopt;
+            }
+            if (right_est.has_value()) {
+                estimated_product.value() *= right_est.value();
+            } else {
+                estimated_product = std::nullopt;
+            }
+            if (left.is_symbolic || right.is_symbolic || (estimated_product.has_value() && estimated_product.value() > minimisation_options_.threshold)) {
+                std::cout << "[ObligationFragment] Computing " << (is_or ? "OR" : "AND")
+                          << " product using symbolic representation" << std::endl;
+                SymbolicStateDfa left_sym = left.to_symbolic();
+                SymbolicStateDfa right_sym = right.to_symbolic();
+                SymbolicStateDfa product = is_or
+                    ? SymbolicStateDfa::product_OR({left_sym, right_sym})
+                    : SymbolicStateDfa::product_AND({left_sym, right_sym});
+                HybridDfa combined(product, var_mgr_);
+                if (left_est && right_est) {
+                    combined.set_state_count(left_est.value() * right_est.value());
+                } else {
+                    combined.clear_state_count();
+                }
+                std::cout << "[ObligationFragment] Symbolic " << (is_or ? "OR" : "AND")
+                          << " product computed" << std::endl;
+                spdlog::info(
+                    "[ObligationFragment] {} product combined ~{} with ~{} -> ~{}",
+                    is_or ? "OR" : "AND",
+                    bigint_to_string(left_est),
+                    bigint_to_string(right_est),
+                    combined.state_count_str());
+                return combined;
+            }
+
+            if (is_or) {
+                std::cout << "[ObligationFragment] Computing OR product using MONA" << std::endl;
+            } else {
+                std::cout << "[ObligationFragment] Computing AND product using MONA" << std::endl;
+            }
+
+            ExplicitStateDfa product = is_or
+                ? ExplicitStateDfa::dfa_product_or({*left.explicit_dfa, *right.explicit_dfa})
+                : ExplicitStateDfa::dfa_product_and({*left.explicit_dfa, *right.explicit_dfa});
+            std::cout << "[ObligationFragment] " << (is_or ? "OR" : "AND")
+                      << " product has " << product.dfa_->ns << " states" << std::endl;
+
+            if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
+                std::cout << "[ObligationFragment] Minimizing " << (is_or ? "OR" : "AND")
+                          << " product (states: " << product.dfa_->ns
+                          << " < " << minimisation_options_.threshold << ")" << std::endl;
+                product = ExplicitStateDfa::dfa_minimize_weak(product);
+            }
+
+            HybridDfa combined(std::move(product), var_mgr_);
+            combined.convert_to_symbolic_if_needed();
+
+            spdlog::info(
+                "[ObligationFragment] {} product combined ~{} with ~{} -> ~{}",
+                is_or ? "OR" : "AND",
+                bigint_to_string(left_est),
+                bigint_to_string(right_est),
+                combined.state_count_str());
+
+            return combined;
+        };
+
+        auto reduce_operands = [&](std::vector<HybridDfa>&& operands, bool is_or) -> HybridDfa {
+            if (operands.empty()) {
+                throw std::runtime_error("Empty operand list in color formula");
+            }
+            if (operands.size() == 1) {
+                return std::move(operands.front());
+            }
+            std::vector<HybridDfa> current = std::move(operands);
+            while (current.size() > 1) {
+                std::vector<HybridDfa> next;
+                next.reserve((current.size() + 1) / 2);
+                std::size_t i = 0;
+                for (; i + 1 < current.size(); i += 2) {
+                    next.push_back(combine_pair(std::move(current[i]), std::move(current[i + 1]), is_or));
+                }
+                if (i < current.size()) {
+                    next.push_back(std::move(current.back()));
+                }
+                current = std::move(next);
+            }
+            return std::move(current.front());
+        };
+
         parse_factor = [&]() -> HybridDfa {
             skip_whitespace();
             if (pos >= formula.size()) {
                 throw std::runtime_error("Unexpected end of color formula");
             }
-            
+
             if (formula[pos] == '(') {
-                pos++;  // skip '('
+                ++pos;
                 HybridDfa result = parse_expr();
                 skip_whitespace();
                 if (pos >= formula.size() || formula[pos] != ')') {
                     throw std::runtime_error("Expected ')' in color formula");
                 }
-                pos++;  // skip ')'
+                ++pos;
                 return result;
-            } else if (std::isdigit(static_cast<unsigned char>(formula[pos]))) {
-                // Parse number
+            }
+            if (std::isdigit(static_cast<unsigned char>(formula[pos]))) {
                 size_t start = pos;
-                while (pos < formula.size() && std::isdigit(static_cast<unsigned char>(formula[pos]))) pos++;
+                while (pos < formula.size() && std::isdigit(static_cast<unsigned char>(formula[pos]))) {
+                    ++pos;
+                }
                 int color = std::stoi(formula.substr(start, pos - start));
-                
+
                 auto it = color_to_dfa.find(color);
                 if (it == color_to_dfa.end()) {
                     throw std::runtime_error("Unknown color in formula: " + std::to_string(color));
                 }
-                // Return a HybridDfa wrapping the explicit DFA
                 return HybridDfa(it->second, var_mgr_);
-            } else {
-                throw std::runtime_error("Unexpected character in color formula: " + std::string(1, formula[pos]));
             }
+
+            throw std::runtime_error("Unexpected character in color formula: " + std::string(1, formula[pos]));
         };
-        
+
         parse_term = [&]() -> HybridDfa {
-            HybridDfa left = parse_factor();
-            
+            std::vector<HybridDfa> factors;
+            factors.push_back(parse_factor());
             while (true) {
                 skip_whitespace();
                 if (pos < formula.size() && formula[pos] == '&') {
-                    pos++;  // skip '&'
-                    HybridDfa right = parse_factor();
-                    
-                    // Check if we need to switch to symbolic
-                    if (left.is_symbolic || right.is_symbolic) {
-                        // At least one is symbolic, use symbolic product
-                        std::cout << "[ObligationFragment] Computing AND product using symbolic representation" << std::endl;
-                        auto left_count_before = left.state_count();
-                        auto right_count_before = right.state_count();
-                        SymbolicStateDfa left_sym = left.to_symbolic();
-                        SymbolicStateDfa right_sym = right.to_symbolic();
-                        // Try to compute n-state as product number, if possible 
-
-                        SymbolicStateDfa product = SymbolicStateDfa::product_AND({left_sym, right_sym});
-                        left = HybridDfa(product, var_mgr_);
-                        if (left_count_before && right_count_before) {
-                            left.set_state_count(left_count_before.value() * right_count_before.value());
-                        } else {
-                            left.clear_state_count();
-                        }
-
-                        std::cout << "[ObligationFragment] Symbolic AND product computed" << std::endl;
-                    } else {
-                        // Both are explicit, use MONA product
-                        std::cout << "[ObligationFragment] Computing AND product using MONA" << std::endl;
-                        ExplicitStateDfa product = ExplicitStateDfa::dfa_product_and({*left.explicit_dfa, *right.explicit_dfa});
-                        std::cout << "[ObligationFragment] AND product has " << product.dfa_->ns << " states" << std::endl;
-                        if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
-                            std::cout << "[ObligationFragment] Minimizing AND product (states: " 
-                                      << product.dfa_->ns << " > " << minimisation_options_.threshold << ")" << std::endl;
-                                                              ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(product);
-                        left = HybridDfa(std::move(minised), var_mgr_);
-                        } else {
-                            left = HybridDfa(std::move(product), var_mgr_);
-                        }
-                        left.convert_to_symbolic_if_needed();
-                    }
+                    ++pos;
+                    factors.push_back(parse_factor());
                 } else {
                     break;
                 }
             }
-            return left;
+
+            if (use_balanced_boolean_product_) {
+                return reduce_operands(std::move(factors), false);
+            }
+
+            HybridDfa accum = std::move(factors.front());
+            for (std::size_t idx = 1; idx < factors.size(); ++idx) {
+                accum = combine_pair(std::move(accum), std::move(factors[idx]), false);
+            }
+            return accum;
         };
-        
+
         parse_expr = [&]() -> HybridDfa {
-            HybridDfa left = parse_term();
-            
+            std::vector<HybridDfa> terms;
+            terms.push_back(parse_term());
             while (true) {
                 skip_whitespace();
                 if (pos < formula.size() && formula[pos] == '|') {
-                    pos++;  // skip '|'
-                    HybridDfa right = parse_term();
-                    
-                    // Check if we need to switch to symbolic
-                    if (left.is_symbolic || right.is_symbolic) {
-                        // At least one is symbolic, use symbolic product
-                        std::cout << "[ObligationFragment] Computing OR product using symbolic representation" << std::endl;
-                        auto left_count_before = left.state_count();
-                        auto right_count_before = right.state_count();
-                        SymbolicStateDfa left_sym = left.to_symbolic();
-                        SymbolicStateDfa right_sym = right.to_symbolic();
-                        SymbolicStateDfa product = SymbolicStateDfa::product_OR({left_sym, right_sym});
-                        left = HybridDfa(product, var_mgr_);
-                        if (left_count_before && right_count_before) {
-                            left.set_state_count(left_count_before.value() * right_count_before.value());
-                        } else {
-                            left.clear_state_count();
-                        }
-                        std::cout << "[ObligationFragment] Symbolic OR product computed" << std::endl;
-                        spdlog::info("[ObligationFragment] OR product computed from ~{} and ~{} states; approx result ~{}",
-                                     bigint_to_string(left_count_before),
-                                     bigint_to_string(right_count_before),
-                                     left.state_count_str());
-
-                    } else {
-                        // Both are explicit, use MONA product
-                        std::cout << "[ObligationFragment] Computing OR product using MONA" << std::endl;
-                        ExplicitStateDfa product = ExplicitStateDfa::dfa_product_or({*left.explicit_dfa, *right.explicit_dfa});
-                        std::cout << "[ObligationFragment] OR product has " << product.dfa_->ns << " states" << std::endl;
-                        // MINIMISE HERE IF NEEDED
-                            spdlog::info("[ObligationFragment] OR product computed from ~{} and ~{} states; approx result ~{}",
-                                     bigint_to_string(left.state_count()),
-                                     bigint_to_string(right.state_count()),
-                                     bigint_to_string(product.get_nb_states()));
-
-                        if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
-                            std::cout << "[ObligationFragment] Minimizing OR product (states: " 
-                                      << product.dfa_->ns << " > " << minimisation_options_.threshold << ")" << std::endl;
-
-                        ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(product);
-                        left = HybridDfa(std::move(minised), var_mgr_);
-
-                        } else {
-                            left = HybridDfa(std::move(product), var_mgr_);
-                        }
-                        left.convert_to_symbolic_if_needed();
-                    }
+                    ++pos;
+                    terms.push_back(parse_term());
                 } else {
                     break;
                 }
             }
-            return left;
+
+            if (use_balanced_boolean_product_) {
+                return reduce_operands(std::move(terms), true);
+            }
+
+            HybridDfa accum = std::move(terms.front());
+            for (std::size_t idx = 1; idx < terms.size(); ++idx) {
+                accum = combine_pair(std::move(accum), std::move(terms[idx]), true);
+            }
+            return accum;
         };
         
         HybridDfa res = parse_expr();
@@ -330,7 +369,9 @@ namespace Syft {
         }
         auto symbolic_arena = res.to_symbolic();
         // info_log the number of states we approximated using spdlog
-    spdlog::info("[ObligationFragment] Final arena has approximately {} states, {} bits ", res.state_count_str(), symbolic_arena.transition_function().size());
+        spdlog::info("[ObligationFragment] Final arena has approximately {} states, {} bits ",
+                     res.state_count_str(),
+                     symbolic_arena.transition_function().size());
 
         // Always return symbolic representation
         return symbolic_arena;

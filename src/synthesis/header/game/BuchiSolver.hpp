@@ -81,7 +81,7 @@ namespace Syft
 
         BuchiMode buechi_mode_ = BuchiMode::CLASSIC;
         // enable verbose debug printing when true
-        bool debug_enabled_ = true;
+        bool debug_enabled_ = false;
 
     public:
         // enable/disable debug prints at runtime

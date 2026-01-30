@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <vector>
 #include <queue>
+#include <unordered_map>
 #include "debug.hpp"
 
 
@@ -261,4 +262,52 @@ ZielonkaTree::ZielonkaTree(const std::string color_formula, const std::vector<CU
 }
 
 ZielonkaNode* ZielonkaTree::get_root() { return root; }
+
+void ZielonkaTree::dump_dot(const std::string& path) const {
+    if (root == nullptr) {
+        throw std::runtime_error("ZielonkaTree::dump_dot called on empty tree");
+    }
+
+    std::ofstream ofs(path);
+    if (!ofs) {
+        throw std::runtime_error("Failed to open file for Zielonka tree DOT dump: " + path);
+    }
+
+    ofs << "digraph ZielonkaTree {\n";
+    ofs << "  node [shape=box, fontname=\"Courier\"];\n";
+    ofs << "  rankdir=TB;\n";
+
+    std::unordered_map<const ZielonkaNode*, std::size_t> ids;
+    std::queue<const ZielonkaNode*> q;
+    std::size_t next_id = 0;
+
+    ids[root] = next_id++;
+    q.push(root);
+
+    while (!q.empty()) {
+        const ZielonkaNode* node = q.front();
+        q.pop();
+
+        std::size_t node_id = ids[node];
+        std::string label = label_to_string(node->label);
+        if (label.empty()) {
+            label = "∅";
+        }
+        ofs << "  n" << node_id << " [label=\"#" << node->order << "\\n" << label
+            << "\\n" << (node->winning ? 'W' : 'L') << "\"];\n";
+
+        for (const ZielonkaNode* child : node->children) {
+            if (!child) {
+                continue;
+            }
+            if (!ids.count(child)) {
+                ids[child] = next_id++;
+                q.push(child);
+            }
+            ofs << "  n" << node_id << " -> n" << ids[child] << ";\n";
+        }
+    }
+
+    ofs << "}\n";
+}
 

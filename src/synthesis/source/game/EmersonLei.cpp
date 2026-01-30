@@ -5,6 +5,8 @@
 #include "game/EmersonLei.hpp"
 #include "debug.hpp"
 #include <spdlog/spdlog.h>
+#include <cstdlib>
+#include <exception>
 
 namespace Syft {
   EmersonLei::EmersonLei(const SymbolicStateDfa &spec, std::string color_formula, Player starting_player,
@@ -24,6 +26,15 @@ namespace Syft {
     spdlog::info("[EmersonLei::EmersonLei] building Zielonka tree");
     z_tree_ = new ZielonkaTree(color_formula_, Colors_, var_mgr_);
     spdlog::info("[EmersonLei::EmersonLei] built Zielonka tree");
+    z_tree_->displayZielonkaTree();
+    if (const char* dump_path = std::getenv("SYFT_ZIELONKA_DOT")) {
+      try {
+        z_tree_->dump_dot(dump_path);
+        spdlog::info("[EmersonLei::EmersonLei] dumped Zielonka tree to {}", dump_path);
+      } catch (const std::exception& ex) {
+        spdlog::warn("[EmersonLei::EmersonLei] failed to dump Zielonka tree: {}", ex.what());
+      }
+    }
   }
 
   CUDD::BDD EmersonLei::getOneUnprocessedState(CUDD::BDD states, CUDD::BDD processed) const {
