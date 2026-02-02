@@ -17,6 +17,7 @@ Usage:
 """
 from __future__ import annotations
 import argparse
+import csv
 import json
 import os
 import re
@@ -24,6 +25,7 @@ from collections import defaultdict
 from functools import lru_cache
 from typing import Dict, List, Tuple, Any
 import math
+import sys
 
 PATTERN_NUM_RE = re.compile(r"pattern[_\-](\d+)", re.IGNORECASE)
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
@@ -162,35 +164,12 @@ def build_cell_with_time(runs: List[Dict[str,Any]], use_color: bool, time_source
         return cell
 
     # else all rc == 0 or missing
-    def get_time(r: Dict[str, Any]) -> Any:
-        # If user requested wall/cpu, prefer parsed stdout values unless the run timed out
-        if time_source in ("wall", "cpu") and not r.get("timeout", False):
-            txt = ""
-            path = r.get("file")
-            if isinstance(path, str):
-                txt = _load_stdout_from_json(path)
-            if not txt:
-                txt = r.get("stdout", "") or ""
-            wall_m = re.search(r"Wall time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
-            cpu_m = re.search(r"CPU time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
-            if time_source == "wall" and wall_m:
-                try:
-                    return float(wall_m.group(1))
-                except Exception:
-                    pass
-            if time_source == "cpu" and cpu_m:
-                try:
-                    return float(cpu_m.group(1))
-                except Exception:
-                    pass
-        # fallback to elapsed field
-        return r.get("elapsed")
 
     elapsed_vals: List[float] = []
     for r in runs:
-        val = get_time(r)
-        if isinstance(val, (int, float)):
-            elapsed_vals.append(float(val))
+        val = _extract_time(r, time_source)
+        if val is not None:
+            elapsed_vals.append(val)
     cell_parts = []
     if elapsed_vals:
         avg = sum(elapsed_vals) / len(elapsed_vals)
@@ -244,33 +223,11 @@ def format_latex_cell(runs: List[Dict[str, Any]], show_ci: bool, time_source: st
     if nonzero_codes:
         return r"\textsc{$\ddagger$}"
 
-    def get_time(r: Dict[str, Any]) -> Any:
-        if time_source in ("wall", "cpu") and not r.get("timeout", False):
-            txt = ""
-            path = r.get("file")
-            if isinstance(path, str):
-                txt = _load_stdout_from_json(path)
-            if not txt:
-                txt = r.get("stdout", "") or ""
-            wall_m = re.search(r"Wall time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
-            cpu_m = re.search(r"CPU time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
-            if time_source == "wall" and wall_m:
-                try:
-                    return float(wall_m.group(1))
-                except Exception:
-                    pass
-            if time_source == "cpu" and cpu_m:
-                try:
-                    return float(cpu_m.group(1))
-                except Exception:
-                    pass
-        return r.get("elapsed")
-
     elapsed_vals: List[float] = []
     for r in runs:
-        val = get_time(r)
-        if isinstance(val, (int, float)):
-            elapsed_vals.append(float(val))
+        val = _extract_time(r, time_source)
+        if val is not None:
+            elapsed_vals.append(val)
     if not elapsed_vals:
         return r"\textsc{$\dagger$}"
 
@@ -396,6 +353,97 @@ def make_table(bucket: Dict[Tuple[str,str], List[Dict[str,Any]]], parse_errors: 
         for p, err in parse_errors:
             print(f"# - {p}: {err}")
 
+
+def _extract_time(run: Dict[str, Any], time_source: str) -> float | None:
+    if time_source in ("wall", "cpu") and not run.get("timeout", False):
+        txt = ""
+        path = run.get("file")
+        if isinstance(path, str):
+            txt = _load_stdout_from_json(path)
+        if not txt:
+            txt = run.get("stdout", "") or ""
+        wall_m = re.search(r"Wall time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
+        cpu_m = re.search(r"CPU time:\s*([0-9]+\.?[0-9]*)\s*seconds", txt)
+        match = wall_m if time_source == "wall" else cpu_m
+        if match:
+            try:
+                return float(match.group(1))
+            except Exception:
+                return None
+    val = run.get("elapsed")
+    if isinstance(val, (int, float)):
+        return float(val)
+    return None
+
+
+def make_table_csv(bucket: Dict[Tuple[str, str], List[Dict[str, Any]]], parse_errors: List[Tuple[str, str]], time_source: str = "elapsed"):
+    pattern_nums = set()
+    modes = set()
+    for (pat, mode) in bucket.keys():
+        pattern_nums.add(pat)
+        modes.add(mode)
+
+    if not pattern_nums:
+        writer = csv.writer(sys.stdout)
+        writer.writerow(["size"])
+        if parse_errors:
+            for p, err in parse_errors:
+                print(f"Parse error: {p}: {err}", file=sys.stderr)
+        return
+
+    def pat_key(x):
+        try:
+            return (0, int(x))
+        except Exception:
+            return (1, x)
+
+    sorted_patterns = sorted(pattern_nums, key=pat_key)
+
+    ordered_modes = [m for m in LATEX_MODE_ORDER if m in modes]
+    unknown_modes = [m for m in sorted(modes) if m not in ordered_modes]
+    ordered_modes.extend(unknown_modes)
+
+    headers = ["size"] + [LATEX_MODE_NAMES.get(m, m) for m in ordered_modes]
+    writer = csv.writer(sys.stdout)
+    writer.writerow(headers)
+
+    for pat in sorted_patterns:
+        row = [pat]
+        for mode in ordered_modes:
+            runs = bucket.get((pat, mode), [])
+            if not runs:
+                row.append(0)
+                continue
+
+            timeout_any = any(r.get("timeout", False) for r in runs)
+            sig_any = any(r.get("sig", False) for r in runs)
+            rc_set = set()
+            for r in runs:
+                rc = r.get("rc")
+                if isinstance(rc, str) and rc.isdigit():
+                    rc = int(rc)
+                if rc is not None:
+                    rc_set.add(rc)
+            nonzero_codes = [c for c in rc_set if isinstance(c, int) and c != 0] + [c for c in rc_set if not isinstance(c, int) and c not in (None, 0)]
+
+            if timeout_any or sig_any or nonzero_codes:
+                row.append(0)
+                continue
+
+            times = [_extract_time(r, time_source) for r in runs]
+            times = [t for t in times if t is not None]
+            if not times:
+                row.append(0)
+            else:
+                avg = sum(times) / len(times)
+                row.append(f"{avg:.3f}")
+
+        writer.writerow(row)
+
+    if parse_errors:
+        for p, err in parse_errors:
+            print(f"Parse error: {p}: {err}", file=sys.stderr)
+
 def main():
     ap = argparse.ArgumentParser(description="Generate mode table with runtimes / timeouts / SIGSEGV marks.")
     ap.add_argument("dir", help="Directory with JSON files")
@@ -405,10 +453,13 @@ def main():
     ap.add_argument("--latex-ci", action="store_true", help="Show ±stddev in LaTeX output when multiple runs")
     ap.add_argument("--time-source", choices=["elapsed", "wall", "cpu"], default="elapsed",
                     help="Which time to use when reporting runtimes: 'elapsed' from JSON (default), or parse 'Wall/CPU' from stdout when available")
+    ap.add_argument("--csv", action="store_true", help="Output CSV with runtimes (timeouts/segfaults reported as 0)")
     args = ap.parse_args()
 
     bucket, parse_errors = collect(args.dir, recursive=args.recursive)
-    if args.latex:
+    if args.csv:
+        make_table_csv(bucket, parse_errors, time_source=args.time_source)
+    elif args.latex:
         # LaTeX table will use the chosen time source when formatting cells
         make_table_latex(bucket, parse_errors, show_ci=args.latex_ci, time_source=args.time_source)
     else:

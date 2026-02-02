@@ -139,16 +139,36 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
     return job_script
 
 
-def submit_script(script_path):
+TRANSIENT_SBATCH_ERRORS = (
+    'socket timed out',
+    'connection timed out',
+    'communications connection failure',
+)
+
+
+def submit_script(script_path, retries=3, retry_delay=5.0, retry_backoff=2.0):
     # Submit with sbatch and return job id (parsable form)
-    try:
-        res = subprocess.run(['sbatch', '--parsable', str(script_path)], capture_output=True, text=True, check=True)
-        jobid = res.stdout.strip()
-        print(f"Submitted {script_path.name} -> job {jobid}")
-        return jobid
-    except subprocess.CalledProcessError as e:
-        print('sbatch failed:', e.stderr)
-        raise
+    max_attempts = max(1, retries)
+    delay = retry_delay
+    for attempt in range(1, max_attempts + 1):
+        try:
+            res = subprocess.run(['sbatch', '--parsable', str(script_path)], capture_output=True, text=True, check=True)
+            jobid = res.stdout.strip()
+            print(f"Submitted {script_path.name} -> job {jobid}")
+            return jobid
+        except subprocess.CalledProcessError as e:
+            stderr = (e.stderr or '').strip()
+            stdout = (e.stdout or '').strip()
+            combined = '\n'.join(filter(None, [stderr, stdout])).lower()
+            is_transient = any(pattern in combined for pattern in TRANSIENT_SBATCH_ERRORS)
+            if is_transient and attempt < max_attempts:
+                print(f"sbatch transient failure (attempt {attempt}/{max_attempts}): {stderr or stdout}. Retrying in {delay:.1f}s...",
+                      file=sys.stderr)
+                time.sleep(delay)
+                delay *= retry_backoff if retry_backoff > 0 else 1
+                continue
+            print('sbatch failed:', stderr or stdout, file=sys.stderr)
+            raise
 
 
 def wait_for_results(out_dir, expected_count, timeout_s=3600, poll_interval=10):
@@ -198,6 +218,12 @@ def main():
     parser.add_argument('--sbatch-mem', default='16G', help='Slurm memory per task')
     parser.add_argument('--sbatch-cpus', default='1', help='Slurm cpus-per-task')
     parser.add_argument('--sbatch-partition', default='', help='Slurm partition (optional)')
+    parser.add_argument('--sbatch-retries', type=int, default=3,
+                        help='Retry sbatch submission up to N times on transient socket errors (default: 3)')
+    parser.add_argument('--sbatch-retry-delay', type=float, default=5.0,
+                        help='Initial delay in seconds before retrying sbatch submission (default: 5.0)')
+    parser.add_argument('--sbatch-retry-backoff', type=float, default=2.0,
+                        help='Multiplicative backoff applied to the retry delay (default: 2.0)')
     parser.add_argument('--max-examples', type=int, default=None, help='Limit to first N examples')
     parser.add_argument('--modes', type=str, default='el,cl,pm,wg,cb',
                         help='Comma-separated solver modes to run: el,cl,pm,wg,cb (default: all)')
@@ -272,7 +298,12 @@ def main():
 
         for mode in modes:
             job_script = write_job_script(run_out_dir, pattern, partition_file, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts, mode)
-            jobid = submit_script(job_script)
+            jobid = submit_script(
+                job_script,
+                retries=args.sbatch_retries,
+                retry_delay=args.sbatch_retry_delay,
+                retry_backoff=args.sbatch_retry_backoff,
+            )
             submitted.append(jobid)
             expected_runs += args.runs
 
