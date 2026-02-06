@@ -140,10 +140,21 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         tmpl_body = '\n'.join(tmpl_text.splitlines()[1:])
         if single_node:
             # Wrap the template body in a loop that sets RUN_IDX for each sequential run
+            # with early-exit logic: skip remaining runs if one fails
+            out.write('skip_remaining=0\n')
             out.write(f"for RUN_IDX in $(seq 1 {runs}); do\n")
-            # indent the template body for readability
+            out.write('  if [ "$skip_remaining" -eq 1 ]; then\n')
+            out.write('    echo "Skipping run ${RUN_IDX} (previous run failed)"\n')
+            out.write('    continue\n')
+            out.write('  fi\n')
+            # indent the template body
             for line in tmpl_body.splitlines():
-                out.write(line + '\n')
+                out.write('  ' + line + '\n')
+            out.write('  exit_code=$?\n')
+            out.write('  if [ "$exit_code" -ne 0 ]; then\n')
+            out.write('    echo "Run ${RUN_IDX} failed with exit code ${exit_code}, skipping remaining runs"\n')
+            out.write('    skip_remaining=1\n')
+            out.write('  fi\n')
             out.write('done\n')
         else:
             out.write(tmpl_body)
@@ -238,6 +249,7 @@ def main():
     parser.add_argument('--sbatch-retry-backoff', type=float, default=2.0,
                         help='Multiplicative backoff applied to the retry delay (default: 2.0)')
     parser.add_argument('--single-node', action='store_true', help='Run all runs for a pattern sequentially in a single Slurm job (no array)')
+    parser.add_argument('--single-job', action='store_true', help='Run all patterns and modes sequentially in one Slurm job on a single node')
     parser.add_argument('--max-examples', type=int, default=None, help='Limit to first N examples')
     parser.add_argument('--modes', type=str, default='el,cl,pm,wg,cb',
                         help='Comma-separated solver modes to run: el,cl,pm,wg,cb (default: all)')
@@ -304,34 +316,138 @@ def main():
 
     submitted = []
     expected_runs = 0
-    for pattern in examples:
-        partition_file = pattern.with_suffix('.part')
-        if not partition_file.exists():
-            print(f"Skipping {pattern.name}: partition file not found: {partition_file}")
-            continue
 
-        for mode in modes:
-            job_script = write_job_script(
-                run_out_dir,
-                pattern,
-                partition_file,
-                args.binary,
-                args.singularity,
-                args.binary_args,
-                args.timeout,
-                args.runs,
-                sbatch_opts,
-                mode,
-                single_node=args.single_node,
-            )
-            jobid = submit_script(
-                job_script,
-                retries=args.sbatch_retries,
-                retry_delay=args.sbatch_retry_delay,
-                retry_backoff=args.sbatch_retry_backoff,
-            )
-            submitted.append(jobid)
-            expected_runs += args.runs
+    # If the user requested a single job for all patterns/modes, create one job script
+    # that runs everything sequentially on a single node and submit it once.
+    if args.single_job:
+        def write_global_job_script(out_dir, patterns, modes, binary, singularity, binary_args, timeout, runs, sbatch_opts):
+            jobs_dir = out_dir / 'jobs'
+            jobs_dir.mkdir(parents=True, exist_ok=True)
+            logs_dir = out_dir / 'logs'
+            logs_dir.mkdir(parents=True, exist_ok=True)
+
+            # Copy runner
+            src_runner = Path(__file__).parent / 'job_runner.py'
+            dst_runner = jobs_dir / 'job_runner.py'
+            try:
+                shutil.copy2(src_runner, dst_runner)
+                os.chmod(dst_runner, 0o755)
+            except Exception:
+                dst_runner = None
+
+            job_script = jobs_dir / f"job_all_patterns.sh"
+            with open(TEMPLATE, 'r') as t, open(job_script, 'w') as out:
+                out.write('#!/usr/bin/env bash\n')
+                sjob = 'bench_all'
+                out.write(f"#SBATCH --job-name={sjob}\n")
+                out.write(f"#SBATCH --output={logs_dir}/{sjob}-%A.out\n")
+                for k, v in sbatch_opts.items():
+                    out.write(f"#SBATCH {k}={v}\n")
+                # single node for the whole job
+                out.write(f"#SBATCH --nodes=1\n")
+                out.write('\n')
+
+                out.write(f"BINARY=\"{binary}\"\n")
+                out.write(f"SINGULARITY=\"{singularity or ''}\"\n")
+                out.write(f"BINARY_ARGS=\"{(binary_args or '').strip()}\"\n")
+                out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
+                out.write(f"TIMEOUT=\"{timeout}\"\n")
+                if dst_runner is not None:
+                    out.write(f"JOB_RUNNER=\"{dst_runner}\"\n")
+                out.write('\n')
+
+                # Prepare arrays of formulas and partitions
+                out.write('FORMULAS=(\n')
+                for p in patterns:
+                    out.write(f"  \"{p}\"\n")
+                out.write(')\n')
+                out.write('PARTS=(\n')
+                for p in patterns:
+                    part = str(Path(p).with_suffix('.part'))
+                    out.write(f"  \"{part}\"\n")
+                out.write(')\n')
+                out.write('\n')
+
+                # modes list
+                out.write('MODES=(\n')
+                for m in modes:
+                    out.write(f"  \"{m}\"\n")
+                out.write(')\n')
+                out.write('\n')
+
+                # Loop over patterns, modes, and runs
+                # Early-exit logic: skip remaining runs for a pattern×mode if we encounter timeout/failure
+                out.write('for i in "${!FORMULAS[@]}"; do\n')
+                out.write('  formula="${FORMULAS[$i]}"\n')
+                out.write('  partition="${PARTS[$i]}"\n')
+                out.write('  for mode in "${MODES[@]}"; do\n')
+                out.write('    skip_remaining=0\n')
+                out.write('    for RUN_IDX in $(seq 1 %d); do\n' % runs)
+                out.write('      if [ "$skip_remaining" -eq 1 ]; then\n')
+                out.write('        echo "Skipping formula=${formula}, mode=${mode}, run=${RUN_IDX} (previous run failed)"\n')
+                out.write('        continue\n')
+                out.write('      fi\n')
+                out.write('      echo "Running formula=${formula}, mode=${mode}, run=${RUN_IDX}, host=$(hostname)"\n')
+                out.write('      python3 "${JOB_RUNNER:-./job_runner.py}" \\n')
+                out.write('        --binary "${BINARY}" \\n')
+                out.write('        --binary-args "${BINARY_ARGS}" \\n')
+                out.write('        --singularity "${SINGULARITY}" \\n')
+                out.write('        --mode "${mode}" \\n')
+                out.write('        --formula "${formula}" \\n')
+                out.write('        --partition "${partition}" \\n')
+                out.write('        --run-idx "${RUN_IDX}" \\n')
+                out.write('        --out-dir "${OUT_DIR}" \\n')
+                out.write('        --timeout "${TIMEOUT}"\n')
+                out.write('      exit_code=$?\n')
+                out.write('      if [ "$exit_code" -ne 0 ]; then\n')
+                out.write('        echo "Run failed with exit code ${exit_code}, skipping remaining runs for this pattern×mode"\n')
+                out.write('        skip_remaining=1\n')
+                out.write('      fi\n')
+                out.write('    done\n')
+                out.write('  done\n')
+                out.write('done\n')
+
+            os.chmod(job_script, 0o755)
+            return job_script
+
+        # Build and submit the global job script
+        global_script = write_global_job_script(run_out_dir, [str(p) for p in examples], modes, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts)
+        jobid = submit_script(
+            global_script,
+            retries=args.sbatch_retries,
+            retry_delay=args.sbatch_retry_delay,
+            retry_backoff=args.sbatch_retry_backoff,
+        )
+        submitted.append(jobid)
+        expected_runs = len(examples) * len(modes) * args.runs
+    else:
+        for pattern in examples:
+            partition_file = pattern.with_suffix('.part')
+            if not partition_file.exists():
+                print(f"Skipping {pattern.name}: partition file not found: {partition_file}")
+                continue
+            for mode in modes:
+                job_script = write_job_script(
+                    run_out_dir,
+                    pattern,
+                    partition_file,
+                    args.binary,
+                    args.singularity,
+                    args.binary_args,
+                    args.timeout,
+                    args.runs,
+                    sbatch_opts,
+                    mode,
+                    single_node=args.single_node,
+                )
+                jobid = submit_script(
+                    job_script,
+                    retries=args.sbatch_retries,
+                    retry_delay=args.sbatch_retry_delay,
+                    retry_backoff=args.sbatch_retry_backoff,
+                )
+                submitted.append(jobid)
+                expected_runs += args.runs
 
     print(f"Submitted {len(submitted)} jobs ({expected_runs} runs total)")
 
