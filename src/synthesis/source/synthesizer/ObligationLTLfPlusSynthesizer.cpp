@@ -401,24 +401,16 @@ namespace Syft {
                     // Safety property: convert to G(phi) form
                     spdlog::info("[ObligationFragment] Applying Forall transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa_obligation(explicit_dfa);
-                    if (minimisation_options_.allow_minimisation && trimmed_explicit_dfa.dfa_->ns <= minimisation_options_.threshold) {
-                        ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
-                        color_to_explicit_dfa.insert({color, std::move(minised)});
-                    } else {
-                        color_to_explicit_dfa.insert({color, std::move(trimmed_explicit_dfa)});
-                    }
+                    ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
+                    color_to_explicit_dfa.insert({color, std::move(minised)});
                     break;
                 }
                 case whitemech::lydia::PrefixQuantifier::Exists: {
                     // Guarantee property: convert to F(phi) form
                     spdlog::info("[ObligationFragment] Applying Exists transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
-                    if (minimisation_options_.allow_minimisation && trimmed_explicit_dfa.dfa_->ns <= minimisation_options_.threshold) {
-                        ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
-                        color_to_explicit_dfa.insert({color, std::move(minised)});
-                    } else {
-                        color_to_explicit_dfa.insert({color, std::move(trimmed_explicit_dfa)});
-                    }
+                    ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
+                    color_to_explicit_dfa.insert({color, std::move(minised)});
                     break;
                 }
                 default:
