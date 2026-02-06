@@ -320,6 +320,22 @@ def main():
     # If the user requested a single job for all patterns/modes, create one job script
     # that runs everything sequentially on a single node and submit it once.
     if args.single_job:
+        # For single-job mode, we need a much longer time limit since we're running
+        # all patterns × modes × runs sequentially. Auto-calculate if user didn't specify.
+        if not user_provided_time:
+            # Estimate: (number of patterns) × (number of modes) × (runs) × (timeout per run) + margin
+            # This is a rough upper bound; early-exit will help if runs fail/timeout
+            estimated_seconds = len(examples) * len(modes) * args.runs * args.timeout
+            # Add 10% margin for overhead
+            estimated_seconds = int(estimated_seconds * 1.1)
+            # Cap at 24 hours (86400 seconds) as a safety limit
+            total_seconds = min(estimated_seconds, 86400)
+            hh = total_seconds // 3600
+            mm = (total_seconds % 3600) // 60
+            ss = total_seconds % 60
+            sbatch_opts['--time'] = f"{hh:02d}:{mm:02d}:{ss:02d}"
+            print(f"Auto-calculated time limit for single-job: {sbatch_opts['--time']} ({len(examples)} patterns × {len(modes)} modes × {args.runs} runs × {args.timeout}s)")
+        
         def write_global_job_script(out_dir, patterns, modes, binary, singularity, binary_args, timeout, runs, sbatch_opts):
             jobs_dir = out_dir / 'jobs'
             jobs_dir.mkdir(parents=True, exist_ok=True)
