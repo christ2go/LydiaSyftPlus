@@ -357,14 +357,37 @@ def main():
                 out.write('\n')
 
                 # Prepare arrays of formulas and partitions
+                # If using Singularity, rewrite paths to point to /opt/examples inside container
                 out.write('FORMULAS=(\n')
                 for p in patterns:
-                    out.write(f"  \"{p}\"\n")
+                    if singularity:
+                        # Rewrite path for Singularity container
+                        parts = Path(p).parts
+                        if 'examples' in parts:
+                            idx = parts.index('examples')
+                            rel = Path(*parts[idx+1:])
+                            container_path = Path('/opt/examples') / rel
+                        else:
+                            container_path = Path(p)
+                        out.write(f"  \"{container_path}\"\n")
+                    else:
+                        out.write(f"  \"{p}\"\n")
                 out.write(')\n')
                 out.write('PARTS=(\n')
                 for p in patterns:
-                    part = str(Path(p).with_suffix('.part'))
-                    out.write(f"  \"{part}\"\n")
+                    part_path = Path(p).with_suffix('.part')
+                    if singularity:
+                        # Rewrite path for Singularity container
+                        parts = part_path.parts
+                        if 'examples' in parts:
+                            idx = parts.index('examples')
+                            rel = Path(*parts[idx+1:])
+                            container_path = Path('/opt/examples') / rel
+                        else:
+                            container_path = part_path
+                        out.write(f"  \"{container_path}\"\n")
+                    else:
+                        out.write(f"  \"{part_path}\"\n")
                 out.write(')\n')
                 out.write('\n')
 
