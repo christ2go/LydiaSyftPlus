@@ -1030,19 +1030,18 @@ namespace Syft {
             }
         }
         // Print out the colouring in SCC order
-        std::cout << "SCC Coloring Results:" << std::endl;
+        spdlog::trace("SCC Coloring Results:");
         for (int scc = 0; scc < num_sccs; scc++) {
-            std::cout << "SCC " << scc << ": Color " << scc_color[scc]
-                      << ", Recurrent: " << is_recurrent[scc]
-                      << ", Accepting: " << scc_is_accepting[scc] << std::endl;
+                spdlog::trace("SCC {}: Color {}, Recurrent: {}, Accepting: {}",
+                              scc, scc_color[scc], is_recurrent[scc], scc_is_accepting[scc]);
         }
         // Step 4: Set final states based on coloring (even = final, odd = non-final)
         DFA* normalized = dfaCopy(a);
         for (int i = 0; i < ns; i++) {
             int color = scc_color[scc_id[i]];
-            std::cout << "State " << i << " in SCC " << scc_id[i] << " colored " << color << std::endl;
-            // Logif state wsa final before
-            std::cout << "State " << i << " was final before: " << normalized->f[i] << std::endl;
+            spdlog::trace("State {} in SCC {} colored {}", i, scc_id[i], color);
+            // Log if state was final before
+            spdlog::trace("State {} was final before: {}", i, normalized->f[i]);
             normalized->f[i] = (color % 2 == 0) ? 1 : -1;
         }
         
@@ -1050,8 +1049,8 @@ namespace Syft {
         DFA* minimized = dfaMinimize(normalized);
         dfaFree(normalized);
         // Log number of states now and before
-        spdlog::info("[ExplicitStateDfa::dfa_to_Gdfa] Number of states before minimization: {}", ns);
-        spdlog::info("[ExplicitStateDfa::dfa_to_Gdfa] Number of states after minimization: {}", minimized->ns);
+        spdlog::info("[ExplicitStateDfa::minise] Number of states before minimization: {}", ns);
+        spdlog::info("[ExplicitStateDfa::minise] Number of states after minimization: {}", minimized->ns);
         ExplicitStateDfa result(minimized, d.names);
         return result;
     }

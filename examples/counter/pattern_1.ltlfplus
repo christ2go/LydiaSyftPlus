@@ -1,0 +1,1 @@
+A((!c_0 & !b_0) & G(add -> (X(c_0) & XX(c_0) & XXX(c_0))) & () & F(add ∧ X(false))) -> E((b_0 & X(false)))

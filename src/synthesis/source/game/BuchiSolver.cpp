@@ -38,8 +38,7 @@ namespace Syft
         if (!debug_enabled_)
             return;
 
-        std::cout << "[BuchiSolver PRINT] " << label << " nodes=" << set_bdd.nodeCount()
-                  << " isZero=" << set_bdd.IsZero() << " isOne=" << set_bdd.IsOne() << "\n";
+            spdlog::trace("[BuchiSolver PRINT] {} nodes={} isZero={} isOne={}", label, set_bdd.nodeCount(), set_bdd.IsZero(), set_bdd.IsOne());
 
         if (bit_count > (std::size_t)max_enum_bits)
         {
@@ -150,14 +149,25 @@ namespace Syft
         // Dump information about starting and protagonist players
         if (debug_enabled_)
         {
-            std::cout << "[BuchiSolver INIT] starting_player="
-                      << (starting_player_ == Player::Agent ? "Agent" : "Environment")
-                      << " protagonist_player="
-                      << (protagonist_player_ == Player::Agent ? "Agent" : "Environment");
+                spdlog::debug("[BuchiSolver INIT] starting_player={} protagonist_player={}",
+                              (starting_player_ == Player::Agent ? "Agent" : "Environment"),
+                              (protagonist_player_ == Player::Agent ? "Agent" : "Environment"));
 
             // print chosen Buchi mode
-            std::string mode_str = (buechi_mode_ == BuchiMode::PITERMAN) ? "PITERMAN" : "CLASSIC";
-            std::cout << " mode=" << mode_str << "\n";
+            std::string mode_str;
+            switch (buechi_mode_)
+            {
+            case BuchiMode::PITERMAN:
+                mode_str = "PITERMAN";
+                break;
+            case BuchiMode::COBUCHI:
+                mode_str = "COBUCHI";
+                break;
+            default:
+                mode_str = "CLASSIC";
+                break;
+            }
+            spdlog::debug("[BuchiSolver INIT] mode={}", mode_str);
         }
 
         // game_.dump_json("buchi_dfa.json");
@@ -243,16 +253,14 @@ namespace Syft
 
             if (debug_enabled_)
             {
-                std::cout << "[BuchiSolver Alternating] outer=" << outer_iter
-                          << " safety_iters=" << safety_iters
-                          << " X_nodes=" << X.nodeCount() << "\n";
+                spdlog::debug("[BuchiSolver Alternating] outer={} safety_iters={} X_nodes={}", outer_iter, safety_iters, X.nodeCount());
                 //print_state_set(X, "X (after safety)");
             }
 
             if (W == X)
             {
                 if (debug_enabled_)
-                    std::cout << "[BuchiSolver Alternating] W==X, terminating at outer=" << outer_iter << "\n";
+                    spdlog::debug("[BuchiSolver Alternating] W==X, terminating at outer={}", outer_iter);
                 return W & state_space_;
             }
             else
@@ -275,16 +283,14 @@ namespace Syft
 
             if (debug_enabled_)
             {
-                std::cout << "[BuchiSolver Alternating] outer=" << outer_iter
-                          << " reach_iters=" << reach_iters
-                          << " Y_nodes=" << Y.nodeCount() << "\n";
+                spdlog::debug("[BuchiSolver Alternating] outer={} reach_iters={} Y_nodes={}", outer_iter, reach_iters, Y.nodeCount());
                 //print_state_set(Y, "Y (after reach)");
             }
 
             if (W == Y)
             {
                 if (debug_enabled_)
-                    std::cout << "[BuchiSolver Alternating] W==Y, terminating at outer=" << outer_iter << "\n";
+                    spdlog::debug("[BuchiSolver Alternating] W==Y, terminating at outer={}", outer_iter);
                 return W & state_space_;
             }
             else
@@ -349,7 +355,7 @@ namespace Syft
         CUDD::BDD initial = game_.initial_state_bdd();
         bool initial_in = (initial & !X).IsZero();
         if (debug_enabled_)
-            std::cout << "[BuchiSolver DoubleFixpoint] initial_in=" << initial_in << "\n";
+                spdlog::debug("[BuchiSolver DoubleFixpoint] initial_in={}", initial_in);
         return initial_in;
     }
 

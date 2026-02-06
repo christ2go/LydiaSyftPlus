@@ -137,8 +137,8 @@ namespace Syft {
         
         void convert_to_symbolic_if_needed() {
             if (!is_symbolic && explicit_dfa->dfa_->ns > EXPLICIT_TO_SYMBOLIC_THRESHOLD) {
-                std::cout << "[ObligationFragment] Converting to symbolic (exceeded threshold: " 
-                          << explicit_dfa->dfa_->ns << " > " << EXPLICIT_TO_SYMBOLIC_THRESHOLD << ")" << std::endl;
+                spdlog::debug("[ObligationFragment] Converting to symbolic (exceeded threshold: {} > {})",
+                              explicit_dfa->dfa_->ns, EXPLICIT_TO_SYMBOLIC_THRESHOLD);
                 BigInt explicit_count = BigInt(explicit_dfa->get_nb_states());
                 symbolic_dfa = SymbolicStateDfa::from_explicit(
                     ExplicitStateDfaAdd::from_dfa_mona(var_mgr, *explicit_dfa));
@@ -202,8 +202,8 @@ namespace Syft {
                 estimated_product = std::nullopt;
             }
             if (left.is_symbolic || right.is_symbolic || (estimated_product.has_value() && estimated_product.value() > minimisation_options_.threshold)) {
-                std::cout << "[ObligationFragment] Computing " << (is_or ? "OR" : "AND")
-                          << " product using symbolic representation" << std::endl;
+                spdlog::debug("[ObligationFragment] Computing {} product using symbolic representation",
+                              is_or ? "OR" : "AND");
                 SymbolicStateDfa left_sym = left.to_symbolic();
                 SymbolicStateDfa right_sym = right.to_symbolic();
                 SymbolicStateDfa product = is_or
@@ -215,9 +215,9 @@ namespace Syft {
                 } else {
                     combined.clear_state_count();
                 }
-                std::cout << "[ObligationFragment] Symbolic " << (is_or ? "OR" : "AND")
-                          << " product computed" << std::endl;
-                spdlog::info(
+                spdlog::debug("[ObligationFragment] Symbolic {} product computed",
+                              is_or ? "OR" : "AND");
+                spdlog::debug(
                     "[ObligationFragment] {} product combined ~{} with ~{} -> ~{}",
                     is_or ? "OR" : "AND",
                     bigint_to_string(left_est),
@@ -227,21 +227,23 @@ namespace Syft {
             }
 
             if (is_or) {
-                std::cout << "[ObligationFragment] Computing OR product using MONA" << std::endl;
+                spdlog::info("[ObligationFragment] Computing OR product using MONA");
             } else {
-                std::cout << "[ObligationFragment] Computing AND product using MONA" << std::endl;
+                spdlog::info("[ObligationFragment] Computing AND product using MONA");
             }
 
             ExplicitStateDfa product = is_or
                 ? ExplicitStateDfa::dfa_product_or({*left.explicit_dfa, *right.explicit_dfa})
                 : ExplicitStateDfa::dfa_product_and({*left.explicit_dfa, *right.explicit_dfa});
-            std::cout << "[ObligationFragment] " << (is_or ? "OR" : "AND")
-                      << " product has " << product.dfa_->ns << " states" << std::endl;
+            spdlog::info("[ObligationFragment] {} product has {} states",
+                         is_or ? "OR" : "AND",
+                         product.dfa_->ns);
 
             if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
-                std::cout << "[ObligationFragment] Minimizing " << (is_or ? "OR" : "AND")
-                          << " product (states: " << product.dfa_->ns
-                          << " < " << minimisation_options_.threshold << ")" << std::endl;
+                spdlog::info("[ObligationFragment] Minimizing {} product (states: {} < {})",
+                             is_or ? "OR" : "AND",
+                             product.dfa_->ns,
+                             minimisation_options_.threshold);
                 product = ExplicitStateDfa::dfa_minimize_weak(product);
             }
 
@@ -386,7 +388,7 @@ namespace Syft {
         std::map<int, ExplicitStateDfa> color_to_explicit_dfa;
         std::map<int, CUDD::BDD> color_to_final_states;
 
-        std::cout << "[ObligationFragment] Building explicit DFAs for each color..." << std::endl;
+        spdlog::info("[ObligationFragment] Building explicit DFAs for each color...");
         
         for (const auto& [ltlf_plus_arg, prefix_quantifier] : ltlf_plus_formula_.formula_to_quantification_) {
             whitemech::lydia::ltlf_ptr ltlf_arg = ltlf_plus_arg->ltlf_arg();
@@ -397,32 +399,40 @@ namespace Syft {
             switch (prefix_quantifier) {
                 case whitemech::lydia::PrefixQuantifier::Forall: {
                     // Safety property: convert to G(phi) form
-                    std::cout << "[ObligationFragment] Applying Forall transformation for color " << color << std::endl;
+                    spdlog::info("[ObligationFragment] Applying Forall transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa_obligation(explicit_dfa);
-                    color_to_explicit_dfa.insert({color, std::move(trimmed_explicit_dfa)});
+                    if (minimisation_options_.allow_minimisation && trimmed_explicit_dfa.dfa_->ns <= minimisation_options_.threshold) {
+                        ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
+                        color_to_explicit_dfa.insert({color, std::move(minised)});
+                    } else {
+                        color_to_explicit_dfa.insert({color, std::move(trimmed_explicit_dfa)});
+                    }
                     break;
                 }
                 case whitemech::lydia::PrefixQuantifier::Exists: {
                     // Guarantee property: convert to F(phi) form
-                    std::cout << "[ObligationFragment] Applying Exists transformation for color " << color << std::endl;
+                    spdlog::info("[ObligationFragment] Applying Exists transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
-                    ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
-                    color_to_explicit_dfa.insert({color, std::move(minised)});
+                    if (minimisation_options_.allow_minimisation && trimmed_explicit_dfa.dfa_->ns <= minimisation_options_.threshold) {
+                        ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
+                        color_to_explicit_dfa.insert({color, std::move(minised)});
+                    } else {
+                        color_to_explicit_dfa.insert({color, std::move(trimmed_explicit_dfa)});
+                    }
                     break;
                 }
                 default:
-                    // This should not happen if validate_obligation_fragment was called
+                    // This should not happen since validate_obligation_fragment was called
                     throw std::runtime_error("Unexpected quantifier in obligation fragment conversion");
             }
         }
 
         // Step 2: Build the product arena using hybrid approach (MONA when small, symbolic when large)
-        std::cout << "[ObligationFragment] Computing product DFA using hybrid approach..." << std::endl;
+        spdlog::info("[ObligationFragment] Computing product DFA using hybrid approach...");
         SymbolicStateDfa arena = build_arena_from_color_formula_hybrid(
             ltlf_plus_formula_.color_formula_, color_to_explicit_dfa);
         
-        std::cout << "[ObligationFragment] Final arena DFA created" << std::endl;
-
+        spdlog::info("[ObligationFragment] Final arena DFA created");
         // Step 3: Collect final states for debugging (convert individual DFAs just for final state info)
         for (const auto &[color, explicit_dfa] : color_to_explicit_dfa) {
             ExplicitStateDfaAdd add = ExplicitStateDfaAdd::from_dfa_mona(var_mgr_, explicit_dfa);
@@ -435,7 +445,7 @@ namespace Syft {
         
         auto t1 = clock::now();
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-        std::cout << "[ObligationFragment] Total DFA construction time: " << ms << " ms" << std::endl;
+        spdlog::info("[ObligationFragment] Total DFA construction time: {} ms", ms);
 
         return std::make_pair(arena, color_to_final_states);
     }
@@ -443,26 +453,22 @@ namespace Syft {
     ELSynthesisResult ObligationLTLfPlusSynthesizer::solve_with_scc(
         const SymbolicStateDfa& arena,
         const std::map<int, CUDD::BDD>& color_to_final_states) const {
-                    std::cout << "Solving with WeakGameSolver" << std::endl;
+                    spdlog::info("[ObligationFragment] Solving with WeakGameSolver");
         
         // Use the arena's final states which already encode the correct AND/OR structure
         CUDD::BDD accepting_states = arena.final_states();
-        
-        std::cout << "Starting WeakGameSolver" << std::endl;
-        
+                
         // Create and run the weak game solver (debug=true for detailed output)
         WeakGameSolver solver(arena, accepting_states, true);
         WeakGameResult game_result = solver.Solve();
-        
-        std::cout << "WeakGameSolver completed" << std::endl;
-        
+                
         // Check if initial state is winning
         CUDD::BDD initial_state = arena.initial_state_bdd();
         bool is_realizable = !(initial_state & !game_result.winning_states).IsZero() == false;
         // Simplified: check if initial state is in winning states
         is_realizable = !(initial_state & game_result.winning_states).IsZero();
         
-        std::cout << "Realizability: " << (is_realizable ? "true" : "false") << std::endl;
+        spdlog::info("[ObligationFragment] Realizability: {}", (is_realizable ? "true" : "false"));
         
         // Build result
         ELSynthesisResult result;
@@ -479,12 +485,11 @@ namespace Syft {
         const SymbolicStateDfa& arena,
         const std::map<int, CUDD::BDD>& color_to_final_states) const {
         
-        std::cout << "Solving with BuchiStandalone solver" << std::endl;
+        spdlog::info("[ObligationFragment] Solving with BuchiStandalone solver");
         
         // Use the arena's final states which already encode the correct AND/OR structure
         CUDD::BDD accepting_states = arena.final_states();
         
-        // Compute state space: all reachable states from initial state (forward reachability)
         auto var_mgr = arena.var_mgr();
         auto mgr = var_mgr->cudd_mgr();
         auto automaton_id = arena.automaton_id();
@@ -497,15 +502,12 @@ namespace Syft {
         CUDD::BDD io_cube = var_mgr->input_cube() * var_mgr->output_cube();
         
         
-        std::cout << "State space computed, starting BuchiStandalone" << std::endl;
-                std::cout << state_space << std::endl;
-
         // Create and run the Büchi solver (arena already has final_states)
     BuchiSolver solver(arena, starting_player_, protagonist_player_, var_mgr_->cudd_mgr()->bddOne(), buechi_mode_);
         SynthesisResult game_result = solver.run();
         
-        std::cout << "BuchiStandalone completed" << std::endl;
-        std::cout << "Realizability: " << (game_result.realizability ? "true" : "false") << std::endl;
+        spdlog::info("[ObligationFragment] BuchiStandalone completed");
+        spdlog::info("[ObligationFragment] Realizability: {}", (game_result.realizability ? "true" : "false"));
         
         // Convert SynthesisResult to ELSynthesisResult
         ELSynthesisResult result;

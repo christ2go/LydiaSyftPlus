@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
     auto console = spdlog::stdout_color_mt("console");
     spdlog::set_default_logger(console);
-    spdlog::set_level(spdlog::level::trace); // or debug, trace, etc.
+    spdlog::set_level(spdlog::level::off); // or debug, trace, etc.
     spdlog::set_pattern("[%H:%M:%S.%e] [%^%l%$] %v");
 
     // CLI::Option* ltlf_plus_file_opt;
@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
         ->default_val(12);
 
     app.add_flag("--legacy-boolean-product", legacy_boolean_product,
-                 "Use the legacy left-associative boolean product when combining color DFAs");
+                 "Use the legacy left-associative boolean product when combining DFAs");
 
     app.add_option("-b,--buechi-mode", buechi_mode_str, "Solver mode: wg (weak-game / SCC), cl (Büchi classic), pm (Büchi Piterman), cb (CoBuchi)")
     ->default_val("wg");

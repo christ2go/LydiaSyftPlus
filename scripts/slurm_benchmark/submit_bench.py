@@ -37,7 +37,7 @@ def find_examples(examples_dir, prefix='pattern'):
     return files
 
 
-def write_job_script(out_dir, pattern_file, partition_file, binary, singularity, binary_args, timeout, runs, sbatch_opts, mode):
+def write_job_script(out_dir, pattern_file, partition_file, binary, singularity, binary_args, timeout, runs, sbatch_opts, mode, single_node=False):
     # Create a job script under out_dir/jobs
     job_name = pattern_file.stem
     jobs_dir = out_dir / 'jobs'
@@ -66,8 +66,12 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         # append other sbatch opts
         for k, v in sbatch_opts.items():
             out.write(f"#SBATCH {k}={v}\n")
-        # array directive
-        out.write(f"#SBATCH --array=1-{runs}\n")
+        # array directive (skip for single-node sequential mode)
+        if not single_node:
+            out.write(f"#SBATCH --array=1-{runs}\n")
+        else:
+            # request a single node/task for sequential runs
+            out.write(f"#SBATCH --nodes=1\n")
         out.write('\n')
 
         # Export environment variables that template expects
@@ -121,7 +125,8 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
         out.write(f"export MODE=\"{mode}\"\n")
         out.write(f"OUT_DIR=\"{out_dir / 'results'}\"\n")
         out.write(f"TIMEOUT=\"{timeout}\"\n")   
-        out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")
+        if not single_node:
+            out.write(f"RUN_IDX=\"${{SLURM_ARRAY_TASK_ID}}\"\n")
 
         # Inject JOB_RUNNER absolute path (so template doesn't rely on $0-based lookup)
         if dst_runner is not None:
@@ -133,7 +138,15 @@ def write_job_script(out_dir, pattern_file, partition_file, binary, singularity,
             tmpl_text = tmpl.read()
         # write everything after the first line
         tmpl_body = '\n'.join(tmpl_text.splitlines()[1:])
-        out.write(tmpl_body)
+        if single_node:
+            # Wrap the template body in a loop that sets RUN_IDX for each sequential run
+            out.write(f"for RUN_IDX in $(seq 1 {runs}); do\n")
+            # indent the template body for readability
+            for line in tmpl_body.splitlines():
+                out.write(line + '\n')
+            out.write('done\n')
+        else:
+            out.write(tmpl_body)
 
     os.chmod(job_script, 0o755)
     return job_script
@@ -224,6 +237,7 @@ def main():
                         help='Initial delay in seconds before retrying sbatch submission (default: 5.0)')
     parser.add_argument('--sbatch-retry-backoff', type=float, default=2.0,
                         help='Multiplicative backoff applied to the retry delay (default: 2.0)')
+    parser.add_argument('--single-node', action='store_true', help='Run all runs for a pattern sequentially in a single Slurm job (no array)')
     parser.add_argument('--max-examples', type=int, default=None, help='Limit to first N examples')
     parser.add_argument('--modes', type=str, default='el,cl,pm,wg,cb',
                         help='Comma-separated solver modes to run: el,cl,pm,wg,cb (default: all)')
@@ -297,7 +311,19 @@ def main():
             continue
 
         for mode in modes:
-            job_script = write_job_script(run_out_dir, pattern, partition_file, args.binary, args.singularity, args.binary_args, args.timeout, args.runs, sbatch_opts, mode)
+            job_script = write_job_script(
+                run_out_dir,
+                pattern,
+                partition_file,
+                args.binary,
+                args.singularity,
+                args.binary_args,
+                args.timeout,
+                args.runs,
+                sbatch_opts,
+                mode,
+                single_node=args.single_node,
+            )
             jobid = submit_script(
                 job_script,
                 retries=args.sbatch_retries,

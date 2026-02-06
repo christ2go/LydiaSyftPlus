@@ -497,7 +497,7 @@ WeakGameResult WeakGameSolver::Solve() const {
     //PrintStateSet("Reachable states from initial", reachable);
     */
     // Compute all layers and layers_below (like reference implementation)
-    std::cout << "[WeakGameSolver] Starting SCC decomposition..." << std::endl;
+    spdlog::info("[WeakGameSolver] Starting SCC decomposition...");
     auto scc_start = std::chrono::steady_clock::now();
     
     std::vector<CUDD::BDD> layers;
@@ -512,7 +512,7 @@ WeakGameResult WeakGameSolver::Solve() const {
         
         if (layer.IsZero()) {
             if (debug_ && kVerboseSolver) {
-                std::cout << "[WeakGameSolver] PeelLayer returned empty, breaking" << std::endl;
+                spdlog::info("[WeakGameSolver] PeelLayer returned empty, breaking");
             }
             // States remaining here have no internal transitions - they only transition
             // to already-peeled states. They will be handled via reachability/safety
@@ -542,18 +542,15 @@ WeakGameResult WeakGameSolver::Solve() const {
     
     auto scc_end = std::chrono::steady_clock::now();
     auto scc_duration = std::chrono::duration_cast<std::chrono::milliseconds>(scc_end - scc_start);
-    std::cout << "[WeakGameSolver] SCC decomposition completed in " << scc_duration.count() << " ms (" << layers.size() << " layers)" << std::endl;
+    spdlog::info("[WeakGameSolver] SCC decomposition completed in {} ms ({} layers)", scc_duration.count(), layers.size());
     
     if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Total layers: " << layers.size() << std::endl;
+        spdlog::debug("[WeakGameSolver] Total layers: {}", layers.size());
     }
         
     // Reverse layers so we process from bottom SCCs (terminal) to top (source)
     std::reverse(layers.begin(), layers.end());
     std::reverse(layers_below.begin(), layers_below.end());
-    if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Reversed layers (now processing bottom-up)" << std::endl;
-    }
 
     CUDD::BDD good_states = mgr->bddZero();
 	CUDD::BDD bad_states = mgr->bddZero();
@@ -583,14 +580,13 @@ WeakGameResult WeakGameSolver::Solve() const {
 
     if (debug_ && kVerboseSolver) {
         double final_good = good_states.CountMinterm(var_mgr_->state_variable_count(automaton_id));
-        std::cout << "[WeakGameSolver] Final winning states: " << good_states << std::endl;
+        spdlog::debug("[WeakGameSolver] Final winning states: {}", good_states);
     }
 
     CUDD::BDD initial = arena_.initial_state_bdd();
     bool initial_winning = !(initial & !good_states).IsZero() == false;
     if (debug_ && kVerboseSolver) {
-        std::cout << "[WeakGameSolver] Initial state is " << (initial_winning ? "WINNING" : "LOSING")
-                  << std::endl;
+        spdlog::debug("[WeakGameSolver] Initial state is {}", (initial_winning ? "WINNING" : "LOSING"));
     }
 
     return WeakGameResult{good_states, good_states};

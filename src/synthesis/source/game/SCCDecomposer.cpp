@@ -224,10 +224,6 @@ namespace {
         auto primed_vars = var_mgr->get_state_variables(primed_id);
         auto mgr = var_mgr->cudd_mgr();
         
-        //std::cout << "[UnprimedToPrimed] Converting BDD from unprimed to primed variables" << std::endl;
-        //std::cout << "[UnprimedToPrimed] Input BDD: " << var_mgr->bdd_to_string(unprimed_bdd) << std::endl;
-        //std::cout << "[UnprimedToPrimed] Unprimed automaton_id: " << unprimed_id << std::endl;
-        //std::cout << "[UnprimedToPrimed] Primed automaton_id: " << primed_id << std::endl;
         
         // Create a variable mapping from unprimed to primed
         // Initialize with identity mapping (all variables map to themselves)
@@ -241,7 +237,6 @@ namespace {
         
         // Replace unprimed state variables with primed ones
         size_t num_bits = var_mgr->state_variable_count(unprimed_id);
-        //std::cout << "[UnprimedToPrimed] Mapping " << num_bits << " state variables:" << std::endl;
         for (size_t i = 0; i < num_bits; ++i) {
             size_t unprimed_index = unprimed_vars[i].NodeReadIndex();
             size_t primed_index = primed_vars[i].NodeReadIndex();
@@ -251,9 +246,6 @@ namespace {
         }
         
         CUDD::BDD result = unprimed_bdd.VectorCompose(compose_vector);
-        //std::cout << "[UnprimedToPrimed] Result BDD: " << var_mgr->bdd_to_string(result) << std::endl;
-        //std::cout << "[UnprimedToPrimed] Result node count: " << result.nodeCount() 
-        //          << ", isZero: " << result.IsZero() << ", isOne: " << result.IsOne() << std::endl;
         
         return result;
     }
@@ -313,14 +305,14 @@ CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automat
     std::vector<CUDD::BDD> terms;
     terms.reserve(transition_func.size());
     for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        std::cout << "[BuildTransitionRelation] Preparing equiv for state variable " << i << std::endl;
+        spdlog::info("[BuildTransitionRelation] Preparing equiv for state variable {}", i);
         terms.push_back(primed_vars[i].Xnor(transition_func[i]));
     }
 
     // Sort terms by BDD size (node count) before merging
     // This implements Huffman-style merging: always merge the two smallest BDDs
     // This minimizes intermediate BDD sizes during conjunction
-    std::cout << "[BuildTransitionRelation] Sorting " << terms.size() << " terms by size" << std::endl;
+    spdlog::info("[BuildTransitionRelation] Sorting {} terms by size", terms.size());
     
     // Calculate sizes and create priority queue (min-heap by node count)
     auto cmp = [](const CUDD::BDD& a, const CUDD::BDD& b) {
@@ -330,7 +322,7 @@ CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automat
     
     // Add all terms to priority queue
     for (const auto& term : terms) {
-        std::cout << "[BuildTransitionRelation]   Term size: " << term.nodeCount() << " nodes" << std::endl;
+            spdlog::trace("[BuildTransitionRelation]   Term size: {} nodes", term.nodeCount());
         pq.push(term);
     }
     
@@ -341,11 +333,11 @@ CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automat
         CUDD::BDD second = pq.top();
         pq.pop();
         
-        std::cout << "[BuildTransitionRelation] Merging BDDs of size " 
-                  << first.nodeCount() << " and " << second.nodeCount() << std::endl;
-        
-        CUDD::BDD merged = first & second;
-        std::cout << "[BuildTransitionRelation]   Result size: " << merged.nodeCount() << " nodes" << std::endl;
+            spdlog::trace("[BuildTransitionRelation] Merging BDDs of size {} and {}", 
+                          first.nodeCount(), second.nodeCount());
+            
+            CUDD::BDD merged = first & second;
+            spdlog::trace("[BuildTransitionRelation]   Result size: {} nodes", merged.nodeCount());
         
         pq.push(merged);
     }
@@ -354,10 +346,10 @@ CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automat
         trans_relation = pq.top();
     }
     
-    std::cout << "[BuildTransitionRelation] Beginning existential abstraction" << std::endl;
+    spdlog::trace("[BuildTransitionRelation] Beginning existential abstraction");
     // Existentially quantify over input and output variables to get state-to-state relation
     trans_relation = trans_relation.ExistAbstract(io_cube);
-        std::cout << "Finished existential abstraction" << std::endl;
+     spdlog::trace("Finished existential abstraction");
 
     return trans_relation;
 }
@@ -402,7 +394,7 @@ CUDD::BDD NaiveSCCDecomposer::ComposeRelations(const CUDD::BDD& R1, const CUDD::
 
     // Compute ∃t. (R1(s,t) ∧ R2(t,s')) via AndAbstract for efficiency
     CUDD::BDD composition = (R1_st & R2_ts).ExistAbstract(temp_cube);
-    std::cout << "[ComposeRelations] Composition node count: " << composition.nodeCount() << std::endl;
+    spdlog::debug("[ComposeRelations] Composition node count: {}", composition.nodeCount());
     return composition;
 }
 
@@ -477,7 +469,7 @@ CUDD::BDD NaiveSCCDecomposer::BuildPathRelation(const CUDD::BDD& states,
     CUDD::BDD restricted_path = cached_path_relation_ & states & primed_states;
 
     if (kVerboseSCC) {
-        std::cout << "[BuildPathRelation] Using cached path relation and restricting to current state set" << std::endl;
+        spdlog::debug("[BuildPathRelation] Using cached path relation and restricting to current state set");
     }
 
     return restricted_path;
@@ -518,7 +510,7 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
 
     if (path_relation.IsZero()) {
         if (kVerboseSCC) {
-            std::cout << "[PeelLayer] Path relation is empty; returning zero layer" << std::endl;
+            spdlog::debug("[PeelLayer] Path relation is empty; returning zero layer");
         }
         return mgr->bddZero();
     }
@@ -528,7 +520,7 @@ CUDD::BDD NaiveSCCDecomposer::PeelLayer(const CUDD::BDD& states) const {
     CUDD::BDD primed_cube = var_mgr->state_variables_cube(primed_automaton_id_);
     CUDD::BDD top_layer = states & (!swapped_path | path_relation).UnivAbstract(primed_cube);
 
-    std::cout << "[PeelLayer] Top layer (restricted) node count: " << top_layer.nodeCount() << std::endl;
+    spdlog::debug("[PeelLayer] Top layer (restricted) node count: {}", top_layer.nodeCount());
 
     auto state_vars = var_mgr->get_state_variables(automaton_id);
 
