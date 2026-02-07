@@ -335,18 +335,18 @@ namespace Syft
                 Y = newY & state_space_;
                 if (debug_enabled_)
             {
-                 spdlog::info("[BuchiSolver DoubleFixpoint] inner_iter={}", inner_iter);
+                 spdlog::debug("[BuchiSolver DoubleFixpoint] inner_iter={}", inner_iter);
                 //(X, "X (current)");
             }
             } while (!(Y == prevY));
-                spdlog::info("[BuchiSolver DoubleFixpoint] inner finished");
+                spdlog::debug("[BuchiSolver DoubleFixpoint] inner finished");
 
             // The phi(X) is the inner fixpoint Y
             X = Y & state_space_;
 
             if (debug_enabled_)
             {
-                spdlog::info("[BuchiSolver DoubleFixpoint] outer_iter={}, inner_iters={}, X_nodes={}", outer_iter, inner_iter, X.nodeCount());
+                spdlog::debug("[BuchiSolver DoubleFixpoint] outer_iter={}, inner_iters={}, X_nodes={}", outer_iter, inner_iter, X.nodeCount());
                 //print_state_set(X, "X (current)");
             }
         }

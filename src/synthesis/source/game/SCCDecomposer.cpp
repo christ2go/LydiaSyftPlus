@@ -305,14 +305,14 @@ CUDD::BDD NaiveSCCDecomposer::BuildTransitionRelation(std::size_t primed_automat
     std::vector<CUDD::BDD> terms;
     terms.reserve(transition_func.size());
     for (std::size_t i = 0; i < transition_func.size(); ++i) {
-        spdlog::info("[BuildTransitionRelation] Preparing equiv for state variable {}", i);
+        spdlog::debug("[BuildTransitionRelation] Preparing equiv for state variable {}", i);
         terms.push_back(primed_vars[i].Xnor(transition_func[i]));
     }
 
     // Sort terms by BDD size (node count) before merging
     // This implements Huffman-style merging: always merge the two smallest BDDs
     // This minimizes intermediate BDD sizes during conjunction
-    spdlog::info("[BuildTransitionRelation] Sorting {} terms by size", terms.size());
+    spdlog::debug("[BuildTransitionRelation] Sorting {} terms by size", terms.size());
     
     // Calculate sizes and create priority queue (min-heap by node count)
     auto cmp = [](const CUDD::BDD& a, const CUDD::BDD& b) {

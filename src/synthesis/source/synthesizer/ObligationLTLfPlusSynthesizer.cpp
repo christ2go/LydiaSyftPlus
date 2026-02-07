@@ -227,20 +227,20 @@ namespace Syft {
             }
 
             if (is_or) {
-                spdlog::info("[ObligationFragment] Computing OR product using MONA");
+                spdlog::debug("[ObligationFragment] Computing OR product using MONA");
             } else {
-                spdlog::info("[ObligationFragment] Computing AND product using MONA");
+                spdlog::debug("[ObligationFragment] Computing AND product using MONA");
             }
 
             ExplicitStateDfa product = is_or
                 ? ExplicitStateDfa::dfa_product_or({*left.explicit_dfa, *right.explicit_dfa})
                 : ExplicitStateDfa::dfa_product_and({*left.explicit_dfa, *right.explicit_dfa});
-            spdlog::info("[ObligationFragment] {} product has {} states",
+            spdlog::debug("[ObligationFragment] {} product has {} states",
                          is_or ? "OR" : "AND",
                          product.dfa_->ns);
 
             if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
-                spdlog::info("[ObligationFragment] Minimizing {} product (states: {} < {})",
+                spdlog::debug("[ObligationFragment] Minimizing {} product (states: {} < {})",
                              is_or ? "OR" : "AND",
                              product.dfa_->ns,
                              minimisation_options_.threshold);
@@ -250,7 +250,7 @@ namespace Syft {
             HybridDfa combined(std::move(product), var_mgr_);
             combined.convert_to_symbolic_if_needed();
 
-            spdlog::info(
+            spdlog::debug(
                 "[ObligationFragment] {} product combined ~{} with ~{} -> ~{}",
                 is_or ? "OR" : "AND",
                 bigint_to_string(left_est),
@@ -399,7 +399,7 @@ namespace Syft {
             switch (prefix_quantifier) {
                 case whitemech::lydia::PrefixQuantifier::Forall: {
                     // Safety property: convert to G(phi) form
-                    spdlog::info("[ObligationFragment] Applying Forall transformation for color {}", color);
+                    spdlog::debug("[ObligationFragment] Applying Forall transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa_obligation(explicit_dfa);
                     ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
                     color_to_explicit_dfa.insert({color, std::move(minised)});
@@ -407,7 +407,7 @@ namespace Syft {
                 }
                 case whitemech::lydia::PrefixQuantifier::Exists: {
                     // Guarantee property: convert to F(phi) form
-                    spdlog::info("[ObligationFragment] Applying Exists transformation for color {}", color);
+                    spdlog::debug("[ObligationFragment] Applying Exists transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
                     ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
                     color_to_explicit_dfa.insert({color, std::move(minised)});

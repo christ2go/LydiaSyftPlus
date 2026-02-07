@@ -470,13 +470,13 @@ namespace Syft {
   CUDD::BDD EmersonLei::cpre(ZielonkaNode *t, int i, CUDD::BDD target) const {
     CUDD::BDD result;
     if (DEBUG_MODE) {
-  spdlog::info("[cpre] entering cpre: node={} idx={} target_nodes={}", t->order, i, target.nodeCount());
+  spdlog::debug("[cpre] entering cpre: node={} idx={} target_nodes={}", t->order, i, target.nodeCount());
     }
 
     if (starting_player_ == Player::Agent) {
       CUDD::BDD quantified_X_transitions_to_winning_states = preimage(target);
       if (DEBUG_MODE) {
-  spdlog::info("[cpre] quantified_X_transitions_to_winning_states nodes={}", quantified_X_transitions_to_winning_states.nodeCount());
+  spdlog::debug("[cpre] quantified_X_transitions_to_winning_states nodes={}", quantified_X_transitions_to_winning_states.nodeCount());
       }
       //             CUDD::BDD new_target_moves = target |
       //                                 (state_space_ & (!target) & quantified_X_transitions_to_winning_states);
@@ -492,14 +492,14 @@ namespace Syft {
         
         result = project_into_states(new_target_moves);
         if (DEBUG_MODE) {
-          spdlog::info("[cpre] project_into_states(new_target_moves) nodes={}", project_into_states(new_target_moves).nodeCount());
-          spdlog::info("[cpre] result nodes={}", result.nodeCount());
-          spdlog::info("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
+          spdlog::debug("[cpre] project_into_states(new_target_moves) nodes={}", project_into_states(new_target_moves).nodeCount());
+          spdlog::debug("[cpre] result nodes={}", result.nodeCount());
+          spdlog::debug("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
         }
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
         if (DEBUG_MODE) {
-          spdlog::info("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
+          spdlog::debug("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
         }
       } else {
         CUDD::BDD new_target_moves_with_loops;
@@ -512,28 +512,28 @@ namespace Syft {
         CUDD::BDD new_target_moves = (!target) & new_target_moves_with_loops;
         result = project_into_states(new_target_moves_with_loops);
         if (DEBUG_MODE) {
-          spdlog::info("[cpre] project_into_states(new_target_moves_with_loops) nodes={}", project_into_states(new_target_moves_with_loops).nodeCount());
-          spdlog::info("[cpre] result nodes={}", result.nodeCount());
-          spdlog::info("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
+          spdlog::debug("[cpre] project_into_states(new_target_moves_with_loops) nodes={}", project_into_states(new_target_moves_with_loops).nodeCount());
+          spdlog::debug("[cpre] result nodes={}", result.nodeCount());
+          spdlog::debug("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
         }
         // CUDD::BDD diffmoves = (result & (!target) & quantified_X_transitions_to_winning_states);
         t->winningmoves[i] = t->winningmoves[i] | new_target_moves;
         if (DEBUG_MODE) {
-          spdlog::info("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
+          spdlog::debug("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
         }
       }
     } else {
       //TODO need to double-check
       CUDD::BDD transitions_to_target_states = preimage(target);
       if (DEBUG_MODE) {
-  spdlog::info("[cpre] transitions_to_target_states nodes={}", transitions_to_target_states.nodeCount());
+      spdlog::debug("[cpre] transitions_to_target_states nodes={}", transitions_to_target_states.nodeCount());
       }
       if (t->winning) {
         result = state_space_ & project_into_states(transitions_to_target_states);
         if (DEBUG_MODE) {
-          spdlog::info("[cpre] project_into_states(transitions_to_target_states) nodes={}", project_into_states(transitions_to_target_states).nodeCount());
-          spdlog::info("[cpre] result nodes={}", result.nodeCount());
-          spdlog::info("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
+          spdlog::debug("[cpre] project_into_states(transitions_to_target_states) nodes={}", project_into_states(transitions_to_target_states).nodeCount());
+          spdlog::debug("[cpre] result nodes={}", result.nodeCount());
+          spdlog::debug("[cpre] winningmoves_before nodes={}", t->winningmoves[i].nodeCount());
         }
         // result = target | new_collected_target_states;
         CUDD::BDD new_target_moves;
@@ -545,7 +545,7 @@ namespace Syft {
         // CUDD::BDD diffmoves = (!target) & transitions_to_target_states;
         t->winningmoves[i] = t->winningmoves[i] & new_target_moves;
         if (DEBUG_MODE) {
-          spdlog::info("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
+          spdlog::debug("[cpre] winningmoves_after nodes={}", t->winningmoves[i].nodeCount());
         }
       } else {
         result = state_space_ & project_into_states(transitions_to_target_states);
@@ -569,7 +569,7 @@ namespace Syft {
       }
     }
       if (DEBUG_MODE) {
-  spdlog::info("[cpre] exiting cpre: result nodes={}", result.nodeCount());
+  spdlog::debug("[cpre] exiting cpre: result nodes={}", result.nodeCount());
     }
     return result;
   }
@@ -581,8 +581,8 @@ namespace Syft {
     }
     CUDD::BDD X, XX;
 
-    // lightweight entry log (info level)
-    spdlog::info("[EmersonLeiSolve] entering node={} initial_X_nodes={}", t->order, (var_mgr_->cudd_mgr()->bddOne()).nodeCount());
+    // lightweight entry log (debug level for recursive calls)
+    spdlog::debug("[EmersonLeiSolve] entering node={} initial_X_nodes={}", t->order, (var_mgr_->cudd_mgr()->bddOne()).nodeCount());
 
     // initialize variables for fixpoint computation (gfp for winning / lfp for losing)
     if (t->winning) {
@@ -631,10 +631,10 @@ namespace Syft {
       outer_iter++;
       int inner_iter = 0;
       if (DEBUG_MODE) {
-  spdlog::info("[EmersonLeiSolve] Node: {} outer_iter={}", t->order, outer_iter);
-  spdlog::info("[EmersonLeiSolve] X nodes={}", X.nodeCount());
-  spdlog::info("instant winning: {}", instant_winning_.nodeCount());
-  spdlog::info("instant losing: {}", instant_losing_.nodeCount());
+  spdlog::debug("[EmersonLeiSolve] Node: {} outer_iter={}", t->order, outer_iter);
+  spdlog::debug("[EmersonLeiSolve] X nodes={}", X.nodeCount());
+  spdlog::debug("instant winning: {}", instant_winning_.nodeCount());
+  spdlog::debug("instant losing: {}", instant_losing_.nodeCount());
       }
 
       // lightweight per-outer-iteration info log; includes inner iteration count later
@@ -653,7 +653,7 @@ namespace Syft {
             auto t1 = std::chrono::steady_clock::now();
             //if (DEBUG_MODE) {
               auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-              spdlog::info("[EmersonLeiSolve] cpre(child leaf) took={} ms", ms);
+              spdlog::debug("[EmersonLeiSolve] cpre(child leaf) took={} ms", ms);
             //}
           }
         } else {
@@ -691,7 +691,7 @@ namespace Syft {
             auto t1 = std::chrono::steady_clock::now();
             if (DEBUG_MODE) {
               auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-              spdlog::info("[EmersonLeiSolve] cpre(child non-leaf) idx={} took={} ms", i, ms);
+              spdlog::debug("[EmersonLeiSolve] cpre(child non-leaf) idx={} took={} ms", i, ms);
             }
           } else {
             inner_iter++;
@@ -700,7 +700,7 @@ namespace Syft {
             auto t1 = std::chrono::steady_clock::now();
             //if (DEBUG_MODE) {
               auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-              spdlog::info("[EmersonLeiSolve] cpre(child non-leaf) idx={} took={} ms", i, ms);
+              spdlog::debug("[EmersonLeiSolve] cpre(child non-leaf) idx={} took={} ms", i, ms);
             //}
           }
           
@@ -716,7 +716,7 @@ namespace Syft {
         }
       }
      if (DEBUG_MODE) {
-  spdlog::info("[EmersonLeiSolve] outer_iter={} inner_iter={} X_nodes={} XX_nodes={}", outer_iter, inner_iter, X.nodeCount(), XX.nodeCount());
+  spdlog::debug("[EmersonLeiSolve] outer_iter={} inner_iter={} X_nodes={} XX_nodes={}", outer_iter, inner_iter, X.nodeCount(), XX.nodeCount());
         //var_mgr_->dump_dot(XX.Add(), "XX.dot");
     }
 
