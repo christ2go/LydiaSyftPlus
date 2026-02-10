@@ -226,7 +226,7 @@ namespace Syft {
             } else {
                 estimated_product = std::nullopt;
             }
-            if (left.is_symbolic || right.is_symbolic || (estimated_product.has_value() && estimated_product.value() > minimisation_options_.threshold)) {
+            if (left.is_symbolic || right.is_symbolic || (estimated_product.has_value() && estimated_product.value() > minimisation_options_.symbolic_threshold)) {
                 spdlog::debug("[ObligationFragment] Computing {} product using symbolic representation",
                               is_or ? "OR" : "AND");
                 SymbolicStateDfa left_sym = left.to_symbolic();
