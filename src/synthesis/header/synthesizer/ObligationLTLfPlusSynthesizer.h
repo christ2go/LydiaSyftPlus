@@ -18,7 +18,8 @@
 
 struct MinimisationOptions {
     bool allow_minimisation = true;
-    int threshold = 12;  // By default, only minimise small weak automata
+    int threshold = 128;  // By default, only minimise small weak automata
+    int symbolic_threshold = 128;
 };
 
 namespace CUDD {
@@ -40,12 +41,6 @@ namespace Syft {
      * This synthesizer is optimized for the obligation fragment, which consists
      * only of safety (forall) and guarantee (exists) quantifiers.
      *
-     * Behaviour:
-     *  - validate the formula belongs to the obligation fragment
-     *  - build symbolic DFAs per color and assemble a product arena according
-     *    to the boolean color formula (via build_arena_from_color_formula)
-     *  - run a Büchi game solver on the arena (the arena's final_states() encodes
-     *    the boolean combination of color finals)
      */
     class ObligationLTLfPlusSynthesizer {
     public:

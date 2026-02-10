@@ -42,7 +42,8 @@ int main(int argc, char** argv) {
     bool obligation_simplification = false;
     bool disable_minimisation = false;
     bool legacy_boolean_product = false;
-    int minimisation_threshold = 12;
+    int minimisation_threshold = 128;
+    int symbolic_threshold = 128;
     std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
     auto console = spdlog::stdout_color_mt("console");
     spdlog::set_default_logger(console);
@@ -71,7 +72,10 @@ int main(int argc, char** argv) {
                  "Disable DFA minimisation in obligation mode (default: enabled)");
     app.add_option("--minimisation-threshold", minimisation_threshold,
                    "State-count threshold below which DFA minimisation is attempted in obligation mode")
-        ->default_val(12);
+        ->default_val(128);
+    app.add_option("--symbolic-threshold", symbolic_threshold,
+                   "State-count threshold at which to switch to symbolic representation in obligation mode")
+        ->default_val(128);
 
     app.add_flag("--legacy-boolean-product", legacy_boolean_product,
                  "Use the legacy left-associative boolean product when combining DFAs");
@@ -186,7 +190,7 @@ int main(int argc, char** argv) {
                 Syft::Player::Agent,
                 use_buchi_flag,
                 mode,
-                MinimisationOptions{!disable_minimisation, minimisation_threshold},
+                MinimisationOptions{!disable_minimisation, minimisation_threshold, symbolic_threshold},
                 /*use_balanced_boolean_product=*/!legacy_boolean_product
             );
             auto synthesis_result = obligation_synthesizer.run();
