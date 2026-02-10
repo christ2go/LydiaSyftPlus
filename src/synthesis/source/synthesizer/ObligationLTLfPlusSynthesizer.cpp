@@ -20,6 +20,7 @@
 #include <optional>
 #include <utility>
 #include <functional>
+#include <cmath>
 #include <boost/multiprecision/cpp_int.hpp>
 
 namespace {
@@ -33,9 +34,39 @@ namespace {
         oss << value.value();
         return oss.str();
     }
+
+    /// Number of BDD bits needed to encode n states: ceil(log2(n)), minimum 1.
+    int bits_needed(int n) {
+        if (n <= 1) return 1;
+        // ceil(log2(n)) = floor(log2(n-1)) + 1
+        int bits = 0;
+        int v = n - 1;
+        while (v > 0) { v >>= 1; ++bits; }
+        return bits;
+    }
 }
 
 namespace Syft {
+
+    /// Minimise an explicit DFA, but only keep the result if it actually
+    /// reduces the number of bits (ceil(log2(states))).  Otherwise the
+    /// minimisation cost is wasted — the symbolic representation would use
+    /// the same number of BDD state variables either way.
+    static ExplicitStateDfa minimize_if_fewer_bits(ExplicitStateDfa dfa) {
+        int old_states = dfa.dfa_->ns;
+        int old_bits = bits_needed(old_states);
+        ExplicitStateDfa minimised = ExplicitStateDfa::dfa_minimize_weak(dfa);
+        int new_states = minimised.dfa_->ns;
+        int new_bits = bits_needed(new_states);
+        if (new_bits < old_bits) {
+            spdlog::debug("[ObligationFragment] Minimisation useful: {} states ({} bits) -> {} states ({} bits)",
+                          old_states, old_bits, new_states, new_bits);
+            return minimised;
+        }
+        spdlog::debug("[ObligationFragment] Minimisation skipped: {} states ({} bits) -> {} states ({} bits), keeping original",
+                      old_states, old_bits, new_states, new_bits);
+        return dfa;
+    }
 
     ObligationLTLfPlusSynthesizer::ObligationLTLfPlusSynthesizer(
         LTLfPlus ltlf_plus_formula,
@@ -234,15 +265,15 @@ namespace Syft {
                          product.dfa_->ns);
 
             if (product.dfa_->ns < minimisation_options_.threshold && minimisation_options_.allow_minimisation) {
-                spdlog::debug("[ObligationFragment] Minimizing {} product (states: {} < {})",
+                spdlog::debug("[ObligationFragment] Attempting minimisation of {} product ({} states, threshold {})",
                              is_or ? "OR" : "AND",
                              product.dfa_->ns,
                              minimisation_options_.threshold);
-                product = ExplicitStateDfa::dfa_minimize_weak(product);
+                product = minimize_if_fewer_bits(std::move(product));
             }
 
             HybridDfa combined(std::move(product), var_mgr_);
-            combined.convert_to_symbolic_if_needed(minimisation_options_.threshold);
+            combined.convert_to_symbolic_if_needed(minimisation_options_.symbolic_threshold);
 
             spdlog::debug(
                 "[ObligationFragment] {} product combined ~{} with ~{} -> ~{}",
@@ -363,6 +394,13 @@ namespace Syft {
         if (pos != formula.size()) {
             throw std::runtime_error("Trailing characters in color formula after parsing");
         }
+                spdlog::info("[ObligationFragment] Running CUDD variable reordering (sifting)...");
+        auto n_nodes_before = var_mgr_->cudd_mgr()->ReadNodeCount();
+        var_mgr_->cudd_mgr()->ReduceHeap(CUDD_REORDER_RANDOM_PIVOT, 0);
+        auto n_nodes_after = var_mgr_->cudd_mgr()->ReadNodeCount();
+        spdlog::info("[ObligationFragment] Reorder complete: {} -> {} BDD nodes",
+                     n_nodes_before, n_nodes_after);
+
         auto symbolic_arena = res.to_symbolic();
         // info_log the number of states we approximated using spdlog
         spdlog::info("[ObligationFragment] Final arena has approximately {} states, {} bits ",
@@ -370,6 +408,8 @@ namespace Syft {
                      symbolic_arena.transition_function().size());
 
         // Always return symbolic representation
+                // Trigger CUDD variable reordering to compact BDDs after product construction
+
         return symbolic_arena;
     }
 
@@ -395,7 +435,7 @@ namespace Syft {
                     // Safety property: convert to G(phi) form
                     spdlog::debug("[ObligationFragment] Applying Forall transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Gdfa_obligation(explicit_dfa);
-                    ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
+                    ExplicitStateDfa minised = minimize_if_fewer_bits(std::move(trimmed_explicit_dfa));
                     color_to_explicit_dfa.insert({color, std::move(minised)});
                     break;
                 }
@@ -403,7 +443,7 @@ namespace Syft {
                     // Guarantee property: convert to F(phi) form
                     spdlog::debug("[ObligationFragment] Applying Exists transformation for color {}", color);
                     ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
-                    ExplicitStateDfa minised = ExplicitStateDfa::dfa_minimize_weak(trimmed_explicit_dfa);   
+                    ExplicitStateDfa minised = minimize_if_fewer_bits(std::move(trimmed_explicit_dfa));
                     color_to_explicit_dfa.insert({color, std::move(minised)});
                     break;
                 }

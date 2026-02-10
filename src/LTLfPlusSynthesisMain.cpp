@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
     std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
     auto console = spdlog::stdout_color_mt("console");
     spdlog::set_default_logger(console);
-    spdlog::set_level(spdlog::level::info); // or debug, trace, etc.
+    spdlog::set_level(spdlog::level::debug); // or debug, trace, etc.
     spdlog::set_pattern("[%H:%M:%S.%e] [%^%l%$] %v");
 
     // CLI::Option* ltlf_plus_file_opt;
