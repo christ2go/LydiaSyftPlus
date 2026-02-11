@@ -394,12 +394,6 @@ namespace Syft {
         if (pos != formula.size()) {
             throw std::runtime_error("Trailing characters in color formula after parsing");
         }
-                spdlog::info("[ObligationFragment] Running CUDD variable reordering (sifting)...");
-        auto n_nodes_before = var_mgr_->cudd_mgr()->ReadNodeCount();
-        var_mgr_->cudd_mgr()->ReduceHeap(CUDD_REORDER_RANDOM_PIVOT, 0);
-        auto n_nodes_after = var_mgr_->cudd_mgr()->ReadNodeCount();
-        spdlog::info("[ObligationFragment] Reorder complete: {} -> {} BDD nodes",
-                     n_nodes_before, n_nodes_after);
 
         auto symbolic_arena = res.to_symbolic();
         // info_log the number of states we approximated using spdlog
