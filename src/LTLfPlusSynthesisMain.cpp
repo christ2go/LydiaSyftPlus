@@ -10,6 +10,13 @@
 #include "synthesizer/LTLfPlusSynthesizerMP.h"
 #include "synthesizer/ObligationLTLfPlusSynthesizer.h"
 #include "ObligationFragmentDetector.h"
+// for mini LTLf mode
+#include "synthesizer/LTLfSynthesizer.h"
+#include "automata/ExplicitStateDfa.h"
+#include "automata/ExplicitStateDfaAdd.h"
+#include "automata/SymbolicStateDfa.h"
+#include "VarMgr.h"
+#include <lydia/parser/ltlf/driver.hpp>
 
 
 #include <CLI/CLI.hpp>
@@ -42,6 +49,7 @@ int main(int argc, char** argv) {
     bool obligation_simplification = false;
     bool disable_minimisation = false;
     bool legacy_boolean_product = false;
+    bool ltlf_mode = false;
     int minimisation_threshold = 128;
     int symbolic_threshold = 128;
     std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
@@ -80,6 +88,8 @@ int main(int argc, char** argv) {
     app.add_flag("--legacy-boolean-product", legacy_boolean_product,
                  "Use the legacy left-associative boolean product when combining DFAs");
 
+    app.add_flag("--ltlf", ltlf_mode, "Run mini LTLf-only synthesis mode (combines all Exists subformulae into a single LTLf and runs reachability LTLf synthesis)");
+
     app.add_option("-b,--buechi-mode", buechi_mode_str, "Solver mode: wg (weak-game / SCC), cl (Büchi classic), pm (Büchi Piterman), cb (CoBuchi)")
     ->default_val("wg");
 
@@ -100,27 +110,74 @@ int main(int argc, char** argv) {
         if (!label.empty()) std::cout << label << ": ";
         std::cout << "Wall time: " << wall_elapsed.count() << " seconds; CPU time: " << cpu_elapsed << " seconds" << std::endl;
     };
-    // parse and process input LTLf+ formula
-    // read formula
+    // read formula (file contains either an LTLf+ formula or, when --ltlf is used, a plain LTLf formula)
     std::string ltlf_plus_formula_str;
     std::ifstream ltlf_plus_formula_stream(ltlf_plus_file);
     getline(ltlf_plus_formula_stream, ltlf_plus_formula_str);
     if (verbose) {
-        std::cout << "LTLf+ formula: " << ltlf_plus_formula_str << std::endl;
+        std::cout << "Formula: " << ltlf_plus_formula_str << std::endl;
     }
 
-    // LTLf+ driver
+    // read partition early since both modes need it
+    Syft::InputOutputPartition partition =
+        Syft::InputOutputPartition::read_from_file(partition_file);
+
+    // determine starting player
+    Syft::Player starting_player;
+    if (starting_player_id) {
+        starting_player = Syft::Player::Agent;
+    } else {
+        starting_player = Syft::Player::Environment;
+    }
+
+    // If requested, run mini LTLf-only synthesis: parse the file as plain LTLf,
+    // build its symbolic DFA and run the reachability-based LTLfSynthesizer.
+    if (ltlf_mode) {
+        if (verbose) std::cout << "Running in --ltlf (mini LTLf) mode" << std::endl;
+
+        // parse LTLf formula
+        auto ltlf_driver = std::make_shared<whitemech::lydia::parsers::ltlf::LTLfDriver>();
+        std::stringstream formula_stream(ltlf_plus_formula_str);
+        ltlf_driver->parse(formula_stream);
+        auto ltlf_result = ltlf_driver->get_result();
+        auto ptr_ltlf_formula = std::static_pointer_cast<const whitemech::lydia::LTLfFormula>(ltlf_result);
+
+    // build VarMgr and named variables from partition
+    std::shared_ptr<Syft::VarMgr> var_mgr = std::make_shared<Syft::VarMgr>();
+    var_mgr->create_named_variables(partition.input_variables);
+    var_mgr->create_named_variables(partition.output_variables);
+    var_mgr->partition_variables(partition.input_variables, partition.output_variables);
+
+    // build explicit DFA from the parsed LTLf formula
+    Syft::ExplicitStateDfa explicit_dfa = Syft::ExplicitStateDfa::dfa_of_formula(*ptr_ltlf_formula);
+    Syft::ExplicitStateDfaAdd explicit_add = Syft::ExplicitStateDfaAdd::from_dfa_mona(var_mgr, explicit_dfa);
+    Syft::SymbolicStateDfa symbolic_dfa = Syft::SymbolicStateDfa::from_explicit(std::move(explicit_add));
+
+    // goal states and state space
+    CUDD::BDD goal_states = symbolic_dfa.final_states();
+    CUDD::BDD state_space = var_mgr->cudd_mgr()->bddOne();
+
+    // run reachability-based LTLf synthesizer
+    Syft::LTLfSynthesizer ltlf_synth(symbolic_dfa, starting_player, Syft::Player::Agent, goal_states, state_space);
+        auto synth_result = ltlf_synth.run();
+
+        if (synth_result.realizability) {
+            std::cout << "LTLf synthesis is REALIZABLE" << std::endl;
+        } else {
+            std::cout << "LTLf synthesis is UNREALIZABLE" << std::endl;
+        }
+        print_times();
+        return 0;
+    }
+
+    // Use obligation synthesizer if enabled
+    // parse as LTLf+ (only reached when not in --ltlf mode)
     std::shared_ptr<whitemech::lydia::parsers::ltlfplus::LTLfPlusDriver> driver = 
         std::make_shared<whitemech::lydia::parsers::ltlfplus::LTLfPlusDriver>();
-
-    // parse formula
-    std::stringstream formula_stream(ltlf_plus_formula_str);
-    driver->parse(formula_stream);
+    std::stringstream formula_stream_ltlfplus(ltlf_plus_formula_str);
+    driver->parse(formula_stream_ltlfplus);
     auto result = driver->get_result();
-
-    // cast ast_ptr into ltlf_plus_ptr. Necessary since AbstractDriver is not template anymore
-    auto ptr_ltlf_plus_formula =
-        std::static_pointer_cast<const whitemech::lydia::LTLfPlusFormula>(result);
+    auto ptr_ltlf_plus_formula = std::static_pointer_cast<const whitemech::lydia::LTLfPlusFormula>(result);
 
     // transform formula in PNF
     auto pnf = whitemech::lydia::get_pnf_result(*ptr_ltlf_plus_formula);
@@ -148,20 +205,6 @@ int main(int argc, char** argv) {
          }
     }
 
-    // std::cout << "Color formula: " << pnf.color_formula_ << std::endl;
-
-    // construct LTLfPlusSynthesizer obj
-    Syft::Player starting_player;
-    if (starting_player_id) {
-        starting_player = Syft::Player::Agent;
-    } else {
-        starting_player = Syft::Player::Environment;
-    }
-
-    Syft::InputOutputPartition partition =
-        Syft::InputOutputPartition::read_from_file(partition_file);
-
-    // Use obligation synthesizer if enabled
     if (obligation_simplification) {
         std::cout << "Using obligation fragment synthesizer" << std::endl;
         try {

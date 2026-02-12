@@ -1,1 +1,1 @@
-A(F((a1 | e1) & X(true))) | A(F((a2 | e2) & X(true))) | A(F((a3 | e3) & X(true))) | A(F((a4 | e4) & X(true))) | A(F((a5 | e5) & X(true)))
+A(F((a1 | e1) & X(false))) | A(F((a2 | e2) & X(false))) | A(F((a3 | e3) & X(false))) | A(F((a4 | e4) & X(false))) | A(F((a5 | e5) & X(false)))

@@ -1,1 +1,1 @@
-A(F((a1 | e1) & X(true)))
+A(F((a1 | e1) & X(false)))

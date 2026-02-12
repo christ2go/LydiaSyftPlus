@@ -21,6 +21,7 @@ import argparse
 import json
 import math
 from pathlib import Path
+import shlex
 
 try:
     import matplotlib.pyplot as plt
@@ -49,7 +50,7 @@ def find_binary():
     
     raise FileNotFoundError("Could not find LydiaSyftEL binary. Please build the project first.")
 
-def run_solver(binary, formula_file, partition_file, solver_id, obligation_simplification, buechi_mode, timeout_sec, num_runs=1):
+def run_solver(binary, formula_file, partition_file, solver_id, obligation_simplification, buechi_mode, timeout_sec, num_runs=1, additional_args=None):
     """
     Run a solver on a formula multiple times and return statistics.
     
@@ -70,12 +71,29 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
         "-p", partition_file,
         "-s", "0",
         "-g", str(solver_id),
-        "--obligation-simplification", str(obligation_simplification)
+        "--obligation-simplification", str(obligation_simplification),
     ]
-    
+
     # Add buechi-mode flag if specified (only for optimised solvers)
     if buechi_mode is not None:
         cmd.extend(["-b", buechi_mode])
+
+    # Append any additional binary args. Accept either a string (which will be split
+    # like a shell command) or a list/tuple of tokens. Ignore empty/whitespace-only strings.
+    if additional_args:
+        if isinstance(additional_args, str):
+            extra_tokens = shlex.split(additional_args)
+            if extra_tokens:
+                cmd.extend(extra_tokens)
+        elif isinstance(additional_args, (list, tuple)):
+            cmd.extend(map(str, additional_args))
+        else:
+            # Unknown type: convert to string and split
+            extra_tokens = shlex.split(str(additional_args))
+            if extra_tokens:
+                cmd.extend(extra_tokens)
+
+    # Print the command for debugging (joined for readability)
     
     runtimes = []
     error_count = 0
@@ -100,6 +118,8 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
         except subprocess.TimeoutExpired:
             timeout_count += 1
             # Don't include timeout runs in statistics
+        except Exception as e:
+            print(e)
     
     # Determine overall status
     if timeout_count > 0:
@@ -142,7 +162,7 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
         'runs': runtimes
     }
 
-def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=None, num_runs=1, pattern_prefix="pattern"):
+def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=None, num_runs=1, pattern_prefix="pattern", additional_args=""):
     """Run benchmarks on all pattern examples.
     
     Args:
@@ -174,6 +194,15 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
         'opt_cobuchi': []   # Optimised Cobuchi (-g 1 --obligation-simplification 1 -b cb)
     }
 
+    # Track if a solver has timed out previously; if so, skip it for remaining examples
+    timeout_flags = {
+        'el': False,
+        'opt_classic': False,
+        'opt_piterman': False,
+        'opt_weak': False,
+        'opt_cobuchi': False,
+    }
+
     print(f"Found {len(pattern_files)} pattern files")
     if max_example is not None:
         print(f"Limiting to patterns up to n={max_example}")
@@ -183,6 +212,16 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
 
     if skip_set is None:
         skip_set = set()
+
+    # Track solvers that should be skipped for the remaining examples once they
+    # produce a timeout or an error. Keys match the `results` dict keys.
+    skip_flags = {
+        'el': False,
+        'opt_classic': False,
+        'opt_piterman': False,
+        'opt_weak': False,
+        'opt_cobuchi': False
+    }
 
     for pattern_file in pattern_files:
         n = int(pattern_file.replace(f"{pattern_prefix}_", "").replace(".ltlfplus", ""))
@@ -194,66 +233,81 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
             continue
         
         print(f"Testing {pattern_prefix}_{n}...", end=" ", flush=True)
-        
+
         # Run EL solver (may be skipped)
-        if 'el' in skip_set:
+        if 'el' in skip_set or skip_flags['el']:
             results['el'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
             print(f"EL: skipped", end=" ", flush=True)
         else:
-            stats = run_solver(binary, formula_file, partition_file, 0, 0, None, timeout_sec, num_runs)
+            stats = run_solver(binary, formula_file, partition_file, 0, 0, None, timeout_sec, num_runs, additional_args)
             results['el'].append((n, stats))
             if stats['status'] == 'ok':
                 print(f"EL: {stats['mean']:.3f}±{stats['conf_interval']:.3f}s", end=" ", flush=True)
             else:
                 print(f"EL: {stats['status']}", end=" ", flush=True)
-        
+                if stats['status'] in ('timeout', 'error'):
+                    skip_flags['el'] = True
+                    print(f"(will skip EL for remaining examples)", end=" ", flush=True)
+
         # Run Optimised Classic (may be skipped)
-        if 'classic' in skip_set or 'opt_classic' in skip_set:
+        if 'classic' in skip_set or 'opt_classic' in skip_set or skip_flags['opt_classic']:
             results['opt_classic'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
             print(f"Opt-CL: skipped", end=" ", flush=True)
         else:
-            stats = run_solver(binary, formula_file, partition_file, 1, 1, "cl", timeout_sec, num_runs)
+            stats = run_solver(binary, formula_file, partition_file, 1, 1, "cl", timeout_sec, num_runs, additional_args)
             results['opt_classic'].append((n, stats))
             if stats['status'] == 'ok':
                 print(f"Opt-CL: {stats['mean']:.3f}±{stats['conf_interval']:.3f}s", end=" ", flush=True)
             else:
                 print(f"Opt-CL: {stats['status']}", end=" ", flush=True)
-        
+                if stats['status'] in ('timeout', 'error'):
+                    skip_flags['opt_classic'] = True
+                    print(f"(will skip Opt-CL for remaining examples)", end=" ", flush=True)
+
         # Run Optimised Piterman (may be skipped)
-        if 'piterman' in skip_set or 'opt_piterman' in skip_set or 'pm' in skip_set:
+        if 'piterman' in skip_set or 'opt_piterman' in skip_set or 'pm' in skip_set or skip_flags['opt_piterman']:
             results['opt_piterman'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
             print(f"Opt-PM: skipped", end=" ", flush=True)
         else:
-            stats = run_solver(binary, formula_file, partition_file, 1, 1, "pm", timeout_sec, num_runs)
+            stats = run_solver(binary, formula_file, partition_file, 1, 1, "pm", timeout_sec, num_runs, additional_args)
             results['opt_piterman'].append((n, stats))
             if stats['status'] == 'ok':
                 print(f"Opt-PM: {stats['mean']:.3f}±{stats['conf_interval']:.3f}s", end=" ", flush=True)
             else:
                 print(f"Opt-PM: {stats['status']}", end=" ", flush=True)
-        
+                if stats['status'] in ('timeout', 'error'):
+                    skip_flags['opt_piterman'] = True
+                    print(f"(will skip Opt-PM for remaining examples)", end=" ", flush=True)
+
         # Run Optimised Weak-game (SCC) solver
-        if 'weak' in skip_set or 'opt_weak' in skip_set or 'wg' in skip_set:
+        if 'weak' in skip_set or 'opt_weak' in skip_set or 'wg' in skip_set or skip_flags['opt_weak']:
             results['opt_weak'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
             print(f"Opt-WG: skipped", end=" ", flush=True)
         else:
-            stats = run_solver(binary, formula_file, partition_file, 1, 1, "wg", timeout_sec, num_runs)
+            stats = run_solver(binary, formula_file, partition_file, 1, 1, "wg", timeout_sec, num_runs, additional_args)
             results['opt_weak'].append((n, stats))
             if stats['status'] == 'ok':
                 print(f"Opt-WG: {stats['mean']:.3f}±{stats['conf_interval']:.3f}s", end=" ", flush=True)
             else:
                 print(f"Opt-WG: {stats['status']}", end=" ", flush=True)
+                if stats['status'] in ('timeout', 'error'):
+                    skip_flags['opt_weak'] = True
+                    print(f"(will skip Opt-WG for remaining examples)", end=" ", flush=True)
 
         # Run Optimised CoBuchi (may be skipped)
-        if 'cobuchi' in skip_set or 'opt_cobuchi' in skip_set or 'cb' in skip_set:
+        if 'cobuchi' in skip_set or 'opt_cobuchi' in skip_set or 'cb' in skip_set or skip_flags['opt_cobuchi']:
             results['opt_cobuchi'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
             print(f"Opt-CB: skipped")
         else:
-            stats = run_solver(binary, formula_file, partition_file, 1, 1, "cb", timeout_sec, num_runs)
+            stats = run_solver(binary, formula_file, partition_file, 1, 1, "cb", timeout_sec, num_runs, additional_args)
             results['opt_cobuchi'].append((n, stats))
             if stats['status'] == 'ok':
                 print(f"Opt-CB: {stats['mean']:.3f}±{stats['conf_interval']:.3f}s")
             else:
                 print(f"Opt-CB: {stats['status']}")
+                if stats['status'] in ('timeout', 'error'):
+                    skip_flags['opt_cobuchi'] = True
+                    print(f"(will skip Opt-CB for remaining examples)")
     
     return results
 
@@ -471,7 +525,9 @@ def main():
                        help='Number of runs to average for each example (default: 1)')
     parser.add_argument('--pattern', type=str, default='pattern',
                        help='Pattern prefix for files (default: pattern; use chained, dual, nested, etc.)')
-    
+    parser.add_argument('--binary-args', type=str,
+                       help='Additional arguments to pass to the solver binary (e.g. --binary-args="--some-flag 1")')
+
     args = parser.parse_args()
     
     # Determine examples directory
@@ -500,7 +556,7 @@ def main():
             if tok:
                 skip_set.add(tok)
 
-    results = benchmark_examples(examples_dir, args.timeout, skip_set=skip_set, max_example=args.max_example, num_runs=args.runs, pattern_prefix=args.pattern)
+    results = benchmark_examples(examples_dir, args.timeout, skip_set=skip_set, max_example=args.max_example, num_runs=args.runs, pattern_prefix=args.pattern, additional_args=args.binary_args)
     
     # Export JSON
     print("\n" + "=" * 60)

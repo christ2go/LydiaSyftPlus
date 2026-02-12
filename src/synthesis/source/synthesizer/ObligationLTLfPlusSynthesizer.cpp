@@ -436,8 +436,9 @@ namespace Syft {
                 case whitemech::lydia::PrefixQuantifier::Exists: {
                     // Guarantee property: convert to F(phi) form
                     spdlog::debug("[ObligationFragment] Applying Exists transformation for color {}", color);
-                    ExplicitStateDfa trimmed_explicit_dfa = ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
-                    ExplicitStateDfa minised = minimize_if_fewer_bits(std::move(trimmed_explicit_dfa));
+                    Syft::ExplicitStateDfa trimmed_explicit_dfa = Syft::ExplicitStateDfa::dfa_to_Fdfa_obligation(explicit_dfa);
+                                        spdlog::debug("[ObligationFragment] Appplied Exists transformation for color {}", color);
+                    Syft::ExplicitStateDfa minised = minimize_if_fewer_bits(std::move(trimmed_explicit_dfa));
                     color_to_explicit_dfa.insert({color, std::move(minised)});
                     break;
                 }

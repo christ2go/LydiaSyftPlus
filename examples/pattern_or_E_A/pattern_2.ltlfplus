@@ -1,1 +1,1 @@
-A(F((a1 | e1) & X(true))) | E(F((a2 | e2) & X(true)))
+A(F((a1 | e1) & X(false))) | E(F((a2 | e2) & X(false)))

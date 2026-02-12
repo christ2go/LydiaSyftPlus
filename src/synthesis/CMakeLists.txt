@@ -16,7 +16,6 @@ list(REMOVE_ITEM HEADER_FILES
         "${SYNTHESIS_MODULE_PATH}/header/synthesizer/FairnessLtlfSynthesizer.h"
         "${SYNTHESIS_MODULE_PATH}/header/synthesizer/GR1LTLfSynthesizer.h"
         "${SYNTHESIS_MODULE_PATH}/header/synthesizer/LTLfMaxSetSynthesizer.h"
-        "${SYNTHESIS_MODULE_PATH}/header/synthesizer/LTLfSynthesizer.h"
         "${SYNTHESIS_MODULE_PATH}/header/synthesizer/StabilityLtlfSynthesizer.h"
 )
 message(STATUS "Value of HEADER_FILES: ${HEADER_FILES}")
@@ -31,7 +30,6 @@ list(REMOVE_ITEM SOURCE_FILES
         "${SYNTHESIS_MODULE_PATH}/source/synthesizer/FairnessLtlfSynthesizer.cpp"
         "${SYNTHESIS_MODULE_PATH}/source/synthesizer/GR1LTLfSynthesizer.cpp"
         "${SYNTHESIS_MODULE_PATH}/source/synthesizer/LTLfMaxSetSynthesizer.cpp"
-        "${SYNTHESIS_MODULE_PATH}/source/synthesizer/LTLfSynthesizer.cpp"
         "${SYNTHESIS_MODULE_PATH}/source/synthesizer/StabilityLtlfSynthesizer.cpp"
 )
 
