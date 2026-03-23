@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <iostream>
 #include <chrono>
+#include <fstream>
 #include <optional>
 #include <utility>
 #include <functional>
@@ -480,7 +481,19 @@ namespace Syft {
         CUDD::BDD accepting_states = arena.final_states();
                 
         // Create and run the weak game solver (debug=true for detailed output)
-        WeakGameSolver solver(arena, accepting_states, true);
+        WeakGameSolver solver(arena, accepting_states, true, starting_player_);
+
+        // If a DFA dump path is set, dump the arena DFA to the file
+        if (!dfa_dump_path_.empty()) {
+            std::ofstream ofs(dfa_dump_path_);
+            if (ofs.is_open()) {
+                solver.DumpDFAForPython(ofs);
+                spdlog::info("[ObligationFragment] DFA dumped to {}", dfa_dump_path_);
+            } else {
+                spdlog::error("[ObligationFragment] Could not open {} for writing", dfa_dump_path_);
+            }
+        }
+
         WeakGameResult game_result = solver.Solve();
                 
         // Check if initial state is winning
@@ -510,6 +523,18 @@ namespace Syft {
         
         // Use the arena's final states which already encode the correct AND/OR structure
         CUDD::BDD accepting_states = arena.final_states();
+
+        // If a DFA dump path is set, dump the arena DFA to the file
+        if (!dfa_dump_path_.empty()) {
+            WeakGameSolver dump_solver(arena, accepting_states, false, starting_player_);
+            std::ofstream ofs(dfa_dump_path_);
+            if (ofs.is_open()) {
+                dump_solver.DumpDFAForPython(ofs);
+                spdlog::info("[ObligationFragment] DFA dumped to {}", dfa_dump_path_);
+            } else {
+                spdlog::error("[ObligationFragment] Could not open {} for writing", dfa_dump_path_);
+            }
+        }
         
         auto var_mgr = arena.var_mgr();
         auto mgr = var_mgr->cudd_mgr();
@@ -546,6 +571,29 @@ namespace Syft {
         
         // Step 2: Convert to symbolic state DFA
         auto [arena, color_to_final_states] = convert_to_symbolic_dfa();
+
+        // If skip_synthesis is set, return an empty result after automata construction
+        if (skip_synthesis_) {
+            spdlog::info("[ObligationLTLfPlusSynthesizer::run] --skip-synthesis: "
+                         "automata construction complete, skipping game solving.");
+
+            // If a DFA dump path is set, dump the arena DFA before returning
+            if (!dfa_dump_path_.empty()) {
+                CUDD::BDD accepting_states = arena.final_states();
+                WeakGameSolver solver(arena, accepting_states, false, starting_player_);
+                std::ofstream ofs(dfa_dump_path_);
+                if (ofs.is_open()) {
+                    solver.DumpDFAForPython(ofs);
+                    spdlog::info("[ObligationLTLfPlusSynthesizer::run] DFA dumped to {}", dfa_dump_path_);
+                } else {
+                    spdlog::error("[ObligationLTLfPlusSynthesizer::run] Could not open {} for writing", dfa_dump_path_);
+                }
+            }
+
+            ELSynthesisResult empty_result;
+            empty_result.realizability = false;
+            return empty_result;
+        }
         
         // Step 3: Solve using Büchi solver (replaces SCC/WeakGame path)
         if (use_buchi_) {

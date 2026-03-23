@@ -25,6 +25,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <ctime>
 #include <chrono>
+#include "memusage.h"
 
 int main(int argc, char** argv) {
 
@@ -50,6 +51,8 @@ int main(int argc, char** argv) {
     bool disable_minimisation = false;
     bool legacy_boolean_product = false;
     bool ltlf_mode = false;
+    bool skip_synthesis = false;
+    std::string dfa_dump_path;
     int minimisation_threshold = 128;
     int symbolic_threshold = 128;
     std::string buechi_mode_str = "wg"; // default to weak-game (SCC) solver
@@ -94,8 +97,18 @@ int main(int argc, char** argv) {
     ->default_val("wg");
 
     app.add_flag("-v,--verbose", verbose, "Enable verbose mode");      
+    app.add_flag("--skip-synthesis", skip_synthesis, "Skip synthesis step (to get automata construction times only)");      
+
+    app.add_option("--dfa-dump-path", dfa_dump_path,
+                   "Path to dump the arena DFA in PyDFA format (obligation mode only)");
 
     CLI11_PARSE(app, argc, argv);
+
+    // --skip-synthesis is only supported with --obligation-simplification 1
+    if (skip_synthesis && !obligation_simplification) {
+        std::cerr << "Error: --skip-synthesis is only supported when --obligation-simplification is enabled (1)." << std::endl;
+        return 1;
+    }
 
     // Start stopwatch to measure execution time (wall and CPU)
     auto start = std::chrono::high_resolution_clock::now();
@@ -107,8 +120,10 @@ int main(int argc, char** argv) {
         std::chrono::duration<double> wall_elapsed = end - start;
         const std::clock_t c_end = std::clock();
         double cpu_elapsed = double(c_end - c_start) / double(CLOCKS_PER_SEC);
+        size_t peak_rss = getPeakRSS();
         if (!label.empty()) std::cout << label << ": ";
-        std::cout << "Wall time: " << wall_elapsed.count() << " seconds; CPU time: " << cpu_elapsed << " seconds" << std::endl;
+        std::cout << "Wall time: " << wall_elapsed.count() << " seconds; CPU time: " << cpu_elapsed << " seconds"
+                  << "; Peak RSS: " << (peak_rss / (1024.0 * 1024.0)) << " MB" << std::endl;
     };
     // read formula (file contains either an LTLf+ formula or, when --ltlf is used, a plain LTLf formula)
     std::string ltlf_plus_formula_str;
@@ -236,9 +251,17 @@ int main(int argc, char** argv) {
                 MinimisationOptions{!disable_minimisation, minimisation_threshold, symbolic_threshold},
                 /*use_balanced_boolean_product=*/!legacy_boolean_product
             );
+            if (skip_synthesis) {
+                obligation_synthesizer.set_skip_synthesis(true);
+            }
+            if (!dfa_dump_path.empty()) {
+                obligation_synthesizer.set_dfa_dump_path(dfa_dump_path);
+            }
             auto synthesis_result = obligation_synthesizer.run();
 
-            if (synthesis_result.realizability) {
+            if (skip_synthesis) {
+                std::cout << "Automata construction complete (synthesis skipped)." << std::endl;
+            } else if (synthesis_result.realizability) {
                 std::cout << "LTLf+ synthesis is REALIZABLE" << std::endl;
             } else {
                 std::cout << "LTLf+ synthesis is UNREALIZABLE" << std::endl;

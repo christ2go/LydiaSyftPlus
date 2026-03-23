@@ -3,9 +3,11 @@
 
 #include "automata/SymbolicStateDfa.h"
 #include "game/SCCDecomposer.h"
+#include "Player.h"
 #include "VarMgr.h"
 #include "cuddObj.hh"
 #include <memory>
+#include <ostream>
 #include <vector>
 
 namespace Syft {
@@ -19,7 +21,7 @@ struct WeakGameResult {
 };
 
 /**
- * \brief Solver for weak parity games using SCC decomposition.
+ * \brief Solver for weak büchi games using SCC decomposition.
  * 
  * Implements the algorithm:
  * 1. Compute SCC decomposition, mark each SCC as accepting (⊆ F) or rejecting (⊆ V\F)
@@ -41,6 +43,7 @@ private:
     mutable bool initialized_ = false;
     
     bool debug_ = true;  ///< Enable debug printing of state sets
+    Player starting_player_ = Player::Environment;  ///< Who moves first each turn
     
     /**
      * \brief Print the actual states in a BDD for debugging.
@@ -82,20 +85,31 @@ private:
      * \brief Dump DFA transitions and accepting states for debugging.
      */
     void DumpDFA() const;
-    
+
+public:
     /**
      * \brief Dump DFA in machine-readable format for Python reconstruction.
+     * \param os Output stream to write to (defaults to std::cout).
+     */
+    void DumpDFAForPython(std::ostream& os) const;
+
+    /**
+     * \brief Dump DFA in machine-readable format to std::cout.
      */
     void DumpDFAForPython() const;
 
-public:
     /**
      * \brief Constructs a WeakGameSolver.
      * 
      * \param arena The symbolic state DFA representing the game arena.
      * \param accepting_states The set of accepting/final states (F).
+     * \param debug Enable verbose debug output.
+     * \param starting_player Who moves first (determines quantification order in CPre).
+     *        Agent  ⇒ system moves first  ⇒ ∃output.∀input
+     *        Environment ⇒ env moves first ⇒ ∀input.∃output
      */
-    WeakGameSolver(const SymbolicStateDfa& arena, const CUDD::BDD& accepting_states, bool debug = false);
+    WeakGameSolver(const SymbolicStateDfa& arena, const CUDD::BDD& accepting_states,
+                   bool debug = false, Player starting_player = Player::Environment);
     
     /**
      * \brief Solve the weak parity game.

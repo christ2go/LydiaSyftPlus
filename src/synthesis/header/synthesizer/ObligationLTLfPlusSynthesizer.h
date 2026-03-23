@@ -73,6 +73,19 @@ namespace Syft {
          */
         ELSynthesisResult run() const;
 
+        /**
+         * \brief If set to true, run() will build the automata arena but skip
+         * the game-solving step and return an empty result.
+         * Useful for benchmarking automata construction time only.
+         */
+        void set_skip_synthesis(bool skip) { skip_synthesis_ = skip; }
+
+        /**
+         * \brief Set a file path to dump the arena DFA in PyDFA format.
+         * Works with both normal synthesis and --skip-synthesis mode.
+         */
+        void set_dfa_dump_path(const std::string& path) { dfa_dump_path_ = path; }
+
     private:
         // --- state ---
         std::shared_ptr<VarMgr> var_mgr_;
@@ -83,6 +96,8 @@ namespace Syft {
         Syft::BuchiSolver::BuchiMode buechi_mode_ = Syft::BuchiSolver::BuchiMode::CLASSIC;
         MinimisationOptions minimisation_options_ = MinimisationOptions();
     bool use_balanced_boolean_product_ = true;
+    mutable bool skip_synthesis_ = false;
+    std::string dfa_dump_path_;  ///< If non-empty, dump arena DFA in PyDFA format to this file
 
         // --- core phases ---
         void validate_obligation_fragment() const;

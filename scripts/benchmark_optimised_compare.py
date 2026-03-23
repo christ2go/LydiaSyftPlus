@@ -20,6 +20,7 @@ import time
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 import shlex
 
@@ -96,8 +97,15 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
     # Print the command for debugging (joined for readability)
     
     runtimes = []
+    parsed_runs = []  # list of dicts with wall_time, cpu_time, peak_rss_mb parsed from stdout
     error_count = 0
     timeout_count = 0
+
+    # Regex to parse the timing/memory line printed by the binary:
+    #   Wall time: 41.0498 seconds; CPU time: 41.0458 seconds; Peak RSS: 2043.92 MB
+    _timing_re = re.compile(
+        r'Wall time:\s*([0-9.]+)\s*seconds;\s*CPU time:\s*([0-9.]+)\s*seconds(?:;\s*Peak RSS:\s*([0-9.]+)\s*MB)?'
+    )
     
     for run_idx in range(num_runs):
         start_time = time.time()
@@ -112,6 +120,15 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
             
             if result.returncode == 0:
                 runtimes.append(elapsed)
+                # Parse timing/memory from stdout
+                run_info = {'wall_time': None, 'cpu_time': None, 'peak_rss_mb': None}
+                m = _timing_re.search(result.stdout)
+                if m:
+                    run_info['wall_time'] = float(m.group(1))
+                    run_info['cpu_time'] = float(m.group(2))
+                    if m.group(3) is not None:
+                        run_info['peak_rss_mb'] = float(m.group(3))
+                parsed_runs.append(run_info)
             else:
                 error_count += 1
                 # Don't include error runs in statistics
@@ -138,7 +155,8 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
             'mean': 0.0,
             'stddev': 0.0,
             'conf_interval': 0.0,
-            'runs': []
+            'runs': [],
+            'parsed_runs': []
         }
     
     mean = sum(runtimes) / len(runtimes)
@@ -159,7 +177,8 @@ def run_solver(binary, formula_file, partition_file, solver_id, obligation_simpl
         'mean': mean,
         'stddev': stddev,
         'conf_interval': conf_interval,
-        'runs': runtimes
+        'runs': runtimes,
+        'parsed_runs': parsed_runs
     }
 
 def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=None, num_runs=1, pattern_prefix="pattern", additional_args=""):
@@ -236,7 +255,7 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
 
         # Run EL solver (may be skipped)
         if 'el' in skip_set or skip_flags['el']:
-            results['el'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
+            results['el'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': [], 'parsed_runs': []}))
             print(f"EL: skipped", end=" ", flush=True)
         else:
             stats = run_solver(binary, formula_file, partition_file, 0, 0, None, timeout_sec, num_runs, additional_args)
@@ -251,7 +270,7 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
 
         # Run Optimised Classic (may be skipped)
         if 'classic' in skip_set or 'opt_classic' in skip_set or skip_flags['opt_classic']:
-            results['opt_classic'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
+            results['opt_classic'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': [], 'parsed_runs': []}))
             print(f"Opt-CL: skipped", end=" ", flush=True)
         else:
             stats = run_solver(binary, formula_file, partition_file, 1, 1, "cl", timeout_sec, num_runs, additional_args)
@@ -266,7 +285,7 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
 
         # Run Optimised Piterman (may be skipped)
         if 'piterman' in skip_set or 'opt_piterman' in skip_set or 'pm' in skip_set or skip_flags['opt_piterman']:
-            results['opt_piterman'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
+            results['opt_piterman'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': [], 'parsed_runs': []}))
             print(f"Opt-PM: skipped", end=" ", flush=True)
         else:
             stats = run_solver(binary, formula_file, partition_file, 1, 1, "pm", timeout_sec, num_runs, additional_args)
@@ -281,7 +300,7 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
 
         # Run Optimised Weak-game (SCC) solver
         if 'weak' in skip_set or 'opt_weak' in skip_set or 'wg' in skip_set or skip_flags['opt_weak']:
-            results['opt_weak'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
+            results['opt_weak'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': [], 'parsed_runs': []}))
             print(f"Opt-WG: skipped", end=" ", flush=True)
         else:
             stats = run_solver(binary, formula_file, partition_file, 1, 1, "wg", timeout_sec, num_runs, additional_args)
@@ -296,7 +315,7 @@ def benchmark_examples(examples_dir, timeout_sec=60, skip_set=None, max_example=
 
         # Run Optimised CoBuchi (may be skipped)
         if 'cobuchi' in skip_set or 'opt_cobuchi' in skip_set or 'cb' in skip_set or skip_flags['opt_cobuchi']:
-            results['opt_cobuchi'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': []}))
+            results['opt_cobuchi'].append((n, {'status': 'skipped', 'mean': 0.0, 'stddev': 0.0, 'conf_interval': 0.0, 'runs': [], 'parsed_runs': []}))
             print(f"Opt-CB: skipped")
         else:
             stats = run_solver(binary, formula_file, partition_file, 1, 1, "cb", timeout_sec, num_runs, additional_args)
@@ -436,14 +455,16 @@ def export_json(results, output_file):
     for solver_name, solver_results in results.items():
         json_data['solvers'][solver_name] = []
         for n, stats in solver_results:
-            json_data['solvers'][solver_name].append({
+            entry = {
                 'pattern_n': n,
                 'status': stats['status'],
                 'mean_s': stats['mean'],
                 'stddev_s': stats['stddev'],
                 'conf_interval_95_s': stats['conf_interval'],
-                'individual_runs_s': stats['runs']
-            })
+                'individual_runs_s': stats['runs'],
+                'parsed_runs': stats.get('parsed_runs', [])
+            }
+            json_data['solvers'][solver_name].append(entry)
     
     with open(output_file, 'w') as f:
         json.dump(json_data, f, indent=2)

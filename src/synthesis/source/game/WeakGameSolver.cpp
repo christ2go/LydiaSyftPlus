@@ -1,5 +1,6 @@
 #include "game/WeakGameSolver.h"
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <set>
 #include <chrono>
@@ -7,12 +8,14 @@
 
 namespace Syft {
 
-WeakGameSolver::WeakGameSolver(const SymbolicStateDfa& arena, const CUDD::BDD& accepting_states, bool debug)
+WeakGameSolver::WeakGameSolver(const SymbolicStateDfa& arena, const CUDD::BDD& accepting_states,
+                               bool debug, Player starting_player)
     : arena_(arena)
     , var_mgr_(arena.var_mgr())
     , accepting_states_(accepting_states)
     , decomposer_(std::make_unique<NaiveSCCDecomposer>(arena))
-    , debug_(debug) {
+    , debug_(debug)
+    , starting_player_(starting_player) {
 
     // Log the number of bits used for automaton
     auto automaton_id = arena_.automaton_id();
@@ -81,14 +84,23 @@ CUDD::BDD WeakGameSolver::CPreSystem(const CUDD::BDD& target, const CUDD::BDD& s
     // T(s,i,o) is true when the next state is in W
     CUDD::BDD T = W.VectorCompose(transition_compose_vector);
 
-    CUDD::BDD exists_output = T.ExistAbstract(var_mgr_->output_cube());
-    CUDD::BDD forall_input = exists_output.UnivAbstract(var_mgr_->input_cube());
+    // Quantification order depends on who moves first:
+    //   Agent (system) first  ⇒ ∃output.∀input  (system picks output, then env picks input)
+    //   Environment first     ⇒ ∀input.∃output   (env picks input, then system picks output)
+    CUDD::BDD result;
+    if (starting_player_ == Player::Agent) {
+        CUDD::BDD exists_output = T.ExistAbstract(var_mgr_->output_cube());
+        result = exists_output.UnivAbstract(var_mgr_->input_cube());
+    } else {
+        CUDD::BDD forall_input = T.UnivAbstract(var_mgr_->input_cube());
+        result = forall_input.ExistAbstract(var_mgr_->output_cube());
+    }
 
     if (debug_ && kVerboseSolver) {
         spdlog::debug("[WeakGameSolver] CPreSystem target count: {}", target.CountMinterm(var_mgr_->state_variable_count(automaton_id)));
     }
 
-    return state_space & forall_input;
+    return state_space & result;
 }
 
 CUDD::BDD WeakGameSolver::CPreEnvironment(const CUDD::BDD& target, const CUDD::BDD& state_space) const {
@@ -247,6 +259,10 @@ void WeakGameSolver::DumpDFA() const {
 }
 
 void WeakGameSolver::DumpDFAForPython() const {
+    DumpDFAForPython(std::cout);
+}
+
+void WeakGameSolver::DumpDFAForPython(std::ostream& os) const {
     auto mgr = var_mgr_->cudd_mgr();
     auto automaton_id = arena_.automaton_id();
     size_t num_state_bits = var_mgr_->state_variable_count(automaton_id);
@@ -255,36 +271,36 @@ void WeakGameSolver::DumpDFAForPython() const {
     size_t num_inputs = var_mgr_->input_variable_count();
     size_t num_outputs = var_mgr_->output_variable_count();
     
-    std::cout << "===PYDFA_BEGIN===" << std::endl;
-    std::cout << "num_state_bits=" << num_state_bits << std::endl;
-    std::cout << "num_inputs=" << num_inputs << std::endl;
-    std::cout << "num_outputs=" << num_outputs << std::endl;
+    os << "===PYDFA_BEGIN===" << std::endl;
+    os << "num_state_bits=" << num_state_bits << std::endl;
+    os << "num_inputs=" << num_inputs << std::endl;
+    os << "num_outputs=" << num_outputs << std::endl;
     
     // State variable indices
-    std::cout << "state_var_indices=";
+    os << "state_var_indices=";
     for (size_t i = 0; i < state_vars.size(); ++i) {
-        if (i > 0) std::cout << ",";
-        std::cout << state_vars[i].NodeReadIndex();
+        if (i > 0) os << ",";
+        os << state_vars[i].NodeReadIndex();
     }
-    std::cout << std::endl;
+    os << std::endl;
     
     // Input variable labels and indices
     auto input_labels = var_mgr_->input_variable_labels();
-    std::cout << "input_labels=";
+    os << "input_labels=";
     for (size_t i = 0; i < input_labels.size(); ++i) {
-        if (i > 0) std::cout << ",";
-        std::cout << input_labels[i];
+        if (i > 0) os << ",";
+        os << input_labels[i];
     }
-    std::cout << std::endl;
+    os << std::endl;
     
     // Output variable labels and indices
     auto output_labels = var_mgr_->output_variable_labels();
-    std::cout << "output_labels=";
+    os << "output_labels=";
     for (size_t i = 0; i < output_labels.size(); ++i) {
-        if (i > 0) std::cout << ",";
-        std::cout << output_labels[i];
+        if (i > 0) os << ",";
+        os << output_labels[i];
     }
-    std::cout << std::endl;
+    os << std::endl;
     
     // Dump each transition function BDD as minterms
     // Format: for each (state, input, output) -> next_state_bit value
@@ -295,7 +311,7 @@ void WeakGameSolver::DumpDFAForPython() const {
     size_t num_assignments = 1ULL << total_vars;
     
     for (size_t bit = 0; bit < transition_func.size(); ++bit) {
-        std::cout << "trans_func_" << bit << "=";
+        os << "trans_func_" << bit << "=";
         
         bool first = true;
         for (size_t assign = 0; assign < num_assignments; ++assign) {
@@ -343,17 +359,17 @@ void WeakGameSolver::DumpDFAForPython() const {
             
             // Check if transition_func[bit] is true under this assignment
             if (!(transition_func[bit] & assignment).IsZero()) {
-                if (!first) std::cout << ";";
+                if (!first) os << ";";
                 // Output as: state_bits,input_bits,output_bits
-                std::cout << state_val << "," << input_val << "," << output_val;
+                os << state_val << "," << input_val << "," << output_val;
                 first = false;
             }
         }
-        std::cout << std::endl;
+        os << std::endl;
     }
     
     // Dump accepting states BDD as minterms
-    std::cout << "accepting_minterms=";
+    os << "accepting_minterms=";
     size_t num_states = 1ULL << state_vars.size();
     bool first = true;
     for (size_t s = 0; s < num_states; ++s) {
@@ -366,17 +382,17 @@ void WeakGameSolver::DumpDFAForPython() const {
             }
         }
         if (!(state_bdd & accepting_states_).IsZero()) {
-            if (!first) std::cout << ";";
+            if (!first) os << ";";
             for (size_t i = 0; i < state_vars.size(); ++i) {
-                std::cout << ((s >> i) & 1);
+                os << ((s >> i) & 1);
             }
             first = false;
         }
     }
-    std::cout << std::endl;
+    os << std::endl;
     
     // Dump initial state
-    std::cout << "initial_minterm=";
+    os << "initial_minterm=";
     CUDD::BDD initial_bdd = arena_.initial_state_bdd();
     for (size_t s = 0; s < num_states; ++s) {
         CUDD::BDD state_bdd = mgr->bddOne();
@@ -389,14 +405,14 @@ void WeakGameSolver::DumpDFAForPython() const {
         }
         if (!(state_bdd & initial_bdd).IsZero()) {
             for (size_t i = 0; i < state_vars.size(); ++i) {
-                std::cout << ((s >> i) & 1);
+                os << ((s >> i) & 1);
             }
             break;
         }
     }
-    std::cout << std::endl;
+    os << std::endl;
     
-    std::cout << "===PYDFA_END===" << std::endl;
+    os << "===PYDFA_END===" << std::endl;
 }
 
 WeakGameResult WeakGameSolver::Solve() const {
@@ -408,7 +424,7 @@ WeakGameResult WeakGameSolver::Solve() const {
     }
     
     // Dump DFA info
-    //DumpDFA();
+    DumpDFA();
     
     if (debug_ && kVerboseSolver) {
         spdlog::debug("[WeakGameSolver] Accepting states count: {}", accepting_states_.CountMinterm(var_mgr_->state_variable_count(automaton_id)));
