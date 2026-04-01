@@ -1,0 +1,24 @@
+INFO {
+  TITLE:       "pattern_A_02"
+  DESCRIPTION: "Generated pattern pattern (n=2)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+    e2;
+  }
+
+  OUTPUTS {
+    a1;
+    a2;
+  }
+
+  GUARANTEES {
+    ((F ((e1 || a1))  &&  (F ((e2 || a2)));
+  }
+
+}

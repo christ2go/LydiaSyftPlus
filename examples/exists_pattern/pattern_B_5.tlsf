@@ -1,0 +1,30 @@
+INFO {
+  TITLE:       "pattern_B_05"
+  DESCRIPTION: "Generated pattern pattern (n=5)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+    e2;
+    e3;
+    e4;
+    e5;
+  }
+
+  OUTPUTS {
+    a1;
+    a2;
+    a3;
+    a4;
+    a5;
+  }
+
+  GUARANTEES {
+    ((G (F ((e1 || a1) && X(true))))  &&  (G (F ((e2 || a2) && X(true))))  &&  (G (F ((e3 || a3) && X(true))))  &&  (G (F ((e4 || a4) && X(true))))  &&  (G (F ((e5 || a5) && X(true)))));
+  }
+
+}

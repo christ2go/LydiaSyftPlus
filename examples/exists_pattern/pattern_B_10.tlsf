@@ -1,0 +1,40 @@
+INFO {
+  TITLE:       "pattern_B_10"
+  DESCRIPTION: "Generated pattern pattern (n=10)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+    e2;
+    e3;
+    e4;
+    e5;
+    e6;
+    e7;
+    e8;
+    e9;
+    e10;
+  }
+
+  OUTPUTS {
+    a1;
+    a2;
+    a3;
+    a4;
+    a5;
+    a6;
+    a7;
+    a8;
+    a9;
+    a10;
+  }
+
+  GUARANTEES {
+    ((G (F ((e1 || a1) && X(true))))  &&  (G (F ((e2 || a2) && X(true))))  &&  (G (F ((e3 || a3) && X(true))))  &&  (G (F ((e4 || a4) && X(true))))  &&  (G (F ((e5 || a5) && X(true))))  &&  (G (F ((e6 || a6) && X(true))))  &&  (G (F ((e7 || a7) && X(true))))  &&  (G (F ((e8 || a8) && X(true))))  &&  (G (F ((e9 || a9) && X(true))))  &&  (G (F ((e10 || a10) && X(true)))));
+  }
+
+}

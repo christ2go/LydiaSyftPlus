@@ -1,0 +1,22 @@
+INFO {
+  TITLE:       "pattern_A_01"
+  DESCRIPTION: "Generated pattern pattern (n=1)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+  }
+
+  OUTPUTS {
+    a1;
+  }
+
+  GUARANTEES {
+    ((F ((e1 || a1)));
+  }
+
+}

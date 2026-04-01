@@ -1,0 +1,60 @@
+INFO {
+  TITLE:       "pattern_A_20"
+  DESCRIPTION: "Generated pattern pattern (n=20)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+    e2;
+    e3;
+    e4;
+    e5;
+    e6;
+    e7;
+    e8;
+    e9;
+    e10;
+    e11;
+    e12;
+    e13;
+    e14;
+    e15;
+    e16;
+    e17;
+    e18;
+    e19;
+    e20;
+  }
+
+  OUTPUTS {
+    a1;
+    a2;
+    a3;
+    a4;
+    a5;
+    a6;
+    a7;
+    a8;
+    a9;
+    a10;
+    a11;
+    a12;
+    a13;
+    a14;
+    a15;
+    a16;
+    a17;
+    a18;
+    a19;
+    a20;
+  }
+
+  GUARANTEES {
+    ((F ((e1 || a1))  &&  (F ((e2 || a2))  &&  (F ((e3 || a3))  &&  (F ((e4 || a4))  &&  (F ((e5 || a5))  &&  (F ((e6 || a6))  &&  (F ((e7 || a7))  &&  (F ((e8 || a8))  &&  (F ((e9 || a9))  &&  (F ((e10 || a10))  &&  (F ((e11 || a11))  &&  (F ((e12 || a12))  &&  (F ((e13 || a13))  &&  (F ((e14 || a14))  &&  (F ((e15 || a15))  &&  (F ((e16 || a16))  &&  (F ((e17 || a17))  &&  (F ((e18 || a18))  &&  (F ((e19 || a19))  &&  (F ((e20 || a20)));
+  }
+
+}

@@ -1,0 +1,1 @@
+A(G((f_0 -> ((pluck & !(m_0)) -> X(!f_0)) & (!(pluck & !(m_0)) -> X(f_0)))) & G(!(pluck & scare)) & G((scare & X(scare) & X(X(scare))) -> (X(!m_0) | X(X(!m_0)) | X(X(X(!m_0))))) & G(F(!(!f_0)))) -> (A(G(F(!f_0))))

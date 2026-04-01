@@ -1,0 +1,36 @@
+INFO {
+  TITLE:       "pattern_A_08"
+  DESCRIPTION: "Generated pattern pattern (n=8)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+    e2;
+    e3;
+    e4;
+    e5;
+    e6;
+    e7;
+    e8;
+  }
+
+  OUTPUTS {
+    a1;
+    a2;
+    a3;
+    a4;
+    a5;
+    a6;
+    a7;
+    a8;
+  }
+
+  GUARANTEES {
+    ((F ((e1 || a1))  &&  (F ((e2 || a2))  &&  (F ((e3 || a3))  &&  (F ((e4 || a4))  &&  (F ((e5 || a5))  &&  (F ((e6 || a6))  &&  (F ((e7 || a7))  &&  (F ((e8 || a8)));
+  }
+
+}

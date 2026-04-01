@@ -1,0 +1,26 @@
+INFO {
+  TITLE:       "pattern_A_03"
+  DESCRIPTION: "Generated pattern pattern (n=3)"
+  SEMANTICS:   Finite,Moore
+  TARGET:      Moore
+}
+
+MAIN {
+
+  INPUTS {
+    e1;
+    e2;
+    e3;
+  }
+
+  OUTPUTS {
+    a1;
+    a2;
+    a3;
+  }
+
+  GUARANTEES {
+    ((F ((e1 || a1))  &&  (F ((e2 || a2))  &&  (F ((e3 || a3)));
+  }
+
+}
